@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+@File    : preprocess.py
+@Time    : 2022/7/6 下午3:06
+@Author  : xingwg
+@Email   : xing.weiguo@intellif.com
+@Software: PyCharm
+"""
+import cv2
+import numpy as np
+from utils.enum_type import PaddingMode
+
+
+def calc_padding_size(im, target_size, padding_mode):
+    """
+    计算padding_size
+    :param im:
+    :param target_size:
+    :param padding_mode:  仅支持左上角(LEFT_TOP)和中心点(CENTER)
+    :return: 上(top)/下(bottom)/左(left)/右(right)向外偏移像素，如[0, 10, 10, 20]；留空表示自动计算offset size
+    """
+    top, bottom, left, right = 0, 0, 0, 0
+
+    th, tw = target_size
+    h, w, _ = im.shape
+    nh, nw = 0, 0
+    if h > w:
+        nh = th
+        s = float(h) / nh
+        nw = int(float(w) / s)
+        if padding_mode == PaddingMode.LEFT_TOP:
+            right = tw - nw
+        elif padding_mode == PaddingMode.CENTER:
+            left = int((tw - nw) * 0.5)
+            right = tw - nw - left
+        else:
+            raise "Not support padding mode -> {}".format(padding_mode)
+    else:
+        nw = tw
+        s = float(w) / nw
+        nh = int(float(h) / s)
+
+        if padding_mode == PaddingMode.LEFT_TOP:
+            bottom = th - nh
+        elif padding_mode == PaddingMode.CENTER:
+            top = int((th - nh) * 0.5)
+            bottom = th - nh - top
+        else:
+            raise "Not support padding mode -> {}".format(padding_mode)
+
+    padding_size = [top, bottom, left, right]
+    size =(nh, nw)
+    return padding_size, size
+
+
+def resize(im, size, resize_type=0, padding_value=114, padding_mode=PaddingMode.LEFT_TOP,
+           interpolation=cv2.INTER_LINEAR):
+    """opencv resize封装，目前仅支持双线性差值
+    :param im:
+    :param size:
+    :param resize_type:  0-长宽分别resize，1-长边等比例resize，2-短边等比例resize，默认为0
+    :param padding_value:
+    :param padding_mode:
+    :param interpolation:
+    :return:
+    """
+    assert resize_type in [0, 1, 2], "resize_type must be equal 0 or 1 or 2"
+    if resize_type == 0:
+        return cv2.resize(im, size, interpolation=interpolation)
+
+    if resize_type == 1:
+        padding_size, nsize = calc_padding_size(im, size, padding_mode=padding_mode)
+        h, w = nsize
+        im = cv2.resize(im, (w, h), interpolation=interpolation)
+        top, bottom, left, right = padding_size
+
+        return cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=padding_value)
+
+    if resize_type == 2:
+        raise "Not support yet"
+
+
+def default_preprocess(im, size, mean=None, std=None, use_norm=True, use_rgb=False, resize_type=0,
+                       interpolation=cv2.INTER_LINEAR, padding_value=114, padding_mode=PaddingMode.LEFT_TOP):
+    """默认预处理函数
+    :param im: BGR or GRAY图像
+    :param size:
+    :param mean:
+    :param std:
+    :param use_norm:
+    :param use_rgb:
+    :param interpolation:
+    :param resize_type:  0-长宽分别resize，1-长边等比例resize，2-短边等比例resize，默认为0
+    :param padding_value:
+    :param padding_mode:  目前仅支持左上角(LEFT_TOP)和中心点(CENTER)
+    :return:
+    """
+    assert im is not None, "Image is None, please check!"
+    im = resize(im, size, resize_type=resize_type,
+                padding_value=padding_value, padding_mode=padding_mode, interpolation=interpolation)
+
+    assert len(im.shape) in [2, 3], "Image must be 2d or 3d"
+
+    if use_rgb and len(im.shape) == 3:
+        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+
+    if use_norm:
+        im = im.astype(dtype=np.float32)
+        if mean:
+            im -= np.array(mean, dtype=np.float32)
+        if std:
+            im /= np.array(std, dtype=np.float32)
+
+    if len(im.shape) == 2:
+        im = np.expand_dims(im, (0, -1))
+    else:
+        im = np.expand_dims(im, 0)
+
+    return im.transpose((0, 3, 1, 2))
+
