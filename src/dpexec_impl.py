@@ -24,10 +24,10 @@ import tvm
 class DpExec(object):
     def __init__(self, cfg: dict):
         self._cfg = cfg
-        self._quant_cfg = cfg["quantization"]
-        self._target = cfg["quantization"]["target"]
-        self._enable_quant = cfg["quantization"]["enable_quant"]
-        self._enable_dump = cfg["quantization"]["enable_dump"]
+        self._quant_cfg = cfg["build"]["quant"]
+        self._target = cfg["build"]["target"]
+        self._enable_quant = cfg["build"]["enable_quant"]
+        self._enable_dump = cfg["build"]["enable_dump"]
         self._framework = cfg["model"]["framework"]
         self._model_name = cfg["model"]["name"]
         self._graph = cfg["model"]["graph"]
@@ -298,7 +298,7 @@ class DpExec(object):
             in_dtypes[_input["name"]] = "float32" if self.data_type(idx) == np.float32 else "uint8"
             norm[_input["name"]] = {"mean": self.mean(idx), "std": self.std(idx), "axis": 1}
 
-        quantize_config = get_quantize_config(self._quant_cfg["target"], in_dtypes)
+        quantize_config = get_quantize_config(self._target, in_dtypes)
         quantize_config["calib_method"] = self._quant_cfg["calib_method"]
 
         quantize_config["float_list"] = list()

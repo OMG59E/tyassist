@@ -44,7 +44,7 @@ def main(args):
     config_abspath = os.path.abspath(config_file)
     config_dir = os.path.dirname(config_abspath)
     config_name, _ = os.path.splitext(os.path.basename(config_abspath))
-    config["quantization"]["custom_preprocess_dir"] = config_dir
+    config["build"]["quant"]["custom_preprocess_dir"] = config_dir
 
     # 参数检查
     mode_name = config["model"]["name"]
@@ -74,7 +74,7 @@ def main(args):
             in_datas = dpexec.get_datas(use_norm=False)  # 仅需要自行resize和cvtColor
 
         host_iss_fixed_output = None
-        if config["quantization"]["enable_quant"]:
+        if config["build"]["enable_quant"]:
             # 量化模型
             dpexec.relay_quantization()
             # 编译生成芯片模型，
@@ -193,7 +193,6 @@ def main(args):
         )
 
         model.evaluate()
-
 
     if args.type == "demo":
         if dpexec.num_inputs > 1:

@@ -48,7 +48,7 @@ model: {
   cls_name: "SqueezeNet"
 }
 
-config: {
+build: {
   # 目标平台，必须设置
   target: "nnp300",
 

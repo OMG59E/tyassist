@@ -21,8 +21,8 @@ def check_config(cfg):
         logger.error("The key(model) must be in cfg")
         return False
 
-    if "quantization" not in cfg:
-        logger.error("The key(quantize) must be in cfg")
+    if "build" not in cfg:
+        logger.error("The key(build) must be in cfg")
         return False
 
     if "weight" not in cfg["model"]:
@@ -34,7 +34,7 @@ def check_config(cfg):
         return False
 
     # 多输入必须定义预处理
-    if len(cfg["model"]["inputs"]) > 1 and not cfg["quantization"]["custom_preprocess"]:
+    if len(cfg["model"]["inputs"]) > 1 and not cfg["build"]["quant"]["custom_preprocess"]:
         logger.error("Multi-input must be setting custom_preprocess")
         return False
 
