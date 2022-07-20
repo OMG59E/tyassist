@@ -54,7 +54,7 @@ def calc_padding_size(im, target_size, padding_mode):
     return padding_size, size
 
 
-def resize(im, size, resize_type=0, padding_value=114, padding_mode=PaddingMode.LEFT_TOP,
+def resize(im, size, resize_type=0, padding_value=128, padding_mode=PaddingMode.LEFT_TOP,
            interpolation=cv2.INTER_LINEAR):
     """opencv resize封装，目前仅支持双线性差值
     :param im:
@@ -82,7 +82,7 @@ def resize(im, size, resize_type=0, padding_value=114, padding_mode=PaddingMode.
 
 
 def default_preprocess(im, size, mean=None, std=None, use_norm=True, use_rgb=False, resize_type=0,
-                       interpolation=cv2.INTER_LINEAR, padding_value=114, padding_mode=PaddingMode.LEFT_TOP):
+                       interpolation=cv2.INTER_LINEAR, padding_value=128, padding_mode=PaddingMode.LEFT_TOP):
     """默认预处理函数
     :param im: BGR or GRAY图像
     :param size:

@@ -27,7 +27,7 @@ model: {
       mean: ,   # 输入均值，支持broadcast；不配置，默认使用0
       std: ,   # 输入方差，支持broadcast；不配置，默认使用1
       resize_type: 0,   # resize类型，0-长宽分别resize，1-长边等比例resize，2-短边等比例resize，默认为0
-      padding_value: 114,  # resize图像不足部分将自动padding，默认114
+      padding_value: 128,  # resize图像不足部分将自动padding，默认128
       padding_mode: 0,  # 目前仅支持 0: 左上角(LEFT_TOP), 1: 中心点(CENTER), 默认0，仅等比例resize生效
       # 用于比较各阶段输出的相似度，空表示采用随机数
       img_path: "/DEngine/tyexamples/data/pic/rgbd/rgb/banana.png",

@@ -16,7 +16,7 @@ class ModelBase(object, metaclass=abc.ABCMeta):
     """
     @abc.abstractmethod
     def __init__(self, input_size: tuple, mean: tuple, std: tuple, use_rgb=False, use_norm=False,
-                 resize_type=0, padding_value=114, padding_mode=PaddingMode.LEFT_TOP, dataset=None, test_num=0):
+                 resize_type=0, padding_value=128, padding_mode=PaddingMode.LEFT_TOP, dataset=None, test_num=0):
         pass
 
     @abc.abstractmethod

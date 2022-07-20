@@ -19,7 +19,7 @@ from utils.enum_type import PaddingMode
 
 class SqueezeNet(ModelBase):
     def __init__(self, input_size: tuple, mean: tuple, std: tuple, use_rgb=False, use_norm=False,
-                 resize_type=0, padding_value=114, padding_mode=PaddingMode.LEFT_TOP, dataset=None, test_num=0):
+                 resize_type=0, padding_value=128, padding_mode=PaddingMode.LEFT_TOP, dataset=None, test_num=0):
         self._dataset = dataset
         self._test_num = test_num
         self._infer = None
