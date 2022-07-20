@@ -48,50 +48,53 @@ model: {
   cls_name: "YoloV5"
 }
 
-quantization: {
+config: {
   # 目标平台，必须设置
   target: "nnp300",
 
-  # 量化输入数据路径(必须设置)
-  data_dir: "/DEngine/tyexamples/data/datasets/coco_val2017/val2017",
-
-  # 量化使用的数据数量，0表示使用所有数据，默认为0
-  prof_img_num: 100,
-
-  # 进行check_similarity的图片的张数，默认为1。
-  # 如果大于1，最终会输出所有图片的平均相似度；如果等于0，则会处理similarity_dataset中所有图片
-  similarity_img_num: 1,
-
-  # 进行相似度比对的输入数据，配置为空，则默认取前述data_dir接口表示的输入。
-  # 具体配置参照dataset，可定义为图片集路径，或用户自定义的预处理。
-  similarity_dataset: ,
-
-  # 用户自定义量化函数，若不配置此项，则使用默认前处理，多输入或非1,3通道数据必须配置
-  custom_preprocess: ,
-
-  # 量化调试等级, 默认为1
-  # 0 - 输出整体余弦相似度,
-  # 1 - 输出整体余弦相似度、输出逐层余弦相似度、逐层保存浮点模型和定点模型的数据、逐层保存浮点定点的对比PNG图
-  # 2 - 输出整体余弦相似度、输出逐层余弦相似度、逐层保存浮点定点的对比PNG图
-  # 3 - 输出整体余弦相似度、输出逐层余弦相似度
-  #-1 - 不输出debug信息
-  debug_level: 0,
-
-  # 校准方法 "kld", "min_max", "percentile_0.99..", "l2norm", 可以缺省此项，默认kld
-  calib_method: "kld",
-
-  # 可配置为op的索引，可单个配置也可组成list, 可以缺省此项
-  skip_layer_idxes: [],
-
-  # 可配置为op的类型，可单个配置也可组成list, 可以为空list或缺省此项
-  skip_layer_types: [],   # 例子 ["nn.conv2d", "nn.conv2d"]
-
-   # 是否使能进行逐层dump结果，默认为0
-  enable_dump: 0,
-
   # 是否跳过量化编译过程，仅做CPU端的浮点和定点仿真，默认为true
   # 注意disable之前必须已经生成量化模型
-  enable_quant: true
+  enable_quant: true,
+
+  # 量化配置参数，仅在enable_quant为true生效
+  quant: {
+    # 量化输入数据路径(必须设置)
+    data_dir: "/DEngine/tyexamples/data/datasets/coco_val2017/val2017",
+
+    # 量化使用的数据数量，0表示使用所有数据，默认为0
+    prof_img_num: 100,
+
+    # 进行check_similarity的图片的张数，默认为1。
+    # 如果大于1，最终会输出所有图片的平均相似度；如果等于0，则会处理similarity_dataset中所有图片
+    similarity_img_num: 1,
+
+    # 进行相似度比对的输入数据，配置为空，则默认取前述data_dir接口表示的输入。
+    # 具体配置参照dataset，可定义为图片集路径，或用户自定义的预处理。
+    similarity_dataset: ,
+
+    # 用户自定义量化函数，若不配置此项，则使用默认前处理，多输入或非1,3通道数据必须配置
+    custom_preprocess: ,
+
+    # 量化调试等级, 默认为1
+    # 0 - 输出整体余弦相似度,
+    # 1 - 输出整体余弦相似度、输出逐层余弦相似度、逐层保存浮点模型和定点模型的数据、逐层保存浮点定点的对比PNG图
+    # 2 - 输出整体余弦相似度、输出逐层余弦相似度、逐层保存浮点定点的对比PNG图
+    # 3 - 输出整体余弦相似度、输出逐层余弦相似度
+    #-1 - 不输出debug信息
+    debug_level: 0,
+
+    # 校准方法 "kld", "min_max", "percentile_0.99..", "l2norm", 可以缺省此项，默认kld
+    calib_method: "kld",
+
+    # 可配置为op的索引，可单个配置也可组成list, 可以缺省此项
+    skip_layer_idxes: [ ],
+
+    # 可配置为op的类型，可单个配置也可组成list, 可以为空list或缺省此项
+    skip_layer_types: [ ],   # 例子 ["nn.conv2d", "nn.conv2d"]
+  }
+
+   # 是否使能进行逐层dump结果，默认为0
+  enable_dump: 0
 }
 
 benchmark: {
