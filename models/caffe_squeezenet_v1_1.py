@@ -62,6 +62,16 @@ class SqueezeNet(ModelBase):
     def _postprocess(self, outputs):
         return outputs
 
+    def inference(self, cv_image):
+        data = self._preprocess(cv_image)
+        chip_outputs = self._infer.run([data])
+        if len(chip_outputs) != 1:
+            logger.error("Squeezenet only one output, please check")
+            exit(-1)
+        chip_output = chip_outputs[0]
+        chip_output = self._postprocess(chip_output)
+        return chip_output
+
     def evaluate(self):
         """ top-k
         """
@@ -79,13 +89,8 @@ class SqueezeNet(ModelBase):
             if cv_image is None:
                 logger.warning("Failed to decode img by opencv -> {}".format(img_path))
                 continue
-            data = self._preprocess(cv_image)
-            chip_outputs = self._infer.run([data])
-            if len(chip_outputs) != 1:
-                logger.error("Squeezenet only one output, please check")
-                exit(-1)
-            chip_output = chip_outputs[0]
-            chip_output = self._postprocess(chip_output)
+
+            chip_output = self.inference(cv_image)
             idxes = np.argsort(-chip_output, axis=1, kind="quicksort").flatten()[0:k]  # 降序
             logger.info("pred = {}, gt = {}".format(idxes, labels[idx]))
             if labels[idx] == idxes[0]:
@@ -105,14 +110,7 @@ class SqueezeNet(ModelBase):
             logger.error("Failed to decode img by opencv -> {}".format(img_path))
             exit(-1)
 
-        data = self._preprocess(cv_image)
-        chip_outputs = self._infer.run([data])
-        if len(chip_outputs) != 1:
-            logger.error("Squeezenet only one output, please check")
-            exit(-1)
-
-        chip_output = chip_outputs[0]
-        chip_output = self._postprocess(chip_output)
+        chip_output = self.inference(cv_image)
         max_idx = np.argmax(chip_output, axis=1).flatten()[0]
         max_prob = chip_output[:, max_idx].flatten()[0]
         logger.info("predict cls = {}, prob = {}".format(max_idx, max_prob))
