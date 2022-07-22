@@ -2,7 +2,7 @@
 import os
 import cv2
 import numpy as np
-from custom.base_custom_preprocess import BaseCustomPreprocess
+from base.base_custom_preprocess import BaseCustomPreprocess
 
 
 class CustomTensorFlowImgD(BaseCustomPreprocess):

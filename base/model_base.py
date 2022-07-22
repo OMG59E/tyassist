@@ -21,26 +21,50 @@ class ModelBase(object, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def load(self, model_dir):
+        """
+        加载模型
+        :param model_dir: 模型目录
+        :return:
+        """
         pass
 
     @abc.abstractmethod
     def _preprocess(self, cv_image):
-        pass
-
-    def preprocess(self, img_path):
+        """
+        内部预处理调用
+        :param cv_image: opencv image
+        :return:
+        """
         pass
 
     @abc.abstractmethod
     def _postprocess(self, outputs):
+        """
+        内部后处理调用
+        :param outputs: 模型推理输出
+        :return:
+        """
         pass
 
-    def postprocess(self):
+    @abc.abstractmethod
+    def inference(self, cv_image):
+        """
+        推理接口，目前仅支持batch1
+        :param cv_image: opencv image
+        :return:
+        """
         pass
 
     @abc.abstractmethod
     def evaluate(self):
+        """模型指标评估"""
         pass
 
     @abc.abstractmethod
     def demo(self, img_path):
+        """
+        模型demo
+        :param img_path: 图片路径
+        :return:
+        """
         pass

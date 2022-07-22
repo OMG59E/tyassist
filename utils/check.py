@@ -34,7 +34,7 @@ def check_config(cfg):
         return False
 
     # 多输入必须定义预处理
-    if len(cfg["model"]["inputs"]) > 1 and not cfg["build"]["quant"]["custom_preprocess"]:
+    if len(cfg["model"]["inputs"]) > 1 and not cfg["build"]["quant"]["custom_preprocess_cls"]:
         logger.error("Multi-input must be setting custom_preprocess")
         return False
 
@@ -51,61 +51,71 @@ def check_config(cfg):
             logger.error("padding_mode must be in [0, 1]")
             return False
 
+        if _input["img_path"]:
+            if not os.path.exists(_input["img_path"]):
+                logger.error("img_path not exist -> {}".format(_input["img_path"]))
+                return False
+
+    # 预处理模块检查
+    if (not cfg["build"]["quant"]["custom_preprocess_module"]) != (not cfg["build"]["quant"]["custom_preprocess_cls"]):
+        logger.error("custom_preprocess_module and custom_preprocess_cls both must be set.")
+        return False
+
     # TODO
     # 检查是否缺少关键字
 
     return True
 
 
-def check_benchmark_config(cfg):
-    if "benchmark" not in cfg:
-        logger.error("Not found key(benchmark) in config")
+def check_test_config(cfg):
+    if "test" not in cfg:
+        logger.error("Not found key(test) in config")
         return False
 
-    if "data_dir" not in cfg["benchmark"]:
+    if "data_dir" not in cfg["test"]:
         logger.error("Not found key(data_dir) in config")
         return False
 
-    if "test_num" not in cfg["benchmark"]:
+    if "test_num" not in cfg["test"]:
         logger.error("Not found key(test_num) in config")
         return False
 
-    if "dataset_module" not in cfg["benchmark"]:
+    if "dataset_module" not in cfg["test"]:
         logger.error("Not found key(dataset_module) in config")
         return False
 
-    if "dataset_name" not in cfg["benchmark"]:
-        logger.error("Not found key(dataset_name) in config")
+    if "dataset_cls" not in cfg["test"]:
+        logger.error("Not found key(dataset_cls) in config")
         return False
 
-    if "py_module" not in cfg["model"]:
-        logger.error("Not found key(py_module) in config")
+    if "model_impl_module" not in cfg["model"]:
+        logger.error("Not found key(model_impl_module) in config")
         return False
 
-    if "cls_name" not in cfg["model"]:
-        logger.error("Not found key(cls_name) in config")
+    if "model_impl_cls" not in cfg["model"]:
+        logger.error("Not found key(model_impl_cls) in config")
         return False
 
-    data_dir = cfg["benchmark"]["data_dir"]
+    data_dir = cfg["test"]["data_dir"]
     if not os.path.exists(data_dir):
         logger.error("Not found data_dir -> {}".format(data_dir))
         return False
 
-    num = cfg["benchmark"]["test_num"]
+    num = cfg["test"]["test_num"]
     if not isinstance(num, int):
-        logger.error("Not found benchmark_num type not int, -> {}".format(num))
+        logger.error("Not found test_num type not int, -> {}".format(num))
         return False
 
     if num < 0:
-        logger.error("Not found benchmark_num must be >= 0, -> {}".format(num))
+        logger.error("Not found test_num must be >= 0, -> {}".format(num))
         return False
 
-    if not cfg["model"]["py_module"]:
-        logger.error("py_module is null")
+    if not cfg["model"]["model_impl_module"]:
+        logger.error("model_impl_module is null")
         return False
 
-    if not cfg["model"]["cls_name"]:
-        logger.error("cls_name is null")
+    if not cfg["model"]["model_impl_cls"]:
+        logger.error("model_impl_cls is null")
         return False
 
     return True
@@ -124,12 +134,12 @@ def check_demo_config(cfg):
         logger.error("Not found key(num) in config")
         return False
 
-    if "py_module" not in cfg["model"]:
-        logger.error("Not found key(py_module) in config")
+    if "model_impl_module" not in cfg["model"]:
+        logger.error("Not found key(model_impl_module) in config")
         return False
 
-    if "cls_name" not in cfg["model"]:
-        logger.error("Not found key(cls_name) in config")
+    if "model_impl_cls" not in cfg["model"]:
+        logger.error("Not found key(model_impl_cls) in config")
         return False
 
     data_dir = cfg["demo"]["data_dir"]
@@ -146,12 +156,12 @@ def check_demo_config(cfg):
         logger.error("Not found demo_num must be >= 0, -> {}".format(num))
         return False
 
-    if not cfg["model"]["py_module"]:
-        logger.error("py_module is null")
+    if not cfg["model"]["model_impl_module"]:
+        logger.error("model_impl_module is null")
         return False
 
-    if not cfg["model"]["cls_name"]:
-        logger.error("cls_name is null")
+    if not cfg["model"]["model_impl_cls"]:
+        logger.error("model_impl_cls is null")
         return False
 
     return True

@@ -76,7 +76,10 @@ class Infer(object):
         """
         self._model_dir = model_dir
         self._result_dir = os.path.join(self._model_dir, "result")
-        assert os.path.exists(self._result_dir), "Not found result_dir -> {}".format(self._result_dir)
+        if not os.path.exists(self._result_dir):
+            logger.error("Not found result_dir -> {}".format(self._result_dir))
+            exit(-1)
+        self._result_dir = os.path.abspath(self._result_dir)
         if self._enable_dump:
             self._dump_root_path = self._sdk.set_dump_work_path(self._result_dir)
             logger.info("dump root path: {}".format(self._dump_root_path))

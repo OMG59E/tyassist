@@ -9,7 +9,7 @@
 """
 import os
 from utils import logger
-from .dataset_base import DatasetBase
+from base.dataset_base import DatasetBase
 
 
 class ILSVRC2012(DatasetBase):

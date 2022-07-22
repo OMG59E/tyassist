@@ -8,6 +8,8 @@
 @Software: PyCharm
 """
 import os
+import sys
+
 import numpy as np
 import argparse
 import importlib
@@ -17,7 +19,7 @@ from utils import logger
 from utils.glog_format import GLogFormatter
 from utils.parser import read_yaml_to_dict
 from utils.dist_metrics import cosine_distance
-from utils.check import check_config, check_demo_config, check_benchmark_config
+from utils.check import check_config, check_demo_config, check_test_config
 from src.dpexec_impl import DpExec
 
 
@@ -43,14 +45,16 @@ def main(args):
     # 补充自定义预处理文件所在目录，必须与配置文件同目录
     config_abspath = os.path.abspath(config_file)
     config_dir = os.path.dirname(config_abspath)
-    config_name, _ = os.path.splitext(os.path.basename(config_abspath))
-    config["build"]["quant"]["custom_preprocess_dir"] = config_dir
+    sys.path.append(config_dir)  # 自定义模块的环境变量
+    # config_name, _ = os.path.splitext(os.path.basename(config_abspath))
+    # config["build"]["quant"]["custom_preprocess_dir"] = config_dir
 
     # 参数检查
-    mode_name = config["model"]["name"]
-    if config_name != mode_name:
-        logger.error("config_name({}) must be equal model_name({})".format(config_name, mode_name))
-        exit(-1)
+    # mode_name = config["model"]["name"]
+    # if config_name != mode_name:
+    #     logger.error("config_name({}) must be equal model_name({})".format(config_name, mode_name))
+    #     exit(-1)
+
     if not check_config(config):
         exit(-1)
 
@@ -101,7 +105,7 @@ def main(args):
                 dist = cosine_distance(host_tvm_float_output[idx], host_iss_fixed_output[idx])
                 logger.info("[runoncpu] float(tvm) vs fixed(iss) output tensor [{}] similarity: {:.6f}".format(idx, dist))
 
-    if args.type == "infer":
+    elif args.type == "infer":
         from src import Infer
 
         # device端 硬仿
@@ -139,34 +143,34 @@ def main(args):
             logger.info("[runonchip] fixed(chip) vs fixed(tvm) output tensor: [{}] similarity={:.6f}".format(idx, dist0))
             logger.info("[runonchip] fixed(chip) vs float(tvm) output tensor: [{}] similarity={:.6f}".format(idx, dist1))
 
-    if args.type == "benchmark":
-        if not check_benchmark_config(config):
+    elif args.type == "test":
+        if not check_test_config(config):
             exit(-1)
 
-        data_dir = config["benchmark"]["data_dir"]
-        test_num = config["benchmark"]["test_num"]
-        dataset_module = config["benchmark"]["dataset_module"]
-        dataset_name = config["benchmark"]["dataset_name"]
+        data_dir = config["test"]["data_dir"]
+        test_num = config["test"]["test_num"]
+        dataset_module = config["test"]["dataset_module"]
+        dataset_cls = config["test"]["dataset_cls"]
 
         _, c, h, w = dpexec.shape(0)
 
         dataset = None
         m = importlib.import_module(dataset_module)
-        if hasattr(m, dataset_name):
+        if hasattr(m, dataset_cls):
             # 实例化预处理对象
-            dataset = getattr(m, dataset_name)(data_dir)
+            dataset = getattr(m, dataset_cls)(data_dir)
         else:
-            logger.error("{}.py has no class named {}".format(dataset_module, dataset_name))
+            logger.error("{}.py has no class named {}".format(dataset_module, dataset_cls))
             exit(-1)
 
-        py_module = config["model"]["py_module"]
-        cls_name = config["model"]["cls_name"]
+        model_impl_module = config["model"]["model_impl_module"]
+        model_impl_cls = config["model"]["model_impl_cls"]
 
         model = None
-        m = importlib.import_module(py_module)
-        if hasattr(m, cls_name):
+        m = importlib.import_module(model_impl_module)
+        if hasattr(m, model_impl_cls):
             # 实例化预处理对象
-            model = getattr(m, cls_name)(
+            model = getattr(m, model_impl_cls)(
                 (h, w),
                 mean=dpexec.mean(0),
                 std=dpexec.std(0),
@@ -179,7 +183,7 @@ def main(args):
                 test_num=test_num
             )
         else:
-            logger.error("{}.py has no class named {}".format(py_module, cls_name))
+            logger.error("{}.py has no class named {}".format(model_impl_module, model_impl_cls))
             exit(-1)
 
         model.load(
@@ -194,7 +198,7 @@ def main(args):
 
         model.evaluate()
 
-    if args.type == "demo":
+    elif args.type == "demo":
         if dpexec.num_inputs > 1:
             logger.error("Not support demo multi-input model")
             exit(-1)
@@ -204,8 +208,8 @@ def main(args):
 
         data_dir = config["demo"]["data_dir"]
         num = config["demo"]["num"]
-        py_module = config["model"]["py_module"]
-        cls_name = config["model"]["cls_name"]
+        model_impl_module = config["model"]["model_impl_module"]
+        model_impl_cls = config["model"]["model_impl_cls"]
 
         file_list = os.listdir(data_dir)
         file_list = file_list if num > len(file_list) else file_list[0:num]
@@ -214,10 +218,10 @@ def main(args):
 
         model = None
 
-        m = importlib.import_module(py_module)
-        if hasattr(m, cls_name):
+        m = importlib.import_module(model_impl_module)
+        if hasattr(m, model_impl_cls):
             # 实例化预处理对象
-            model = getattr(m, cls_name)(
+            model = getattr(m, model_impl_cls)(
                 (h, w),
                 mean=dpexec.mean(0),
                 std=dpexec.std(0),
@@ -229,7 +233,7 @@ def main(args):
                 dataset=None
             )
         else:
-            logger.error("{}.py has no class named {}".format(py_module, cls_name))
+            logger.error("{}.py has no class named {}".format(model_impl_module, model_impl_cls))
             exit(-1)
 
         model.load(
@@ -251,14 +255,17 @@ def main(args):
             filepath = os.path.join(data_dir, filename)
             model.demo(filepath)
 
+    elif args.type == "benchmark":
+        pass
+
     logger.info("success")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TyAssist Tool")
-    parser.add_argument("type", type=str, choices=("demo", "infer", "benchmark", "build"),
+    parser.add_argument("type", type=str, choices=("demo", "test", "infer", "benchmark", "build"),
                         help="Please choose one of them")
-    parser.add_argument("--config", type=str, required=True,
+    parser.add_argument("--config", "-c", type=str, required=True,
                         help="Please specify a configuration file")
     parser.add_argument("--log_dir", type=str, default="./logs",
                         help="Please specify a log dir, default ./logs")

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-@File    : caffe_squeezenet_v1.1.py
-@Time    : 2022/7/18 上午10:25
+@File    : classification.py
+@Time    : 2022/7/21 上午10:23
 @Author  : xingwg
 @Email   : xing.weiguo@intellif.com
 @Software: PyCharm
@@ -17,7 +17,7 @@ from utils.preprocess import default_preprocess
 from utils.enum_type import PaddingMode
 
 
-class SqueezeNet(ModelBase):
+class Classifier(ModelBase):
     def __init__(self, input_size: tuple, mean: tuple, std: tuple, use_rgb=False, use_norm=False,
                  resize_type=0, padding_value=128, padding_mode=PaddingMode.LEFT_TOP, dataset=None, test_num=0):
         self._dataset = dataset
@@ -114,4 +114,3 @@ class SqueezeNet(ModelBase):
         max_idx = np.argmax(chip_output, axis=1).flatten()[0]
         max_prob = chip_output[:, max_idx].flatten()[0]
         logger.info("predict cls = {}, prob = {}".format(max_idx, max_prob))
-

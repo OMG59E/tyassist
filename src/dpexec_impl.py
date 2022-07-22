@@ -8,7 +8,7 @@
 @Software: PyCharm
 """
 import os
-import sys
+import importlib
 import pickle
 import cv2
 import numpy as np
@@ -29,7 +29,8 @@ class DpExec(object):
         self._enable_quant = cfg["build"]["enable_quant"]
         self._enable_dump = cfg["build"]["enable_dump"]
         self._framework = cfg["model"]["framework"]
-        self._model_name = cfg["model"]["name"]
+        self._custom_preprocess_module = self._quant_cfg["custom_preprocess_module"]
+        self._custom_preprocess_cls = self._quant_cfg["custom_preprocess_cls"]
         self._graph = cfg["model"]["graph"]
         self._weight = cfg["model"]["weight"]
         self._inputs = cfg["model"]["inputs"]
@@ -92,9 +93,7 @@ class DpExec(object):
             _input["dtype"] = dtype
             self._data_types.append(dtype)
 
-        self._custom_preprocess = None if "custom_preprocess" not in self._quant_cfg else \
-            self._quant_cfg["custom_preprocess"]
-        self._model_dir = os.path.join(cfg["model"]["save_dir"], cfg["model"]["name"])
+        self._model_dir = cfg["model"]["save_dir"]
         self._result_dir = os.path.join(self._model_dir, "result")
         if not os.path.exists(self._result_dir):
             os.makedirs(self._result_dir)
@@ -104,7 +103,7 @@ class DpExec(object):
 
     @property
     def has_custom_preprocess(self):
-        return True if self._custom_preprocess else False
+        return True if self._custom_preprocess_cls else False
 
     @property
     def enable_dump(self):
@@ -231,15 +230,15 @@ class DpExec(object):
         :return:
         """
         # 自定义预处理
-        if self._custom_preprocess:
-            sys.path.append(self._quant_cfg["custom_preprocess_dir"])
-            m = __import__(self._model_name)
-            if hasattr(m, self._custom_preprocess):
+        if self._custom_preprocess_cls:
+            m = importlib.import_module(self._custom_preprocess_module)
+            if hasattr(m, self._custom_preprocess_cls):
                 # 实例化预处理对象
-                self._custom_preprocess = getattr(m, self._custom_preprocess)(
+                self._custom_preprocess_cls = getattr(m, self._custom_preprocess_cls)(
                     self._inputs, self._quant_cfg["prof_img_num"], self._quant_cfg["data_dir"])
             else:
-                logger.error("{}.py has no function named {}".format(self._custom_preprocess, self._custom_preprocess))
+                logger.error("{}.py has no class named {}".format(
+                    self._custom_preprocess_module, self._custom_preprocess_cls))
                 exit(-1)
 
     def get_datas(self, use_norm=False):
@@ -255,9 +254,9 @@ class DpExec(object):
                 if not os.path.exists(img_path):
                     logger.error("Not found img_path -> {}".format(img_path))
                     return None
-                if self._custom_preprocess:
+                if self._custom_preprocess_cls:
                     # 采用自定义预处理
-                    in_datas[_input["name"]] = self._custom_preprocess.get_single_data(img_path)
+                    in_datas[_input["name"]] = self._custom_preprocess_cls.get_single_data(img_path)
                 else:
                     # 采用默认预处理，目前支持1，3通道图像
                     im = cv2.imread(img_path)
@@ -314,13 +313,13 @@ class DpExec(object):
             model_name="opt_ir",
             # 用户使用云天自带的预处理时，配置为输入量化profile(统计模型的层分布用来 calibrate 生成 scale)
             # 的图片集路径，支持图片格式为 jpg，jpeg，png，bmp。也可配置为用户自定义的预处理。类型str/generator
-            dataset=self._quant_cfg["data_dir"] if not self._custom_preprocess else self._custom_preprocess.get_data,
+            dataset=self._quant_cfg["data_dir"] if not self._custom_preprocess_cls else self._custom_preprocess_cls.get_data,
             # 使用校准数据数量
             prof_img_num=self._quant_cfg["prof_img_num"],
             # 此配置仅在 dataset 配置为图片集路径（即使用云天自带的预处理），且输入为3通道时有效，对生成芯片模型无效
             rgb_en=1 if (self.num_inputs == 1 and self._pixel_formats[0] == PixelFormat.RGB) else 0,
             # 均值方差，对生成芯片模型生效
-            norm=norm if not self._custom_preprocess else None,
+            norm=norm if not self._custom_preprocess_cls else None,
             # 量化配置
             quantize_config=quantize_config,
             # 用来进行相似度以及相关量化效果确认

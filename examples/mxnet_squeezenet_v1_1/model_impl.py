@@ -7,8 +7,8 @@
 @Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
-import models.caffe_squeezenet_v1_1 as caffe_squeezenet_v1_1
+from base.classification import Classifier
 
 
-class SqueezeNet(caffe_squeezenet_v1_1.SqueezeNet):
+class SqueezeNetV1_1(Classifier):
     pass

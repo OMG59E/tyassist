@@ -1,6 +1,6 @@
 
 import numpy as np
-from custom.base_custom_preprocess import BaseCustomPreprocess
+from base.base_custom_preprocess import BaseCustomPreprocess
 
 
 class CustomCenterNetDLA34Part2(BaseCustomPreprocess):

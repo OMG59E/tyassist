@@ -1,9 +1,6 @@
 # 模型量化编译配置文件
 
 model: {
-  # 模型名字, 若存在自定义预处理python脚本名字必须与model_name一致，必须与yml文件名字一致
-  name: "tensorflow_imgD",
-
   # 模型框架，必须设置
   framework: "tensorflow",
 
@@ -66,7 +63,9 @@ build: {
     similarity_dataset: ,
 
     # 用户自定义量化函数，若不配置此项，则使用默认前处理，多输入或非1,3通道数据必须配置
-    custom_preprocess: "CustomTensorFlowImgD",
+    # 自定义预处理模块必须与yml配置文件同级目录
+    custom_preprocess_module: "custom_preprocess",
+    custom_preprocess_cls: "CustomTensorFlowImgD",
 
     # 量化调试等级, 默认为1
     # 0 - 输出整体余弦相似度,
