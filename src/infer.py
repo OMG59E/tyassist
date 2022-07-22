@@ -45,9 +45,17 @@ class Infer(object):
         self._dump_root_path = ""
         self._ave_latency_ms = 0
 
-        assert max_batch == 1, "Not support max_batch > 1 yet."
-        assert os.path.exists(self._net_cfg_file), "Not found net_cfg_file -> {}".format(self._net_cfg_file)
-        assert os.path.exists(self._sdk_cfg_file), "Not found sdk_cfg_file -> {}".format(self._sdk_cfg_file)
+        if max_batch != 1:
+            logger.error("Not support max_batch > 1 yet.")
+            exit(-1)
+
+        if not os.path.exists(self._net_cfg_file):
+            logger.error("Not found net_cfg_file -> {}".format(self._net_cfg_file))
+            exit(-1)
+
+        if not os.path.exists(self._sdk_cfg_file):
+            logger.error("Not found sdk_cfg_file -> {}".format(self._sdk_cfg_file))
+            exit(-1)
 
         f = open(self._net_cfg_file, "r")
         net_cfg = f.read().strip()
@@ -85,6 +93,10 @@ class Infer(object):
             logger.info("dump root path: {}".format(self._dump_root_path))
 
         netbin_file = os.path.join(self._model_dir, "net_combine.bin")
+        if not os.path.isfile(netbin_file):
+            logger.error("netbin_file not file -> {}".format(netbin_file))
+            exit(-1)
+
         logger.info("load model " + netbin_file)
 
         # iss上目前不支持aipp，需要去使能
@@ -162,4 +174,3 @@ class Infer(object):
 
 if __name__ == "__main__":
     infer = Infer()
-
