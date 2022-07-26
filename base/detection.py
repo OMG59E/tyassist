@@ -11,7 +11,11 @@ import os
 import cv2
 import torch
 from base.classification import Classifier
-from utils.postprocess import non_max_suppression, scale_coords
+from utils.postprocess import (
+    non_max_suppression,
+    scale_coords,
+    detection_to_txt
+)
 from utils.enum_type import PaddingMode
 from utils import logger
 
@@ -83,13 +87,7 @@ class Detector(Classifier):
                 logger.warning("Failed to decode img by opencv -> {}".format(img_path))
                 continue
             detections = self.inference(cv_image)
-
-            f = open(label_path, "w")
-            for det in detections:
-                (x1, y1, x2, y2), conf, cls = det[0:4], det[4], det[5]
-                text = "{} {} {} {} {} {}\n".format(conf, cls, x1, y1, x2, y2)
-                f.write(text)
-            f.close()
+            detection_to_txt(detections, label_path)
 
     def demo(self, img_path):
         if not os.path.exists(img_path):
