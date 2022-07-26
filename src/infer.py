@@ -9,7 +9,7 @@
 """
 import os
 import sys
-sys.path.append("/DEngine/tyassist2")
+sys.path.append("/DEngine/tyassist")
 import time
 import shutil
 from utils import logger
@@ -69,9 +69,11 @@ class Infer(object):
         self._sdk = dcl.DeSDKModule(remote)
         logger.info("tyhcp version: {}".format(self._sdk.version))
 
-        if enable_dump:
+        if self._enable_dump:
             self._sdk.select_dump_profile(DumpProfileSel.Dump)
             self._sdk.set_dump_server_ip(get_host_ip(), self._port)
+        else:
+            self._sdk.select_dump_profile(DumpProfileSel.Disable)
 
         self._sdk.sdk_init(self._sdk_cfg_file)
         logger.info("tyhcp init succeed.")
