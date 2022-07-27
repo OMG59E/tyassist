@@ -21,7 +21,11 @@ class COCO2017Val(DatasetBase):
         if not os.path.exists(self._root_path):
             logger.error("root_path not exits -> {}".format(self._root_path))
             exit(-1)
-        # self._label_path = os.path.join(self._root_path, "labels", "val2017")
+
+        self._annotations_file = os.path.join(self._root_path, "..", "annotations", "instances_val2017.json")
+        if not os.path.exists(self._annotations_file):
+            logger.error("annotations_file not exist -> {}".format(self._annotations_file))
+            exit(-1)
 
         self._filepath = os.path.join(self._root_path, "..", "val2017.txt")
         if not os.path.exists(self._filepath):
@@ -32,6 +36,7 @@ class COCO2017Val(DatasetBase):
 
         self._label_files = list()
         self._img_files = list()
+        self._image_ids = list()
         for line in lines:
             sub_path = line.strip()
             basename = os.path.basename(sub_path)
@@ -40,17 +45,17 @@ class COCO2017Val(DatasetBase):
             if not os.path.exists(img_path):
                 logger.warning("img_path not exist -> {}".format(img_path))
                 continue
-            # label_path = os.path.join(self._root_path, "labels", "val2017", "{}.txt".format(filename))
-            # if not os.path.exists(label_path):
-            #     logger.warning("label_path not exist -> {}".format(label_path))
-            #     continue
             self._img_files.append(img_path)
-            # self._label_files.append(label_path)
+            self._image_ids.append(int(filename))
         self._total_num = len(self._img_files)
-        # if len(self._img_files) != len(self._label_files):
-        #     logger.error("img_files_num must be equal label_files_num -> {} vs {}".format(
-        #         len(self._img_files), len(self._label_files)))
-        #     exit(-1)
+
+    @property
+    def annotations_file(self):
+        return self._annotations_file
+
+    @property
+    def image_ids(self):
+        return self._image_ids
 
     def get_next_batch(self):
         """获取下一批数据
