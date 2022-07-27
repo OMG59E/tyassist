@@ -24,7 +24,7 @@ def softmax(x, axis=1):
     return e_x / np.sum(e_x, axis=axis, keepdims=True)
 
 
-def detection_to_txt(detections, filepath):
+def detections2txt(detections, filepath):
     with open(filepath, "w") as f:
         for det in detections:
             (x1, y1, x2, y2), conf, cls = det[0:4], det[4], det[5]
@@ -85,6 +85,16 @@ def box_iou(box1, box2, eps=1e-7):
 
     # IoU = inter / (area1 + area2 - inter)
     return inter / (box_area(box1.T)[:, None] + box_area(box2.T) - inter + eps)
+
+
+def xyxy2xywh(x):
+    # Convert nx4 boxes from [x1, y1, x2, y2] to [x, y, w, h] where xy1=top-left, xy2=bottom-right
+    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y[:, 0] = (x[:, 0] + x[:, 2]) / 2  # x center
+    y[:, 1] = (x[:, 1] + x[:, 3]) / 2  # y center
+    y[:, 2] = x[:, 2] - x[:, 0]  # width
+    y[:, 3] = x[:, 3] - x[:, 1]  # height
+    return y
 
 
 def xywh2xyxy(x):

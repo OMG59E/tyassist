@@ -14,7 +14,11 @@ from base.classification import Classifier
 from utils.postprocess import (
     non_max_suppression,
     scale_coords,
-    detection_to_txt
+    detections2txt,
+)
+from utils.metrics import (
+    coco_eval,
+    detection_txt2json,
 )
 from utils.enum_type import PaddingMode
 from utils import logger
@@ -87,7 +91,10 @@ class Detector(Classifier):
                 logger.warning("Failed to decode img by opencv -> {}".format(img_path))
                 continue
             detections = self.inference(cv_image)
-            detection_to_txt(detections, label_path)
+            detections2txt(detections, label_path)
+        pred_json = "pred.json"
+        detection_txt2json(save_results, pred_json)
+        coco_eval(pred_json, self._dataset.annotations_file, self._dataset.image_ids)
 
     def demo(self, img_path):
         if not os.path.exists(img_path):
