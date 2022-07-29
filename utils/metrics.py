@@ -175,7 +175,8 @@ def coco_eval(pred_json, anno_json, image_ids):
         eval.evaluate()
         eval.accumulate()
         eval.summarize()
-        map, map50 = eval.stats[:2]  # update results (mAP@0.5:0.95, mAP@0.5)
+        _map, map50 = eval.stats[:2]  # update results (mAP@0.5:0.95, mAP@0.5)
+        return _map, map50
     except Exception as e:
         logger.error("pycocotools unable to run: {}".format(e))
         exit(-1)
