@@ -94,7 +94,8 @@ class Detector(Classifier):
             detections2txt(detections, label_path)
         pred_json = "pred.json"
         detection_txt2json(save_results, pred_json)
-        coco_eval(pred_json, self._dataset.annotations_file, self._dataset.image_ids)
+        _map, map50 = coco_eval(pred_json, self._dataset.annotations_file, self._dataset.image_ids)
+        return _map, map50
 
     def demo(self, img_path):
         if not os.path.exists(img_path):
