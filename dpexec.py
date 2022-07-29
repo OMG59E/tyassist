@@ -304,6 +304,13 @@ def benchmark(mapping_file, log_dir):
         config_filepath = models_dict[model_name]
         config_abspath = os.path.abspath(config_filepath)
         config_dir = os.path.dirname(config_abspath)
+        # 判断是否已存在模型
+        model_cfg = read_yaml_to_dict(config_abspath)
+        save_path = os.path.abspath(model_cfg["model"]["save_dir"])
+        if not os.path.join(save_path, "net_combine.bin"):
+            logger.warning("Model not found -> {}".format(save_path))
+            continue
+
         os.chdir(config_dir)  # 切换至模型目录
         res = run(config_abspath, "test", log_dir)
         logger.info("{}".format(res))
