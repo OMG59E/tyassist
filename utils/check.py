@@ -165,3 +165,9 @@ def check_demo_config(cfg):
         return False
 
     return True
+
+
+def check_file_exist(filepath):
+    if not os.path.exists(filepath):
+        logger.error("Not found file -> {}".format(filepath))
+        exit(-1)
