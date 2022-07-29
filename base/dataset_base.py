@@ -15,7 +15,7 @@ class DatasetBase(object, metaclass=abc.ABCMeta):
     """
     @abc.abstractmethod
     def __init__(self, root_path, batch_size=1):
-        pass
+        self._dataset_name = ""
 
     @abc.abstractmethod
     def get_next_batch(self):
@@ -30,3 +30,8 @@ class DatasetBase(object, metaclass=abc.ABCMeta):
         :return:
         """
         pass
+
+    @property
+    @abc.abstractmethod
+    def dataset_name(self):
+        return self._dataset_name

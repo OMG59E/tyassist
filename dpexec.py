@@ -290,7 +290,7 @@ def benchmark(mapping_file, log_dir):
     import csv
     from prettytable import PrettyTable
 
-    header = ["ModelName", "Acc./mAP.", "Latency(ms)"]
+    header = ["ModelName", "Dataset", "Num", "Acc./mAP.", "Latency(ms)"]
     table = PrettyTable(header)
     csv_filepath = "benchmark.csv"
     f = open(csv_filepath, "w")
@@ -311,9 +311,9 @@ def benchmark(mapping_file, log_dir):
 
         row = list()
         if "top1" in res:
-            row = [model_name, "{:.6f}/{:.6f}".format(res["top1"], res["top5"]), "N/A"]
+            row = [model_name, res["dataset"], res["num"], "{:.6f}/{:.6f}".format(res["top1"], res["top5"]), "N/A"]
         elif "map" in res:
-            row = [model_name, "{:.6f}/{:.6f}".format(res["map"], res["map50"]), "N/A"]
+            row = [model_name, res["dataset"], res["num"], "{:.6f}/{:.6f}".format(res["map"], res["map50"]), "N/A"]
         table.add_row(row)
         f_csv.writerow(row)
     f.close()

@@ -68,6 +68,10 @@ class ILSVRC2012(DatasetBase):
         labels = self._labels[0:num]
         return img_paths, labels
 
+    @property
+    def dataset_name(self):
+        return "ILSVRC_2012Val"
+
 
 class ILSVRC2015(ILSVRC2012):
     """
@@ -103,3 +107,7 @@ class ILSVRC2015(ILSVRC2012):
                 self._filepaths.append(filepath)
                 self._labels.append(int(cls))
         self._total_num = len(self._filepaths)
+
+    @property
+    def dataset_name(self):
+        return "ILSVRC_2015Val"

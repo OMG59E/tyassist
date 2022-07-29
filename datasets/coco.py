@@ -76,6 +76,10 @@ class COCO2017Val(DatasetBase):
         # labels = self._labels[0:num]
         return img_paths
 
+    @property
+    def dataset_name(self):
+        return "coco_2017Val"
+
 
 class COCO2014Val(DatasetBase):
     """提供图片path和label
@@ -141,3 +145,7 @@ class COCO2014Val(DatasetBase):
         img_paths = self._img_files[0:num]
         # labels = self._labels[0:num]
         return img_paths
+
+    @property
+    def dataset_name(self):
+        return "coco_2014Val"

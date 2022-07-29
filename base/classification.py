@@ -100,7 +100,7 @@ class Classifier(ModelBase):
             if labels[idx] in idxes:
                 top5 += 1
         top1, top5 = float(top1)/total_num, float(top5)/total_num
-        return {"top1": top1, "top5": top5}
+        return {"dataset": self._dataset.dataset_name, "num": self._test_num, "top1": top1, "top5": top5}
 
     def demo(self, img_path):
         if not os.path.exists(img_path):
