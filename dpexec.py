@@ -44,7 +44,6 @@ def build(cfg):
     # 获取预处理数据
     in_datas = dpexec.get_datas(use_norm=True)
 
-
     # 将模型转译成relay格式
     dpexec.x2relay()
 
