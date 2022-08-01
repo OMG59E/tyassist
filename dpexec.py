@@ -88,7 +88,7 @@ def build(cfg):
 
 
 def compare(cfg):
-    from src import Infer
+    from src.infer import Infer
 
     dpexec = DpExec(cfg)
 
@@ -190,10 +190,7 @@ def test(cfg):
     del sys.modules[dataset_module]
     del sys.modules[model_impl_module]
     #
-    io_str = ""
-    for key in res:
-        io_str += "{}:{:.6f} ".format(key, res[key])
-    logger.info(io_str)
+    logger.info("{}".format(res))
     return res
 
 
@@ -290,7 +287,7 @@ def benchmark(mapping_file, log_dir):
     import csv
     from prettytable import PrettyTable
 
-    header = ["ModelName", "Dataset", "Num", "Acc./mAP.", "Latency(ms)"]
+    header = ["ModelName", "InputSize", "Dataset", "Num", "Acc./mAP.", "Latency(ms)"]
     table = PrettyTable(header)
     csv_filepath = "benchmark.csv"
     f = open(csv_filepath, "w")
@@ -313,14 +310,14 @@ def benchmark(mapping_file, log_dir):
 
         os.chdir(config_dir)  # 切换至模型目录
         res = run(config_abspath, "test", log_dir)
-        logger.info("{}".format(res))
+        # logger.info("{}".format(res))
         os.chdir(root)  # 切换根目录
 
         row = list()
         if "top1" in res:
-            row = [model_name, res["dataset"], res["num"], "{:.6f}/{:.6f}".format(res["top1"], res["top5"]), "N/A"]
+            row = [model_name, res["input_size"], res["dataset"], res["num"], "{}/{}".format(res["top1"], res["top5"]), "N/A"]
         elif "map" in res:
-            row = [model_name, res["dataset"], res["num"], "{:.6f}/{:.6f}".format(res["map"], res["map50"]), "N/A"]
+            row = [model_name, res["input_size"], res["dataset"], res["num"], "{}/{}".format(res["map"], res["map50"]), "N/A"]
         table.add_row(row)
         f_csv.writerow(row)
     f.close()

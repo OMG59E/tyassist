@@ -95,7 +95,13 @@ class Detector(Classifier):
         pred_json = "pred.json"
         detection_txt2json(save_results, pred_json)
         _map, map50 = coco_eval(pred_json, self._dataset.annotations_file, self._dataset.image_ids)
-        return {"dataset": self._dataset.dataset_name, "num": self._test_num, "map": _map, "map50": map50}
+        return {
+            "input_size": "{}x{}x{}x{}".format(1, 3, self._input_size[1], self._input_size[0]),
+            "dataset": self._dataset.dataset_name,
+            "num": len(img_paths),
+            "map": "{:.6f}".format(_map),
+            "map50": "{:.6f}".format(map50),
+        }
 
     def demo(self, img_path):
         if not os.path.exists(img_path):

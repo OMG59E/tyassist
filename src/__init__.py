@@ -7,5 +7,3 @@
 @Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
-from .infer import Infer
-from .dpexec_impl import DpExec
