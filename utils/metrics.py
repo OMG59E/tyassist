@@ -9,7 +9,8 @@
 """
 import json
 import os
-
+import pickle
+import xml.etree.ElementTree as ET
 import torch
 import numpy as np
 from pathlib import Path
@@ -22,7 +23,7 @@ def smooth(y, f=0.05):
     nf = round(len(y) * f * 2) // 2 + 1  # number of filter elements (must be odd)
     p = np.ones(nf // 2)  # ones padding
     yp = np.concatenate((p * y[0], y, p * y[-1]), 0)  # y padded
-    return np.convolve(yp, np.ones(nf) / nf, mode='valid')  # y-smoothed
+    return np.convolve(yp, np.ones(nf) / nf, mode="valid")  # y-smoothed
 
 
 def compute_ap(recall, precision):
@@ -42,11 +43,11 @@ def compute_ap(recall, precision):
     mpre = np.flip(np.maximum.accumulate(np.flip(mpre)))
 
     # Integrate area under curve
-    method = 'interp'  # methods: 'continuous', 'interp'
-    if method == 'interp':
+    method = "interp"  # methods: "continuous", "interp"
+    if method == "interp":
         x = np.linspace(0, 1, 101)  # 101-point interp (COCO)
         ap = np.trapz(np.interp(x, mrec, mpre), x)  # integrate
-    else:  # 'continuous'
+    else:  # "continuous"
         i = np.where(mrec[1:] != mrec[:-1])[0]  # points where x axis (recall) changes
         ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])  # area under curve
 
@@ -118,6 +119,14 @@ def coco80_to_coco91_class():  # converts 80-index (val2014) to 91-index (paper)
         64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90]
 
 
+def detections2txt(detections, filepath):
+    with open(filepath, "w") as f:
+        for det in detections:
+            (x1, y1, x2, y2), conf, cls = det[0:4], det[4], det[5]
+            text = "{} {} {} {} {} {}\n".format(conf, cls, x1, y1, x2, y2)
+            f.write(text)
+
+
 def detection_txt2json(save_results, pred_json):
     """将检测的txt结果转为coco json
     JSON format [{"image_id": 42, "category_id": 18, "bbox": [258.15, 41.29, 348.26, 243.78], "score": 0.236}, ...]
@@ -180,7 +189,3 @@ def coco_eval(pred_json, anno_json, image_ids):
     except Exception as e:
         logger.error("pycocotools unable to run: {}".format(e))
         exit(-1)
-
-
-def voc_eval():
-    pass

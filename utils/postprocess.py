@@ -24,14 +24,6 @@ def softmax(x, axis=1):
     return e_x / np.sum(e_x, axis=axis, keepdims=True)
 
 
-def detections2txt(detections, filepath):
-    with open(filepath, "w") as f:
-        for det in detections:
-            (x1, y1, x2, y2), conf, cls = det[0:4], det[4], det[5]
-            text = "{} {} {} {} {} {}\n".format(conf, cls, x1, y1, x2, y2)
-            f.write(text)
-
-
 def clip_coords(boxes, shape):
     # Clip bounding xyxy bounding boxes to image shape (height, width)
     if isinstance(boxes, torch.Tensor):  # faster individually
