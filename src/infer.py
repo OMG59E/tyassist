@@ -114,10 +114,10 @@ class Infer(object):
         """
         t_start = time.time()
         for idx, in_data in enumerate(in_datas):
-            logger.info("inputs[{}], shape={}, dtype={}".format(idx, in_data.shape, in_data.dtype))
+            # logger.info("inputs[{}], shape={}, dtype={}".format(idx, in_data.shape, in_data.dtype))
             self._engine.set_input(0, idx, in_data.copy())
 
-        logger.info("model is running...")
+        # logger.info("model is running...")
         self._engine.run()
         self._engine.clear_input_data(0, 0)  # 第二个参数未使用
 
@@ -126,7 +126,7 @@ class Infer(object):
             outputs.append(self._engine.get_output(0, idx).numpy())
 
         cost = time.time() - t_start
-        logger.info("[runonchip] predict cost: {:.3f}ms".format(cost * 1000))
+        # logger.info("[runonchip] predict cost: {:.3f}ms".format(cost * 1000))
 
         if self._enable_dump:
             self._compare_dump_out()
