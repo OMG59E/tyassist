@@ -10,6 +10,8 @@
 import numpy as np
 import os
 import cv2
+import tqdm
+
 from .model_base import ModelBase
 from src.infer import Infer
 from utils import logger
@@ -28,7 +30,7 @@ class Classifier(ModelBase):
         self._std = std
         self._use_rgb = use_rgb
         self._use_norm = use_norm
-        self._resize_type =resize_type
+        self._resize_type = resize_type
         self._padding_value = padding_value
         self._padding_mode = padding_mode
 
@@ -59,17 +61,17 @@ class Classifier(ModelBase):
             padding_mode=self._padding_mode
         )
 
-    def _postprocess(self, outputs):
+    def _postprocess(self, outputs, cv_image=None):
+        if len(outputs) != 1:
+            logger.error("only one output, please check")
+            exit(-1)
+        outputs = outputs[0]  # bs=1
         return outputs
 
     def inference(self, cv_image):
         data = self._preprocess(cv_image)
         chip_outputs = self._infer.run([data])
-        if len(chip_outputs) != 1:
-            logger.error("Squeezenet only one output, please check")
-            exit(-1)
-        chip_output = chip_outputs[0]
-        chip_output = self._postprocess(chip_output)
+        chip_output = self._postprocess(chip_outputs)
         return chip_output
 
     def evaluate(self):
@@ -84,7 +86,7 @@ class Classifier(ModelBase):
         k = 5
         top1, top5 = 0, 0
         total_num = len(img_paths)
-        for idx, img_path in enumerate(img_paths):
+        for idx, img_path in enumerate(tqdm.tqdm(img_paths)):
             cv_image = cv2.imread(img_path)
             if cv_image is None:
                 logger.warning("Failed to decode img by opencv -> {}".format(img_path))
@@ -92,7 +94,7 @@ class Classifier(ModelBase):
 
             chip_output = self.inference(cv_image)
             idxes = np.argsort(-chip_output, axis=1, kind="quicksort").flatten()[0:k]  # 降序
-            logger.info("pred = {}, gt = {}".format(idxes, labels[idx]))
+            # logger.info("pred = {}, gt = {}".format(idxes, labels[idx]))
             if labels[idx] == idxes[0]:
                 top1 += 1
                 top5 += 1
@@ -112,6 +114,7 @@ class Classifier(ModelBase):
         if not os.path.exists(img_path):
             logger.error("The img path not exist -> {}".format(img_path))
             exit(-1)
+        logger.info("process: {}".format(img_path))
         cv_image = cv2.imread(img_path)
         if cv_image is None:
             logger.error("Failed to decode img by opencv -> {}".format(img_path))

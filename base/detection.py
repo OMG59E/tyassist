@@ -10,15 +10,17 @@
 import os
 import cv2
 import torch
+import tqdm
+
 from base.classification import Classifier
 from utils.postprocess import (
     non_max_suppression,
     scale_coords,
-    detections2txt,
 )
 from utils.metrics import (
     coco_eval,
     detection_txt2json,
+    detections2txt,
 )
 from utils.enum_type import PaddingMode
 from utils import logger
@@ -48,7 +50,7 @@ class Detector(Classifier):
     def set_conf_threshold(self, conf_threshold=0.25):
         self._conf_threshold = conf_threshold
 
-    def _postprocess(self, outputs):
+    def _postprocess(self, outputs, cv_image=None):
         if len(outputs) == 4 or len(outputs) == 1:
             outputs = outputs[0]
         elif len(outputs) == 3:
@@ -59,15 +61,15 @@ class Detector(Classifier):
             exit(-1)
         outputs = torch.from_numpy(outputs)
         outputs = non_max_suppression(outputs, self._conf_threshold, self._iou_threshold)
-        return outputs
+        outputs = outputs[0]  # bs=1
+        outputs[:, :4] = scale_coords(self._input_size, outputs[:, :4], cv_image.shape).round()
+        return outputs.numpy()
 
     def inference(self, cv_image):
         data = self._preprocess(cv_image)
         outputs = self._infer.run([data])
-        detections = self._postprocess(outputs)
-        detections = detections[0]  # bs=1
-        detections[:, :4] = scale_coords(self._input_size, detections[:, :4], cv_image.shape).round()
-        return detections.numpy()
+        detections = self._postprocess(outputs, cv_image)
+        return detections
 
     def evaluate(self):
         if not self._dataset:
@@ -80,7 +82,7 @@ class Detector(Classifier):
         if not os.path.exists(save_results):
             os.makedirs(save_results)
 
-        for idx, img_path in enumerate(img_paths):
+        for idx, img_path in enumerate(tqdm.tqdm(img_paths)):
             basename = os.path.basename(img_path)
             filename, ext = os.path.splitext(basename)
             label_path = os.path.join(save_results, "{}.txt".format(filename))
@@ -108,6 +110,7 @@ class Detector(Classifier):
             logger.error("The img path not exist -> {}".format(img_path))
             exit(-1)
         filename = os.path.basename(img_path)
+        logger.info("process: {}".format(img_path))
         cv_image = cv2.imread(img_path)
         if cv_image is None:
             logger.error("Failed to decode img by opencv -> {}".format(img_path))

@@ -38,10 +38,11 @@ class ModelBase(object, metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def _postprocess(self, outputs):
+    def _postprocess(self, outputs, cv_image=None):
         """
         内部后处理调用
         :param outputs: 模型推理输出
+        :param cv_image: 原图像
         :return:
         """
         pass
