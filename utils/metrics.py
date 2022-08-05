@@ -127,11 +127,12 @@ def detections2txt(detections, filepath):
             f.write(text)
 
 
-def detection_txt2json(save_results, pred_json):
+def detection_txt2json(save_results, pred_json, to_coco91=True):
     """将检测的txt结果转为coco json
     JSON format [{"image_id": 42, "category_id": 18, "bbox": [258.15, 41.29, 348.26, 243.78], "score": 0.236}, ...]
     :param save_results:
     :param pred_json:
+    :param to_coco91:
     :return:
     """
     label_files = os.listdir(save_results)
@@ -153,7 +154,7 @@ def detection_txt2json(save_results, pred_json):
                 y2 = int(float(y2))
                 w = x2 - x1 + 1
                 h = y2 - y1 + 1
-                category_id = coco80_to_coco91_class()[cls]
+                category_id = coco80_to_coco91_class()[cls] if to_coco91 else cls
                 pred_list.append({
                     "image_id": image_id,
                     "category_id": category_id,
