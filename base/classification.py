@@ -13,7 +13,6 @@ import cv2
 import tqdm
 
 from .model_base import ModelBase
-from src.infer import Infer
 from utils import logger
 from utils.preprocess import default_preprocess
 from utils.enum_type import PaddingMode
@@ -37,6 +36,7 @@ class Classifier(ModelBase):
     def load(self, model_dir: str, net_cfg_file="/DEngine/tyhcp/net.cfg",
              sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg", ip="127.0.0.1", port=9090,
              enable_dump=False, max_batch=1):
+        from src.infer import Infer
         self._infer = Infer(
             net_cfg_file=net_cfg_file,
             sdk_cfg_file=sdk_cfg_file,
