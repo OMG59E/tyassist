@@ -44,6 +44,7 @@ class Infer(object):
         self._result_dir = ""
         self._dump_root_path = ""
         self._ave_latency_ms = 0
+        self._total = 0
 
         if max_batch != 1:
             logger.error("Not support max_batch > 1 yet.")
@@ -73,7 +74,7 @@ class Infer(object):
             self._sdk.select_dump_profile(DumpProfileSel.Dump)
             self._sdk.set_dump_server_ip(get_host_ip(), self._port)
         else:
-            self._sdk.select_dump_profile(DumpProfileSel.Disable)
+            self._sdk.select_dump_profile(DumpProfileSel.Profile)
 
         self._sdk.sdk_init(self._sdk_cfg_file)
         logger.info("tyhcp init succeed.")
@@ -106,13 +107,18 @@ class Infer(object):
         self._engine = self._sdk.create_model(self._max_batch)
         self._engine.load_model(netbin_file)
 
+    @property
+    def ave_latency_ms(self):
+        if self._total == 0:
+            return 0
+        return self._ave_latency_ms / self._total
+
     def run(self, in_datas: list, to_file=False):
         """推理
         :param in_datas: list表示多输入
         :param to_file: 表示是否将结果输出至文件
         :return:
         """
-        t_start = time.time()
         for idx, in_data in enumerate(in_datas):
             # logger.info("inputs[{}], shape={}, dtype={}".format(idx, in_data.shape, in_data.dtype))
             self._engine.set_input(0, idx, in_data.copy())
@@ -125,8 +131,9 @@ class Infer(object):
         for idx in range(self._engine.get_num_outputs()):
             outputs.append(self._engine.get_output(0, idx).numpy())
 
-        cost = time.time() - t_start
-        # logger.info("[runonchip] predict cost: {:.3f}ms".format(cost * 1000))
+        self._total += 1
+        chip_cost = self._engine.get_profile_result()["last_model_exec_time"] * 0.001
+        self._ave_latency_ms += chip_cost
 
         if self._enable_dump:
             self._compare_dump_out()

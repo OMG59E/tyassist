@@ -56,6 +56,18 @@ class ModelBase(object, metaclass=abc.ABCMeta):
         """
         pass
 
+    @property
+    @abc.abstractmethod
+    def ave_latency_ms(self):
+        """模型芯片内部推理时间, 不是严格准确，仅供参考"""
+        pass
+
+    @property
+    @abc.abstractmethod
+    def end2end_latency_ms(self):
+        """python推理时间, 包括数据传入传出、预处理、后处理时间"""
+        pass
+
     @abc.abstractmethod
     def evaluate(self):
         """模型指标评估"""

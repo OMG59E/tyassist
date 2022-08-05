@@ -7,6 +7,7 @@
 @Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
+import time
 import os
 import cv2
 import torch
@@ -65,12 +66,6 @@ class Detector(Classifier):
         outputs[:, :4] = scale_coords(self._input_size, outputs[:, :4], cv_image.shape).round()
         return outputs.numpy()
 
-    def inference(self, cv_image):
-        data = self._preprocess(cv_image)
-        outputs = self._infer.run([data])
-        detections = self._postprocess(outputs, cv_image)
-        return detections
-
     def evaluate(self):
         if not self._dataset:
             logger.error("The dataset is null")
@@ -103,6 +98,7 @@ class Detector(Classifier):
             "num": len(img_paths),
             "map": "{:.6f}".format(_map),
             "map50": "{:.6f}".format(map50),
+            "latency": "{:.6f}".format(self.ave_latency_ms)
         }
 
     def demo(self, img_path):

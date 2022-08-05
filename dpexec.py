@@ -188,7 +188,9 @@ def test(cfg):
     res = model.evaluate()
     del sys.modules[dataset_module]
     del sys.modules[model_impl_module]
-    #
+
+    logger.info("chip ave cost {:.6f}ms".format(model.ave_latency_ms))
+    logger.info("[python] end2end ave cost: {:.6f}ms".format(model.end2end_latency_ms))
     logger.info("{}".format(res))
     return res
 
@@ -251,6 +253,8 @@ def demo(cfg):
 
         filepath = os.path.join(data_dir, filename)
         model.demo(filepath)
+    logger.info("[chip] ave cost {:.6f}ms".format(model.ave_latency_ms))
+    logger.info("[python end2end] ave cost: {:.6f}ms".format(model.end2end_latency_ms))
 
 
 def run(config_filepath, phase, log_dir):
@@ -314,9 +318,9 @@ def benchmark(mapping_file, log_dir):
 
         row = list()
         if "top1" in res:
-            row = [model_name, res["input_size"], res["dataset"], res["num"], "{}/{}".format(res["top1"], res["top5"]), "N/A"]
+            row = [model_name, res["input_size"], res["dataset"], res["num"], "{}/{}".format(res["top1"], res["top5"]), res["latency"]]
         elif "map" in res:
-            row = [model_name, res["input_size"], res["dataset"], res["num"], "{}/{}".format(res["map"], res["map50"]), "N/A"]
+            row = [model_name, res["input_size"], res["dataset"], res["num"], "{}/{}".format(res["map"], res["map50"]), res["latency"]]
         table.add_row(row)
         f_csv.writerow(row)
     f.close()

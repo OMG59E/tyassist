@@ -7,6 +7,7 @@
 @Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
+import time
 import numpy as np
 import os
 import cv2
@@ -32,6 +33,8 @@ class Classifier(ModelBase):
         self._resize_type = resize_type
         self._padding_value = padding_value
         self._padding_mode = padding_mode
+        self._end2end_latency_ms = 0
+        self._total = 0
 
     def load(self, model_dir: str, net_cfg_file="/DEngine/tyhcp/net.cfg",
              sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg", ip="127.0.0.1", port=9090,
@@ -68,10 +71,24 @@ class Classifier(ModelBase):
         outputs = outputs[0]  # bs=1
         return outputs
 
+    @property
+    def ave_latency_ms(self):
+        return self._infer.ave_latency_ms
+
+    @property
+    def end2end_latency_ms(self):
+        if self._total == 0:
+            return 0
+        return self._end2end_latency_ms / self._total
+
     def inference(self, cv_image):
+        t_start = time.time()
         data = self._preprocess(cv_image)
         chip_outputs = self._infer.run([data])
-        chip_output = self._postprocess(chip_outputs)
+        chip_output = self._postprocess(chip_outputs, cv_image)
+        end2end_cost = time.time() - t_start
+        self._end2end_latency_ms += (end2end_cost * 1000)
+        self._total += 1
         return chip_output
 
     def evaluate(self):
@@ -108,6 +125,7 @@ class Classifier(ModelBase):
             "num": total_num,
             "top1": "{:.6f}".format(top1),
             "top5": "{:.6f}".format(top5),
+            "latency": "{:.6f}".format(self.ave_latency_ms)
         }
 
     def demo(self, img_path):
