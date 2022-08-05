@@ -79,6 +79,25 @@ def box_iou(box1, box2, eps=1e-7):
     return inter / (box_area(box1.T)[:, None] + box_area(box2.T) - inter + eps)
 
 
+def bbox_overlap(bb_test, bb_gt):
+    """
+    Computes IUO between two bboxes in the form [x1,y1,x2,y2]
+    :param bb_test:
+    :param bb_gt:
+    :return: overlap
+    """
+    xx1 = np.maximum(bb_test[0], bb_gt[0])
+    yy1 = np.maximum(bb_test[1], bb_gt[1])
+    xx2 = np.minimum(bb_test[2], bb_gt[2])
+    yy2 = np.minimum(bb_test[3], bb_gt[3])
+    w = np.maximum(0., xx2 - xx1)
+    h = np.maximum(0., yy2 - yy1)
+    wh = w * h
+    overlap = wh / ((bb_test[2]-bb_test[0])*(bb_test[3]-bb_test[1]) + (bb_gt[2]-bb_gt[0])*(bb_gt[3]-bb_gt[1]) - wh)
+
+    return overlap
+
+
 def xyxy2xywh(x):
     # Convert nx4 boxes from [x1, y1, x2, y2] to [x, y, w, h] where xy1=top-left, xy2=bottom-right
     y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
@@ -195,3 +214,30 @@ def non_max_suppression(
             break  # time limit exceeded
 
     return output
+
+
+def post_nms(detections, iou_threshold):
+    # sort descend
+    detections = np.array(detections)  # [n, 6]
+    idxes = np.argsort(-(detections[:, 4]))
+    detections = list(detections[idxes])
+
+    # nms
+    tmp_detections = list()
+    keep_detections = list()
+    while len(detections) != 0:
+        if len(detections) == 1:
+            keep_detections.append(detections[0])
+            break
+
+        keep_detections.append(detections[0])
+
+        tmp_detections.clear()
+        for idx in range(1, len(detections)):
+            iou = bbox_overlap(keep_detections[-1][0:4], detections[idx][0:4])
+            if iou < iou_threshold:
+                tmp_detections.append(detections[idx])
+
+        detections = tmp_detections.copy()
+
+    return keep_detections
