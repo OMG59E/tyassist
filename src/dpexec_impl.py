@@ -241,7 +241,7 @@ class DpExec(object):
                     self._custom_preprocess_module, self._custom_preprocess_cls))
                 exit(-1)
 
-    def get_datas(self, use_norm=False):
+    def get_datas(self, use_norm=False, to_file=True):
         """获取处理数据, 外部归一化，输出数据类型为float32，否则使用uint8
         :return:
         """
@@ -278,9 +278,9 @@ class DpExec(object):
                     in_datas[_input["name"]] = np.random.randn(n, c, h, w).astype(dtype=np.float32)
                 else:
                     in_datas[_input["name"]] = np.random.randint(0, 255, (n, c, h, w)).astype(dtype=np.uint8)
-
-            # save data
-            in_datas[_input["name"]].tofile(os.path.join(self._result_dir, "data_{}_CRN.bin".format(idx)))
+            if to_file:
+                # save data
+                in_datas[_input["name"]].tofile(os.path.join(self._result_dir, "data_{}_CRN.bin".format(idx)))
 
         return in_datas
 
@@ -376,26 +376,30 @@ class DpExec(object):
         import deepeye
         return deepeye.eval_relay(relay_func, params, in_datas)
 
-    def tvm_fixed_output(self, in_datas):
+    def tvm_fixed_output(self, in_datas, to_file=True):
         """量化后模型在CPU端仿真推理
         :param in_datas:
+        :param to_file:
         :return:
         """
         fixed_outputs = self._eval_relay(self._relay_quant, {}, in_datas)
-        for idx, output in enumerate(fixed_outputs):
-            output.tofile(os.path.join(self._result_dir, "host_tvm_fixed_out_{}.bin".format(idx)))
-            output.tofile(os.path.join(self._result_dir, "host_tvm_fixed_out_{}.txt".format(idx)), sep="\n")
+        if to_file:
+            for idx, output in enumerate(fixed_outputs):
+                output.tofile(os.path.join(self._result_dir, "host_tvm_fixed_out_{}.bin".format(idx)))
+                output.tofile(os.path.join(self._result_dir, "host_tvm_fixed_out_{}.txt".format(idx)), sep="\n")
         return fixed_outputs
 
-    def tvm_float_output(self, in_datas):
+    def tvm_float_output(self, in_datas, to_file=True):
         """获取转译后的relay(可视为与原始模型等价)推理仿真结果
         :param in_datas:
+        :param to_file:
         :return:
         """
         float_outputs = self._eval_relay(self._relay, self._params, in_datas)
-        for idx, output in enumerate(float_outputs):
-            output.tofile(os.path.join(self._result_dir, "host_tvm_float_out_{}.bin".format(idx)))
-            output.tofile(os.path.join(self._result_dir, "host_tvm_float_out_{}.txt".format(idx)), sep="\n")
+        if to_file:
+            for idx, output in enumerate(float_outputs):
+                output.tofile(os.path.join(self._result_dir, "host_tvm_float_out_{}.bin".format(idx)))
+                output.tofile(os.path.join(self._result_dir, "host_tvm_float_out_{}.txt".format(idx)), sep="\n")
         return float_outputs
 
     def make_netbin(self, in_datas):
