@@ -321,6 +321,8 @@ def benchmark(mapping_file, log_dir):
             row = [model_name, res["input_size"], res["dataset"], res["num"], "{}/{}".format(res["top1"], res["top5"]), res["latency"]]
         elif "map" in res:
             row = [model_name, res["input_size"], res["dataset"], res["num"], "{}/{}".format(res["map"], res["map50"]), res["latency"]]
+        elif "easy" in res:
+            row = [model_name, res["input_size"], res["dataset"], res["num"], "{}/{}/{}".format(res["easy"], res["medium"], res["hard"]), res["latency"]]
         table.add_row(row)
         f_csv.writerow(row)
     f.close()
