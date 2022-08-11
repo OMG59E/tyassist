@@ -216,7 +216,7 @@ def non_max_suppression(
     return output
 
 
-def post_nms(detections, iou_threshold):
+def cpu_nms(detections, iou_threshold):
     # sort descend
     detections = np.array(detections)  # [n, 6]
     idxes = np.argsort(-(detections[:, 4]))
