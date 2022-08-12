@@ -29,6 +29,10 @@ def check_config(cfg):
         logger.error("The key(weight) must be in cfg")
         return False
 
+    if "enable_quant" not in cfg["build"]:
+        logger.error("The key(enable_quant) must be in cfg")
+        return False
+
     if not os.path.exists(cfg["model"]["weight"]):
         logger.error("The model weight not exist -> {}".format(cfg["model"]["weight"]))
         return False
@@ -47,13 +51,17 @@ def check_config(cfg):
             logger.error("pixel_format must be in [None, RGB, BGR, GRAY]")
             return False
 
+        if _input["pixel_format"] == "None" and not cfg["build"]["quant"]["custom_preprocess_cls"]:
+            logger.error("Pixel format == None, must be setting custom_preprocess")
+            return False
+
         if _input["padding_mode"] not in [0, 1]:
             logger.error("padding_mode must be in [0, 1]")
             return False
 
-        if _input["img_path"]:
-            if not os.path.exists(_input["img_path"]):
-                logger.error("img_path not exist -> {}".format(_input["img_path"]))
+        if _input["data_path"]:
+            if not os.path.exists(_input["data_path"]):
+                logger.error("data_path not exist -> {}".format(_input["data_path"]))
                 return False
 
     # 预处理模块检查
