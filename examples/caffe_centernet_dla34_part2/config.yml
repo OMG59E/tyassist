@@ -23,14 +23,14 @@ model: {
       name: "cat_blob11_input",  # 输入名称
       shape: [ 1, 128, 128, 128 ], # 原模型的实际输入形状
       layout: "NCHW",  # 输入数据布局，支持 NCHW，NHWC
-      pixel_format: "None",  # 像素格式，支持 None(未知), RGB，BGR，GRAY
-      mean: ,   # 输入均值，支持broadcast；不配置，表示不使能norm
-      std: ,   # 输入方差，支持broadcast；不配置，表示不使能norm
+      pixel_format: "None",  # 像素格式，支持 None(未知), RGB，BGR，GRAY，设置为None时必须配置自定义处理模块
+      mean: ,   # 输入均值，支持broadcast；不配置，默认0，存在自定义预处理情况下，无须在自定义模块内进行norm
+      std: ,   # 输入方差，支持broadcast；不配置，默认1，存在自定义预处理情况下，无须在自定义模块内进行norm
       resize_type: 0,   # resize类型，0-长宽分别resize，1-长边等比例resize，2-短边等比例resize，默认为0
       padding_value: 128,  # resize图像不足部分将自动padding，默认128
       padding_mode: 0,  # 目前仅支持 0: 左上角(LEFT_TOP), 1: 中心点(CENTER), 默认0，仅等比例resize生效
       # 用于比较各阶段输出的相似度，空表示采用随机数
-      img_path: ,
+      data_path: ,
     },
     {
       name: "relu_blob47_input",  # 输入名称
