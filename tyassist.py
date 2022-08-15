@@ -56,15 +56,15 @@ def build(cfg):
     # - 使用内部CR和norm预处理，输入必须是uint8数据；但如果打开dump功能，则又不能使能内部CR，但norm有效
     in_datas = dpexec.get_datas(use_norm=False)  # 仅需要自行resize和cvtColor
 
-    host_iss_fixed_output = None
     if cfg["build"]["enable_quant"]:
         # 量化模型
         dpexec.relay_quantization(in_datas)
-        # 编译生成芯片模型，
-        host_iss_fixed_output = dpexec.make_netbin(in_datas)
     else:
         # 加载已生成的量化模型
         dpexec.load_relay_from_json()
+
+    # 编译生成芯片模型
+    host_iss_fixed_output = dpexec.make_netbin(in_datas)
 
     # 量化后定点模型仿真，目前只支持在cpu上进行软仿
     host_tvm_fixed_output = dpexec.tvm_fixed_output(in_datas)
@@ -94,8 +94,6 @@ def compare(cfg):
     infer = Infer(
         net_cfg_file="/DEngine/tyhcp/net.cfg",
         sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-        ip="127.0.0.1",  # 存在net_cfg会覆盖ip设置
-        port=9090,
         enable_dump=dpexec.enable_dump,
         max_batch=1  # 目前仅支持最大batch 1
     )
@@ -174,8 +172,6 @@ def test(cfg):
         dpexec.model_dir,
         net_cfg_file="/DEngine/tyhcp/net.cfg",
         sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-        ip="127.0.0.1",  # 存在net_cfg会覆盖ip设置
-        port=9090,
         enable_dump=False,
         max_batch=1  # 目前仅支持最大batch 1
     )
@@ -234,8 +230,6 @@ def demo(cfg):
         dpexec.model_dir,
         net_cfg_file="/DEngine/tyhcp/net.cfg",
         sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-        ip="127.0.0.1",  # 存在net_cfg会覆盖ip设置
-        port=9090,
         enable_dump=False,
         max_batch=1  # 目前仅支持最大batch 1
     )

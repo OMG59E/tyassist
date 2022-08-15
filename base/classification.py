@@ -37,14 +37,11 @@ class Classifier(ModelBase):
         self._total = 0
 
     def load(self, model_dir: str, net_cfg_file="/DEngine/tyhcp/net.cfg",
-             sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg", ip="127.0.0.1", port=9090,
-             enable_dump=False, max_batch=1):
+             sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg", enable_dump=False, max_batch=1):
         from src.infer import Infer
         self._infer = Infer(
             net_cfg_file=net_cfg_file,
             sdk_cfg_file=sdk_cfg_file,
-            ip=ip,
-            port=port,
             enable_dump=enable_dump,
             max_batch=max_batch
         )

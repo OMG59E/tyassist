@@ -259,7 +259,7 @@ class DpExec(object):
                     in_datas[_input["name"]] = self._custom_preprocess_cls.get_single_data(data_path)
                 else:
                     # 采用默认预处理，目前支持1，3通道图像
-                    im = cv2.imread(data_path)
+                    im = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE if self._pixel_formats[idx] == PixelFormat.GRAY else cv2.IMREAD_COLOR)
                     _input["padding_size"], _ = calc_padding_size(im, (h, w), self.padding_mode(idx))
                     in_datas[_input["name"]] = default_preprocess(
                         im,
@@ -424,13 +424,13 @@ class DpExec(object):
             if self._enable_dump or self.has_custom_preprocess:
                 input_info[_input["name"]] = {"layout": "NCHW"}
             else:
-                logger.error(_input["padding_size"])
                 input_info[_input["name"]] = {
                     "layout": _input["pixel_format"],
                     "resize_type": _input["resize_type"],
                     "padding_size": _input["padding_size"],
                     "padding_value": _input["padding_value"],
                 }
+                logger.error("{}".format(input_info))
 
         deepeye.make_netbin(
             self._relay_quant,  # 提供输入数据类型信息
@@ -451,6 +451,7 @@ class DpExec(object):
             if not os.path.exists(netbin_file):
                 logger.error("Not found netbin_file -> {}".format(netbin_file))
                 exit(-1)
+
             in_datas_list = [in_datas[key] for key in in_datas]
             iss_fixed_outputs = run_net_bin(netbin_file, in_datas_list)
             for idx, output in enumerate(iss_fixed_outputs):

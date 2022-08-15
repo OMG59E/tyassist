@@ -24,16 +24,14 @@ from dcl.desdk import DumpProfileSel
 
 class Infer(object):
     def __init__(self, net_cfg_file="/DEngine/tyhcp/net.cfg", sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-                 ip="127.0.0.1", port=9090, enable_dump=False, max_batch=1):
+                 enable_dump=False, max_batch=1):
         """
         :param net_cfg_file:
         :param sdk_cfg_file:
-        :param ip:
-        :param port:
         :param enable_dump:
         """
-        self._ip = ip
-        self._port = port
+        self._ip = "127.0.0.1"
+        self._port = 9090
         self._net_cfg_file = net_cfg_file
         self._sdk_cfg_file = sdk_cfg_file
         self._enable_dump = enable_dump
@@ -58,10 +56,9 @@ class Infer(object):
             logger.error("Not found sdk_cfg_file -> {}".format(self._sdk_cfg_file))
             exit(-1)
 
-        f = open(self._net_cfg_file, "r")
-        net_cfg = f.read().strip()
-        f.close()
-        self._ip = net_cfg.split(":")[0]
+        with open(self._net_cfg_file, "r") as f:
+            net_cfg = f.read().strip()
+            self._ip = net_cfg.split(":")[0]
 
         logger.info("Try to connect to {}:{}".format(self._ip, self._port))
         remote = tvm.rpc.connect(self._ip, self._port)
@@ -72,7 +69,9 @@ class Infer(object):
 
         if self._enable_dump:
             self._sdk.select_dump_profile(DumpProfileSel.Dump)
-            self._sdk.set_dump_server_ip(get_host_ip(), self._port)
+            dump_server_ip = os.getenv("DUMP_SERVER_IP")
+            dump_server_port = os.getenv("DUMP_SERVER_PORT")
+            self._sdk.set_dump_server_ip(dump_server_ip, int(dump_server_port))
         else:
             self._sdk.select_dump_profile(DumpProfileSel.Profile)
 
