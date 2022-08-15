@@ -23,7 +23,7 @@ def calc_padding_size(im, target_size, padding_mode):
     top, bottom, left, right = 0, 0, 0, 0
 
     th, tw = target_size
-    h, w, _ = im.shape
+    h, w = im.shape[0], im.shape[1]
     nh, nw = 0, 0
     if h > w:
         nh = th
@@ -113,7 +113,8 @@ def default_preprocess(im, size, mean=None, std=None, use_norm=True, use_rgb=Fal
             im /= np.array(std, dtype=np.float32)
 
     if len(im.shape) == 2:
-        im = np.expand_dims(im, (0, -1))
+        im = np.expand_dims(im, 0)
+        im = np.expand_dims(im, 3)
     else:
         im = np.expand_dims(im, 0)
 
