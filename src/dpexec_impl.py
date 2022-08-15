@@ -43,7 +43,7 @@ class DpExec(object):
 
         self._data_layouts = list()
         self._pixel_formats = list()
-        self._data_types = list()
+        # self._data_types = list()
         self._resize_types = list()
         self._padding_modes = list()
         self._padding_values = list()
@@ -89,9 +89,9 @@ class DpExec(object):
             self._pixel_formats.append(pixel_format)
 
             # data type
-            dtype = np.uint8 if _input["pixel_format"] in ["RGB", "BGR", "GRAY"] else np.float32
-            _input["dtype"] = dtype
-            self._data_types.append(dtype)
+            # dtype = np.uint8 if _input["pixel_format"] in ["RGB", "BGR", "GRAY"] else np.float32
+            # _input["dtype"] = dtype
+            # self._data_types.append(dtype)
 
         self._model_dir = cfg["model"]["save_dir"]
         self._result_dir = os.path.join(self._model_dir, "result")
@@ -126,8 +126,8 @@ class DpExec(object):
     def shape(self, idx):
         return self._shapes[idx]
 
-    def data_type(self, idx):
-        return self._data_types[idx]
+    # def data_type(self, idx):
+    #     return self._data_types[idx]
 
     def data_layout(self, idx):
         return self._data_layouts[idx]
@@ -247,19 +247,19 @@ class DpExec(object):
         """
         in_datas = collections.OrderedDict()
         for idx, _input in enumerate(self._inputs):
-            img_path = _input["img_path"]
+            data_path = _input["data_path"]
             n, c, h, w = self.shape(idx)
             use_rgb = True if self.data_layout(idx) == PixelFormat.RGB else False
-            if img_path:
-                if not os.path.exists(img_path):
-                    logger.error("Not found img_path -> {}".format(img_path))
+            if data_path:
+                if not os.path.exists(data_path):
+                    logger.error("Not found data_path -> {}".format(data_path))
                     return None
                 if self._custom_preprocess_cls:
                     # 采用自定义预处理
-                    in_datas[_input["name"]] = self._custom_preprocess_cls.get_single_data(img_path)
+                    in_datas[_input["name"]] = self._custom_preprocess_cls.get_single_data(data_path)
                 else:
                     # 采用默认预处理，目前支持1，3通道图像
-                    im = cv2.imread(img_path)
+                    im = cv2.imread(data_path)
                     _input["padding_size"], _ = calc_padding_size(im, (h, w), self.padding_mode(idx))
                     in_datas[_input["name"]] = default_preprocess(
                         im,
@@ -271,10 +271,10 @@ class DpExec(object):
                         resize_type=_input["resize_type"],
                         padding_value=_input["padding_value"],
                         padding_mode=self.padding_mode(idx)
-                    ).astype(dtype=np.float32 if use_norm else self.data_type(idx))
+                    )
             else:
                 # 采用随机数据
-                if self.data_type(idx) == np.float32 or use_norm:
+                if use_norm:
                     in_datas[_input["name"]] = np.random.randn(n, c, h, w).astype(dtype=np.float32)
                 else:
                     in_datas[_input["name"]] = np.random.randint(0, 255, (n, c, h, w)).astype(dtype=np.uint8)
@@ -284,9 +284,8 @@ class DpExec(object):
 
         return in_datas
 
-    def relay_quantization(self):
+    def relay_quantization(self, in_datas):
         """量化，将浮点relay函数转为成定点relay函数
-        :return:
         """
         from tvm.relay.quantization import quantize, get_quantize_config
         from tvm.contrib.export import RelayExporter
@@ -294,7 +293,15 @@ class DpExec(object):
         in_dtypes, norm = dict(), dict()
         # 如果配置文件为设置mean/std
         for idx, _input in enumerate(self._inputs):
-            in_dtypes[_input["name"]] = "float32" if self.data_type(idx) == np.float32 else "uint8"
+            data_type = "uint8"
+            if in_datas[_input["name"]].dtype == np.uint8:
+                pass
+            elif in_datas[_input["name"]].dtype == np.float32:
+                data_type = "float32"
+            else:
+                logger.error("Input dtype not support -> {}".format(in_datas[_input["name"]].dtype))
+                exit(-1)
+            in_dtypes[_input["name"]] = data_type if self.has_custom_preprocess else "uint8"
             norm[_input["name"]] = {"mean": self.mean(idx), "std": self.std(idx), "axis": 1}
 
         quantize_config = get_quantize_config(self._target, in_dtypes)
@@ -319,7 +326,7 @@ class DpExec(object):
             # 此配置仅在 dataset 配置为图片集路径（即使用云天自带的预处理），且输入为3通道时有效，对生成芯片模型无效
             rgb_en=1 if (self.num_inputs == 1 and self._pixel_formats[0] == PixelFormat.RGB) else 0,
             # 均值方差，对生成芯片模型生效
-            norm=norm if not self._custom_preprocess_cls else None,
+            norm=norm,
             # 量化配置
             quantize_config=quantize_config,
             # 用来进行相似度以及相关量化效果确认
@@ -414,7 +421,7 @@ class DpExec(object):
             # 模型输入信息其key包含"layout", "resize_type", "padding_size", "padding_value"，都为可选参数，
             # 但如果配置了任意参数，则"layout"参数就必须设置为"RGB", "BGR"，"GRAY"三者之一
             # 开启dump功能，会禁止CR模块，需要将layout强设成NCHW来关闭CR功能
-            if self._enable_dump or _input["pixel_format"] == "None":
+            if self._enable_dump or self.has_custom_preprocess:
                 input_info[_input["name"]] = {"layout": "NCHW"}
             else:
                 logger.error(_input["padding_size"])

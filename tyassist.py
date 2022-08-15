@@ -52,15 +52,14 @@ def build(cfg):
     host_tvm_float_output = dpexec.tvm_float_output(in_datas)
 
     # 量化编译阶段
-    # - 存在自定义预处理的情况下输入必须是float32数据，不使用内部CR和norm
+    # - 存在自定义预处理的情况下，不使用内部CR, 但是用norm，输入数据可以是float32、uint8等不限制
     # - 使用内部CR和norm预处理，输入必须是uint8数据；但如果打开dump功能，则又不能使能内部CR，但norm有效
-    if not dpexec.has_custom_preprocess:
-        in_datas = dpexec.get_datas(use_norm=False)  # 仅需要自行resize和cvtColor
+    in_datas = dpexec.get_datas(use_norm=False)  # 仅需要自行resize和cvtColor
 
     host_iss_fixed_output = None
     if cfg["build"]["enable_quant"]:
         # 量化模型
-        dpexec.relay_quantization()
+        dpexec.relay_quantization(in_datas)
         # 编译生成芯片模型，
         host_iss_fixed_output = dpexec.make_netbin(in_datas)
     else:
@@ -91,9 +90,6 @@ def compare(cfg):
 
     dpexec = DpExec(cfg)
 
-    # 获取预处理数据
-    in_datas = dpexec.get_datas(use_norm=True)
-
     # device端 硬仿
     infer = Infer(
         net_cfg_file="/DEngine/tyhcp/net.cfg",
@@ -106,8 +102,7 @@ def compare(cfg):
     # 加载模型
     infer.load(dpexec.model_dir)
 
-    if not dpexec.has_custom_preprocess:
-        in_datas = dpexec.get_datas(use_norm=False)  # 仅需要自行resize和cvtColor
+    in_datas = dpexec.get_datas(use_norm=False)  # 仅需要自行resize和cvtColor
 
     in_datas = [in_datas[key] for key in in_datas]
     outputs = infer.run(in_datas, to_file=True)
