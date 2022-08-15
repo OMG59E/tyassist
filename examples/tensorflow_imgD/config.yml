@@ -5,7 +5,7 @@ model: {
   framework: "tensorflow",
 
   # 量化文件以及各种过程文件保存路径
-  save_dir: "/DEngine/tyexamples/models/dp2000_1",
+  save_dir: "./dp2000",
 
   # 模型权重路径，必须设置
   weight: "/DEngine/tyexamples/models/tensorflow/tensorflow_imgD/imgD.pb",
