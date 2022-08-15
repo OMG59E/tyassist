@@ -12,5 +12,5 @@ from base.classification import Classifier
 
 
 class SqueezeNetV1_1(Classifier):
-    def _postprocess(self, outputs):
+    def _postprocess(self, outputs, cv_image=None):
         return softmax(outputs, axis=1)
