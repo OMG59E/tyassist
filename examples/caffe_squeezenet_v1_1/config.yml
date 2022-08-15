@@ -13,9 +13,6 @@ model: {
   # 模型图结构定义路径，非caffe/mxnet框架模型可以不设置
   graph: "/DEngine/tyexamples/models/caffe/caffe_squeezenet_v1.1/deploy.prototxt",
 
-  # 模型输入数量
-  num_inputs: 1,
-
   # 模型输入配置，存在多个输入，注意顺序
   # 目前不能分别设置多个输入的NHWC->NCHW的转换, 必须相同
   inputs: [
@@ -30,7 +27,7 @@ model: {
       padding_value: 128,  # resize图像不足部分将自动padding，默认128
       padding_mode: 0,  # 目前仅支持 0: 左上角(LEFT_TOP), 1: 中心点(CENTER), 默认0，仅等比例resize生效
       # 用于比较各阶段输出的相似度，空表示采用随机数
-      data_path: "/DEngine/tymodelzoo/data/ILSVRC2012/ILSVRC2012_img_val/ILSVRC2012_val_00000001.JPEG",
+      data_path: "/DEngine/tyexamples/data/datasets/ILSVRC2012/ILSVRC2012_img_val/ILSVRC2012_val_00000001.JPEG",
     }
   ],
 
@@ -58,10 +55,10 @@ build: {
   # 量化配置参数，仅在enable_quant为true生效
   quant: {
     # 量化输入数据路径(必须设置)
-    data_dir: "/DEngine/tymodelzoo/data/ILSVRC2012/ILSVRC2012_img_val",
+    data_dir: "/DEngine/tyexamples/data/datasets/ILSVRC2012/ILSVRC2012_img_val",
 
     # 量化使用的数据数量，0表示使用所有数据，默认为0
-    prof_img_num: 100,
+    prof_img_num: 50,
 
     # 进行check_similarity的图片的张数，默认为1。
     # 如果大于1，最终会输出所有图片的平均相似度；如果等于0，则会处理similarity_dataset中所有图片
@@ -101,10 +98,10 @@ build: {
 # test时必须设置以下字段
 test: {
   # 指定test的数据集路径(必须设置)
-  data_dir: "/DEngine/tymodelzoo/data/ILSVRC2012/ILSVRC2012_img_val",
+  data_dir: "/DEngine/tyexamples/data/datasets/ILSVRC2012/ILSVRC2012_img_val",
 
   # test精度测试样例数，实际测试数为数据集内数据数与本数的较小者，不设置或者配置0为数据集内所有数据
-  test_num: 0,
+  test_num: 20,
 
   # 数据集模块名(必须设置), 必须与yml配置文件同级目录
   dataset_module: "dataset",
@@ -113,7 +110,7 @@ test: {
 
 demo: {
   # 指定demo的测试数据路径(必须设置)
-  data_dir: "/DEngine/tymodelzoo/data/ILSVRC2012/ILSVRC2012_img_val",
+  data_dir: "/DEngine/tyexamples/data/datasets/ILSVRC2012/ILSVRC2012_img_val",
   # demo测试样例数，实际测试数为数据路径内数据数与本数的较小者，配置0为数据路径内所有数据
   num: 20,
 }
