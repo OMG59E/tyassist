@@ -27,7 +27,7 @@ class CustomTensorFlowImgD(BaseCustomPreprocess):
 
         self._input_h = self._inputs[0]["shape"][1] if self._inputs[0]["layout"] == "NHWC" else self._inputs[0]["shape"][2]
         self._input_w = self._inputs[0]["shape"][2] if self._inputs[0]["layout"] == "NHWC" else self._inputs[0]["shape"][3]
-        self._dtype = np.uint8 if self._inputs[0]["dtype"] == "uint8" else np.float32
+        # self._dtype = np.uint8 if self._inputs[0]["dtype"] == "uint8" else np.float32
         self._calib_num = calib_num if calib_num < len(img_lists) else len(img_lists)
 
         self._data_lists = list()
@@ -72,14 +72,14 @@ class CustomTensorFlowImgD(BaseCustomPreprocess):
 
     def get_single_data(self, filepath):
         """用于处理指定输入图片的预处理，一般用于推理计算相似度
-            需要自行归一化norm
+            不需要norm归一化，工具链会根据配置文件，内部进行norm
         :param filepath:
         :return:
         """
         not_ext_path, ext = os.path.splitext(filepath)
         name = not_ext_path.split("/")[-1]
         depth_path = os.path.join(os.path.dirname(filepath), "..", "depth", "{}_depth{}".format(name, ext))
-        return self._preprocess(filepath, depth_path, use_norm=True)
+        return self._preprocess(filepath, depth_path, use_norm=False)
 
     def get_data(self):
         """工具链量化时内部调用预处理的函数，获取校准数据
@@ -90,5 +90,5 @@ class CustomTensorFlowImgD(BaseCustomPreprocess):
             in_data = dict()
             for _input in self._inputs:
                 in_data[_input["name"]] = self._preprocess(
-                    self._data_lists[i][0], self._data_lists[i][1], use_norm=False).astype(dtype=self._dtype)
+                    self._data_lists[i][0], self._data_lists[i][1], use_norm=False)
             yield in_data
