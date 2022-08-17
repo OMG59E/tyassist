@@ -18,5 +18,3 @@ console_handler.setFormatter(GLogFormatterWithColor())
 
 logger.addHandler(console_handler)
 logger.setLevel(logging.INFO)
-
-logging.getLogger("deepeye").setLevel(logging.WARNING)
