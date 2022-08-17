@@ -13,7 +13,10 @@ import time
 
 def format_message(record):
     try:
-        record_message = '%s' % (record.msg % record.args)
+        if len(record.args) == 0:
+            record_message = '%s' % record.msg
+        else:
+            record_message = '%s' % (record.msg % record.args)
     except TypeError:
         record_message = record.msg
     return record_message
