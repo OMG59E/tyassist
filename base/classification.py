@@ -47,6 +47,11 @@ class Classifier(ModelBase):
         )
         self._infer.load(model_dir)
 
+    @property
+    def is_fixed(self):
+        from src.infer_relay import InferRelay
+        return not isinstance(self._infer, InferRelay)
+
     def load_relay(self, input_names: list, callback):
         from src.infer_relay import InferRelay
         self._infer = InferRelay(input_names)

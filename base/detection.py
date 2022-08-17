@@ -73,7 +73,7 @@ class Detector(Classifier):
 
         img_paths = self._dataset.get_datas(num=self._test_num)
 
-        save_results = "results"
+        save_results = "results" if self._infer.is_fixed else "results_fp32"
         if not os.path.exists(save_results):
             os.makedirs(save_results)
 
@@ -114,7 +114,7 @@ class Detector(Classifier):
 
         detections = self.inference(cv_image)
 
-        save_results = "vis"
+        save_results = "vis" if self._infer.is_fixed else "vis_fp32"
         if not os.path.exists(save_results):
             os.makedirs(save_results)
 
