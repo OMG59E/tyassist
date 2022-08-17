@@ -29,6 +29,16 @@ class ModelBase(object, metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
+    def load_relay(self, input_names: list, callback):
+        """
+        加载relay模型
+        :param input_names: 模型输入名称
+        :param callback: x2relay 回调
+        :return:
+        """
+        pass
+
+    @abc.abstractmethod
     def _preprocess(self, cv_image):
         """
         内部预处理调用

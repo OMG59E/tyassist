@@ -38,6 +38,7 @@ class DpExec(object):
         self._num_inputs = len(self._inputs)
         self._num_outputs = len(self._outputs)
         self._relay_quant = None
+        self._params_quant = None
         self._relay = None
         self._params = None
 
@@ -112,6 +113,10 @@ class DpExec(object):
     @property
     def model_dir(self):
         return self._model_dir
+
+    @property
+    def input_names(self):
+        return [_input["name"] for _input in self._inputs]
 
     @property
     def num_inputs(self):
@@ -221,6 +226,8 @@ class DpExec(object):
         else:
             logger.error("Not support {} yet".format(self._framework))
             exit(-1)
+
+        return self._relay, self._params
 
     def set_custom_preprocess(self):
         """检查是否存在自定义预处理
@@ -347,12 +354,10 @@ class DpExec(object):
             sync_outdtype=True,
         )
 
-        # 将relay_func存为json
         quan_json_path = os.path.join(self._result_dir, "quantized.json")
-        tvm.relay.quantize.save_deepeye_quan_model(self._relay_quant, quan_json_path)
-        # 生成Netron模型可视化文件
         quan_model_path = os.path.join(self._result_dir, "quantized.model")
-        RelayExporter().save(self._relay_quant, quan_model_path)
+        tvm.relay.quantize.save_deepeye_quan_model(self._relay_quant, quan_json_path)  # 将relay_func存为json
+        RelayExporter().save(self._relay_quant, quan_model_path)  # 生成Netron模型可视化文件
 
         # 是否输出量化调试张量
         if self._quant_cfg["debug_level"] == 1:
@@ -361,7 +366,7 @@ class DpExec(object):
             # 此时会使用opt_ir.pdf中的op_name)，相应的value为浮点和定点结果的组成的list
             layer_outs = tvm.relay.quantization.compare_layer_outputs(self._result_dir)
 
-    def load_relay_from_json(self):
+    def load_relay_quant_from_json(self):
         """加载
         :return:
         """
@@ -430,7 +435,6 @@ class DpExec(object):
                     "padding_size": _input["padding_size"],
                     "padding_value": _input["padding_value"],
                 }
-                logger.error("{}".format(input_info))
 
         deepeye.make_netbin(
             self._relay_quant,  # 提供输入数据类型信息
@@ -468,3 +472,39 @@ class DpExec(object):
                 pickle.dump(weight, fp)
 
         return iss_fixed_outputs
+
+    # @staticmethod
+    # def bind_params(func, params):
+    #     name_dict = dict()
+    #     for arg in func.params:
+    #         name = arg.name_hint
+    #         if name in name_dict:
+    #             name_dict[name] = None
+    #         else:
+    #             name_dict[name] = arg
+    #
+    #     bind_dict = dict()
+    #     for k, v in params.items():
+    #         if k not in name_dict:
+    #             continue
+    #         arg = name_dict[k]
+    #         if arg is None:
+    #             logger.error("Multiple args in the function have name %s" % k)
+    #             exit(-1)
+    #         bind_dict[arg] = tvm.relay.expr.const(v, v.dtype)
+    #     return tvm.relay.expr.bind(func, bind_dict)
+    #
+    # @staticmethod
+    # def save_ir_to_json(filepath, relay_func, params=None):
+    #     if params and not isinstance(relay_func, tvm.relay.Function):
+    #         relay_func["main"] = DpExec.bind_params(relay_func, params)
+    #     elif params:
+    #         relay_func = DpExec.bind_params(relay_func, params)
+    #
+    #     if "ir" in tvm.__dict__:
+    #         json_str = tvm.ir.save_json(relay_func)
+    #     else:
+    #         json_str = tvm.save_json(relay_func)
+    #
+    #     with open(filepath, "w") as f:
+    #         json.dump(json_str, f)

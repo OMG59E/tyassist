@@ -61,7 +61,7 @@ def build(cfg):
         dpexec.relay_quantization(in_datas)
     else:
         # 加载已生成的量化模型
-        dpexec.load_relay_from_json()
+        dpexec.load_relay_quant_from_json()
 
     # 编译生成芯片模型
     host_iss_fixed_output = dpexec.make_netbin(in_datas)
@@ -123,7 +123,9 @@ def compare(cfg):
         logger.info("[runonchip] fixed(chip) vs float(tvm) output tensor: [{}] similarity={:.6f}".format(idx, dist1))
 
 
-def test(cfg):
+def test(cfg, dtype):
+    logging.getLogger("deepeye").setLevel(logging.WARNING)
+
     if not check_test_config(cfg):
         exit(-1)
 
@@ -168,13 +170,22 @@ def test(cfg):
         logger.error("{}.py has no class named {}".format(model_impl_module, model_impl_cls))
         exit(-1)
 
-    model.load(
-        dpexec.model_dir,
-        net_cfg_file="/DEngine/tyhcp/net.cfg",
-        sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-        enable_dump=False,
-        max_batch=1  # 目前仅支持最大batch 1
-    )
+    if dtype == "int8":
+        model.load(
+            dpexec.model_dir,
+            net_cfg_file="/DEngine/tyhcp/net.cfg",
+            sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
+            enable_dump=False,
+            max_batch=1  # 目前仅支持最大batch 1
+        )
+    elif dtype == "fp32":
+        model.load_relay(
+            dpexec.input_names,
+            dpexec.x2relay
+        )
+    else:
+        logger.error("Not support dtype -> {}".format(dtype))
+        exit(-1)
 
     res = model.evaluate()
     del sys.modules[dataset_module]
@@ -186,7 +197,9 @@ def test(cfg):
     return res
 
 
-def demo(cfg):
+def demo(cfg, dtype):
+    logging.getLogger("deepeye").setLevel(logging.WARNING)
+
     dpexec = DpExec(cfg)
 
     if dpexec.num_inputs > 1:
@@ -226,13 +239,22 @@ def demo(cfg):
         logger.error("{}.py has no class named {}".format(model_impl_module, model_impl_cls))
         exit(-1)
 
-    model.load(
-        dpexec.model_dir,
-        net_cfg_file="/DEngine/tyhcp/net.cfg",
-        sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-        enable_dump=False,
-        max_batch=1  # 目前仅支持最大batch 1
-    )
+    if dtype == "int8":
+        model.load(
+            dpexec.model_dir,
+            net_cfg_file="/DEngine/tyhcp/net.cfg",
+            sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
+            enable_dump=False,
+            max_batch=1  # 目前仅支持最大batch 1
+        )
+    elif dtype == "fp32":
+        model.load_relay(
+            dpexec.input_names,
+            dpexec.x2relay
+        )
+    else:
+        logger.error("Not support dtype -> {}".format(dtype))
+        exit(-1)
 
     for filename in file_list:
         _, ext = os.path.splitext(filename)
@@ -242,11 +264,11 @@ def demo(cfg):
 
         filepath = os.path.join(data_dir, filename)
         model.demo(filepath)
-    logger.info("[chip] ave cost {:.6f}ms".format(model.ave_latency_ms))
-    logger.info("[python end2end] ave cost: {:.6f}ms".format(model.end2end_latency_ms))
+    logger.info("average cost {:.6f}ms".format(model.ave_latency_ms))
+    logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
 
 
-def run(config_filepath, phase, log_dir):
+def run(config_filepath, phase, dtype, log_dir):
     check_file_exist(config_filepath)
     basename, _ = os.path.splitext(os.path.basename(config_filepath))
     set_logger(phase, log_dir, basename)
@@ -266,16 +288,16 @@ def run(config_filepath, phase, log_dir):
     elif phase == "infer":
         compare(config)
     elif phase == "test":
-        res = test(config)
+        res = test(config, dtype)
     elif phase == "demo":
-        demo(config)
+        demo(config, dtype)
 
     sys.path.remove(config_dir)
     logger.info("success")
     return res
 
 
-def benchmark(mapping_file, log_dir):
+def benchmark(mapping_file, dtype, log_dir):
     import csv
     from prettytable import PrettyTable
 
@@ -301,7 +323,7 @@ def benchmark(mapping_file, log_dir):
             continue
 
         os.chdir(config_dir)  # 切换至模型目录
-        res = run(config_abspath, "test", log_dir)
+        res = run(config_abspath, "test", dtype, log_dir)
         # logger.info("{}".format(res))
         os.chdir(root)  # 切换根目录
 
@@ -324,12 +346,14 @@ if __name__ == "__main__":
                         help="Please choose one of them")
     parser.add_argument("--config", "-c", type=str, required=True,
                         help="Please specify a configuration file")
+    parser.add_argument("--dtype", "-t", type=str, default="int8",
+                        help="Please specify a dtype(int8, fp32)")
     parser.add_argument("--log_dir", type=str, default="./logs",
                         help="Please specify a log dir, default ./logs")
 
     args = parser.parse_args()
 
     if args.type == "benchmark":
-        benchmark(args.config, args.log_dir)
+        benchmark(args.config, args.dtype, args.log_dir)
     else:
-        _ = run(args.config, args.type, args.log_dir)
+        _ = run(args.config, args.type, args.dtype, args.log_dir)

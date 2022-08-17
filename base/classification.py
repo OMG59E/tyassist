@@ -47,6 +47,11 @@ class Classifier(ModelBase):
         )
         self._infer.load(model_dir)
 
+    def load_relay(self, input_names: list, callback):
+        from src.infer_relay import InferRelay
+        self._infer = InferRelay(input_names)
+        self._infer.load(callback)
+
     def _preprocess(self, cv_image):
         return default_preprocess(
             cv_image,
@@ -81,12 +86,12 @@ class Classifier(ModelBase):
     def inference(self, cv_image):
         t_start = time.time()
         data = self._preprocess(cv_image)
-        chip_outputs = self._infer.run([data])
-        chip_output = self._postprocess(chip_outputs, cv_image)
+        outputs = self._infer.run([data])
+        output = self._postprocess(outputs, cv_image)
         end2end_cost = time.time() - t_start
         self._end2end_latency_ms += (end2end_cost * 1000)
         self._total += 1
-        return chip_output
+        return output
 
     def evaluate(self):
         """ top-k
@@ -138,4 +143,4 @@ class Classifier(ModelBase):
         chip_output = self.inference(cv_image)
         max_idx = np.argmax(chip_output, axis=1).flatten()[0]
         max_prob = chip_output[:, max_idx].flatten()[0]
-        logger.info("predict cls = {}, prob = {}".format(max_idx, max_prob))
+        logger.info("predict cls = {}, prob = {:.6f}".format(max_idx, max_prob))
