@@ -20,6 +20,7 @@ class InferRelay(object):
         self._relay = None
         self._params = None
         self._input_names = input_names
+        self._engine = None
         self._ave_latency_ms = 0
         self._total = 0
 
@@ -28,7 +29,20 @@ class InferRelay(object):
         :param callback:
         :return:
         """
+        import tvm
+        from tvm import relay
+        from tvm.contrib import graph_runtime
+        from deepeye.relay_pass import rewrite_for_cpu
+
         self._relay, self._params = callback()
+        relay_func = relay.relay_pass.bind_params(self._relay, self._params)
+        relay_func.ret_type = None
+        relay_func, cpu_params = rewrite_for_cpu(relay_func, sim_target="nnp300")
+        ctx = tvm.cpu(0)
+        with relay.build_config(opt_level=3):
+            graph, lib, cpu_params = relay.build(relay_func, "llvm", params=cpu_params)
+        self._engine = graph_runtime.create(graph, lib, ctx)
+        self._engine.set_input(**cpu_params)
 
     @property
     def ave_latency_ms(self):
@@ -42,7 +56,6 @@ class InferRelay(object):
         :param to_file: 表示是否将结果输出至文件
         :return:
         """
-        import deepeye
         if len(in_datas) != len(self._input_names):
             pass
         _in_datas = dict()
@@ -50,6 +63,10 @@ class InferRelay(object):
             _in_datas[self._input_names[idx]] = in_datas[idx]
         self._total += 1
         t_start = time.time()
-        outputs = deepeye.eval_relay(self._relay, self._params, _in_datas)
+        self._engine.set_input(**_in_datas)
+        self._engine.run()
+        outputs = list()
+        for idx in range(self._engine.get_num_outputs()):
+            outputs.append(self._engine.get_output(idx).asnumpy())
         self._ave_latency_ms += (time.time() - t_start) * 1000
         return outputs
