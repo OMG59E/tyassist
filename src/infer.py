@@ -176,6 +176,7 @@ class Infer(object):
     def __del__(self):
         if self._engine:
             self._engine.unload_model()
+            logger.info("unload model")
         if self._sdk:
             self._sdk.sdk_finalize()
 
