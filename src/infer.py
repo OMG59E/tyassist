@@ -8,8 +8,8 @@
 @Software: PyCharm
 """
 import os
-import sys
-sys.path.append("/DEngine/tyassist")
+# import sys
+# sys.path.append("/DEngine/tyassist")
 import time
 import shutil
 from utils import logger
