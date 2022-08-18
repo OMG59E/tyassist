@@ -191,8 +191,8 @@ def test(cfg, dtype):
     del sys.modules[dataset_module]
     del sys.modules[model_impl_module]
 
-    logger.info("chip ave cost {:.6f}ms".format(model.ave_latency_ms))
-    logger.info("[python] end2end ave cost: {:.6f}ms".format(model.end2end_latency_ms))
+    logger.info("average cost {:.6f}ms".format(model.ave_latency_ms))
+    logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
     logger.info("{}".format(res))
     return res
 
