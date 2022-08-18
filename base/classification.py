@@ -63,7 +63,7 @@ class Classifier(ModelBase):
             self._input_size,
             mean=self._mean,
             std=self._std,
-            use_norm=self._use_norm,
+            use_norm=self._use_norm if self.is_fixed else True,
             use_rgb=self._use_rgb,
             resize_type=self._resize_type,
             interpolation=cv2.INTER_LINEAR,
