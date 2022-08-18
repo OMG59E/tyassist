@@ -16,11 +16,6 @@ from utils import logger
 from utils.utils import get_host_ip
 from utils.compare import compare_dump_out
 
-import tvm
-import tvm.rpc
-import dcl
-from dcl.desdk import DumpProfileSel
-
 
 class Infer(object):
     def __init__(self, net_cfg_file="/DEngine/tyhcp/net.cfg", sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
@@ -59,24 +54,32 @@ class Infer(object):
         with open(self._net_cfg_file, "r") as f:
             net_cfg = f.read().strip()
             self._ip = net_cfg.split(":")[0]
+        try:
+            import tvm
+            import tvm.rpc
+            import dcl
+            from dcl.desdk import DumpProfileSel
 
-        logger.info("Try to connect to {}:{}".format(self._ip, self._port))
-        remote = tvm.rpc.connect(self._ip, self._port)
-        logger.info("connection succeed.")
+            logger.info("Try to connect to {}:{}".format(self._ip, self._port))
+            remote = tvm.rpc.connect(self._ip, self._port)
+            logger.info("connection succeed.")
 
-        self._sdk = dcl.DeSDKModule(remote)
-        logger.info("tyhcp version: {}".format(self._sdk.version))
+            self._sdk = dcl.DeSDKModule(remote)
+            logger.info("tyhcp version: {}".format(self._sdk.version))
 
-        if self._enable_dump:
-            self._sdk.select_dump_profile(DumpProfileSel.Dump)
-            dump_server_ip = os.getenv("DUMP_SERVER_IP")
-            dump_server_port = os.getenv("DUMP_SERVER_PORT")
-            self._sdk.set_dump_server_ip(dump_server_ip, int(dump_server_port))
-        else:
-            self._sdk.select_dump_profile(DumpProfileSel.Profile)
+            if self._enable_dump:
+                self._sdk.select_dump_profile(DumpProfileSel.Dump)
+                dump_server_ip = os.getenv("DUMP_SERVER_IP")
+                dump_server_port = os.getenv("DUMP_SERVER_PORT")
+                self._sdk.set_dump_server_ip(dump_server_ip, int(dump_server_port))
+            else:
+                self._sdk.select_dump_profile(DumpProfileSel.Profile)
 
-        self._sdk.sdk_init(self._sdk_cfg_file)
-        logger.info("tyhcp init succeed.")
+            self._sdk.sdk_init(self._sdk_cfg_file)
+            logger.info("tyhcp init succeed.")
+        except Exception as e:
+            logger.error("Import failed -> {}, please run in tyhcp".format(e))
+            exit(-1)
 
     def load(self, model_dir):
         """加载芯片模型
