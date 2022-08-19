@@ -146,6 +146,10 @@ class DpExec(object):
     def padding_mode(self, idx):
         return self._padding_modes[idx]
 
+    @property
+    def enable_aipp(self):
+        return not (self._enable_dump or self.has_custom_preprocess)
+
     def x2relay(self):
         """任意框架转译至relay格式
         """
@@ -248,7 +252,7 @@ class DpExec(object):
                     self._custom_preprocess_module, self._custom_preprocess_cls))
                 exit(-1)
 
-    def get_datas(self, use_norm=False, to_file=True):
+    def get_datas(self, use_norm=False, force_cr=False, to_file=True):
         """获取处理数据, 外部归一化，输出数据类型为float32，否则使用uint8
         :return:
         """
@@ -256,29 +260,41 @@ class DpExec(object):
         for idx, _input in enumerate(self._inputs):
             data_path = _input["data_path"]
             n, c, h, w = self.shape(idx)
-            use_rgb = True if self.data_layout(idx) == PixelFormat.RGB else False
+            use_rgb = True if self._pixel_formats[idx] == PixelFormat.RGB else False
             if data_path:
                 if not os.path.exists(data_path):
                     logger.error("Not found data_path -> {}".format(data_path))
                     return None
                 if self._custom_preprocess_cls:
-                    # 采用自定义预处理
+                    # use custom preprocess
                     in_datas[_input["name"]] = self._custom_preprocess_cls.get_single_data(data_path)
                 else:
-                    # 采用默认预处理，目前支持1，3通道图像
+                    # default preprocess，only image channel 1 or 3
                     im = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE if self._pixel_formats[idx] == PixelFormat.GRAY else cv2.IMREAD_COLOR)
-                    _input["padding_size"], _ = calc_padding_size(im, (h, w), self.padding_mode(idx))
-                    in_datas[_input["name"]] = default_preprocess(
-                        im,
-                        (h, w),
-                        mean=self.mean(idx),
-                        std=self.std(idx),
-                        use_norm=use_norm,
-                        use_rgb=use_rgb,
-                        resize_type=_input["resize_type"],
-                        padding_value=_input["padding_value"],
-                        padding_mode=self.padding_mode(idx)
-                    )
+                    if (not self.enable_aipp) or force_cr:
+                        _input["padding_size"], _ = calc_padding_size(im, (w, h), self.padding_mode(idx))
+                        in_datas[_input["name"]] = default_preprocess(
+                            im,
+                            (w, h),
+                            mean=self.mean(idx),
+                            std=self.std(idx),
+                            use_norm=use_norm,
+                            use_rgb=use_rgb,
+                            resize_type=_input["resize_type"],
+                            padding_value=_input["padding_value"],
+                            padding_mode=self.padding_mode(idx)
+                        )
+                    else:
+                        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)  # BGR -> RGB, aipp need
+                        if len(im.shape) not in [2, 3]:
+                            logger.error("Not support image shape -> {}".format(im.shape))
+                            exit(-1)
+                        if len(im.shape) == 2:  # gray
+                            im = np.expand_dims(im, axis=2)
+                            im = np.expand_dims(im, axis=0)
+                        else:
+                            im = np.expand_dims(im, axis=0)
+                        in_datas[_input["name"]] = im.transpose((0, 3, 1, 2))  # hwc -> chw, BGR888
             else:
                 # 采用随机数据
                 if use_norm:
@@ -288,6 +304,7 @@ class DpExec(object):
             if to_file:
                 # save data
                 in_datas[_input["name"]].tofile(os.path.join(self._result_dir, "data_{}_CRN.bin".format(idx)))
+                in_datas[_input["name"]].tofile(os.path.join(self._result_dir, "data_{}_CRN0.txt".format(idx)), sep="\n")
 
         return in_datas
 
@@ -426,7 +443,7 @@ class DpExec(object):
             # 模型输入信息其key包含"layout", "resize_type", "padding_size", "padding_value"，都为可选参数，
             # 但如果配置了任意参数，则"layout"参数就必须设置为"RGB", "BGR"，"GRAY"三者之一
             # 开启dump功能，会禁止CR模块，需要将layout强设成NCHW来关闭CR功能
-            if self._enable_dump or self.has_custom_preprocess:
+            if not self.enable_aipp:
                 input_info[_input["name"]] = {"layout": "NCHW"}
             else:
                 input_info[_input["name"]] = {
