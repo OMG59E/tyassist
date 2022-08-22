@@ -46,7 +46,7 @@ class Classifier(ModelBase):
             enable_dump=enable_dump,
             max_batch=max_batch
         )
-        self._enable_aipp = enable_aipp
+        self._enable_aipp = enable_aipp if self.is_fixed else False   # 浮点模型强制关闭aipp
         self._infer.load(model_dir, self._enable_aipp)
 
     @property
@@ -67,6 +67,7 @@ class Classifier(ModelBase):
             std=self._std,
             use_norm=self._use_norm if self.is_fixed else True,
             use_rgb=self._use_rgb,
+            use_resize=False if self._enable_aipp else True,
             resize_type=self._resize_type,
             interpolation=cv2.INTER_LINEAR,
             padding_value=self._padding_value,

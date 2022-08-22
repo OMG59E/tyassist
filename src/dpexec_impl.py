@@ -151,7 +151,8 @@ class DpExec(object):
 
     @property
     def enable_aipp(self):
-        return not (self._enable_dump or self.has_custom_preprocess)
+        # return not (self._enable_dump or self.has_custom_preprocess)
+        return False  # tyassist 默认关闭
 
     def x2relay(self):
         """任意框架转译至relay格式
@@ -283,12 +284,15 @@ class DpExec(object):
                             std=self.std(idx),
                             use_norm=use_norm,
                             use_rgb=use_rgb,
+                            use_resize=False if self.enable_aipp else True,
                             resize_type=_input["resize_type"],
                             padding_value=_input["padding_value"],
                             padding_mode=self.padding_mode(idx)
                         )
                     else:
-                        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)  # BGR -> RGB, aipp need
+                        if self._pixel_formats[idx] == PixelFormat.RGB:
+                            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)  # BGR -> RGB, aipp need
+
                         if len(im.shape) not in [2, 3]:
                             logger.error("Not support image shape -> {}".format(im.shape))
                             exit(-1)
