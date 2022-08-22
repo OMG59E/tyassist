@@ -33,6 +33,7 @@ class Infer(object):
         self._engine = None
         self._sdk = None
         self._max_batch = max_batch
+        self._enable_aipp = False
         self._model_dir = ""
         self._result_dir = ""
         self._dump_root_path = ""
@@ -81,12 +82,13 @@ class Infer(object):
             logger.error("Import failed -> {}, please run in tyhcp".format(e))
             exit(-1)
 
-    def load(self, model_dir):
+    def load(self, model_dir, enable_aipp=False):
         """加载芯片模型
         :param model_dir:
-        :param max_batch:
+        :param enable_aipp:
         :return:
         """
+        self._enable_aipp = enable_aipp
         self._model_dir = model_dir
         self._result_dir = os.path.join(self._model_dir, "result")
         if not os.path.exists(self._result_dir):
@@ -104,8 +106,8 @@ class Infer(object):
 
         logger.info("load model " + netbin_file)
 
-        # iss上目前不支持aipp，需要去使能
-        self._sdk.disable_aipp()
+        if not self._enable_aipp:
+            self._sdk.disable_aipp()
         self._engine = self._sdk.create_model(self._max_batch)
         self._engine.load_model(netbin_file)
 
@@ -122,7 +124,17 @@ class Infer(object):
         :return:
         """
         for idx, in_data in enumerate(in_datas):
-            # logger.info("inputs[{}], shape={}, dtype={}".format(idx, in_data.shape, in_data.dtype))
+            if self._enable_aipp:
+                shape = in_data.shape
+                h = shape[2]
+                w = shape[3]
+                if shape[1] == 3:
+                    self._engine.set_aipp(batch_idx=0, input_idx=idx, image_format=70, image_size=[w, h])
+                elif shape[1] == 2:
+                    self._engine.set_aipp(batch_idx=0, input_idx=idx, image_format=0, image_size=[w, h])
+                else:
+                    logger.error("Not support image shape -> {}".format(shape))
+                    exit(-1)
             self._engine.set_input(0, idx, in_data.copy())
 
         # logger.info("model is running...")
