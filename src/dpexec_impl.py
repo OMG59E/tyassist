@@ -137,6 +137,9 @@ class DpExec(object):
     def data_layout(self, idx):
         return self._data_layouts[idx]
 
+    def pixel_formats(self, idx):
+        return self._pixel_formats[idx]
+
     def resize_type(self, idx):
         return self._resize_types[idx]
 

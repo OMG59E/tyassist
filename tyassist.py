@@ -19,6 +19,7 @@ from utils import logger
 from utils.glog_format import GLogFormatter
 from utils.parser import read_yaml_to_dict
 from utils.dist_metrics import cosine_distance
+from utils.enum_type import PixelFormat
 from utils.check import (
     check_config,
     check_demo_config,
@@ -41,32 +42,21 @@ def set_logger(op, log_dir, filename):
 def build(cfg):
     dpexec = DpExec(cfg)
 
-    # 获取预处理数据
-    in_datas = dpexec.get_datas(use_norm=True)
+    in_datas = dpexec.get_datas(use_norm=True, force_cr=True)
 
-    # 将模型转译成relay格式
     dpexec.x2relay()
 
-    # 转译后的浮点模型仿真，仿真结果可视为原模型的浮点结果，作为绝对参考
-    # 这里需要预处理后的float32数据
     host_tvm_float_output = dpexec.tvm_float_output(in_datas)
 
-    # 量化编译阶段
-    # - 存在自定义预处理的情况下，不使用内部CR, 但是用norm，输入数据可以是float32、uint8等不限制
-    # - 使用内部CR和norm预处理，输入必须是uint8数据；但如果打开dump功能，则又不能使能内部CR，但norm有效
-    in_datas = dpexec.get_datas(use_norm=False)  # 仅需要自行resize和cvtColor
+    in_datas = dpexec.get_datas(use_norm=False, force_cr=True)  # tvm iss not support CR
 
     if cfg["build"]["enable_quant"]:
-        # 量化模型
         dpexec.relay_quantization(in_datas)
     else:
-        # 加载已生成的量化模型
         dpexec.load_relay_quant_from_json()
 
-    # 编译生成芯片模型
     host_iss_fixed_output = dpexec.make_netbin(in_datas)
 
-    # 量化后定点模型仿真，目前只支持在cpu上进行软仿
     host_tvm_fixed_output = dpexec.tvm_fixed_output(in_datas)
 
     # 计算相似度
@@ -90,22 +80,21 @@ def compare(cfg):
 
     dpexec = DpExec(cfg)
 
-    # device端 硬仿
     infer = Infer(
         net_cfg_file="/DEngine/tyhcp/net.cfg",
         sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
         enable_dump=dpexec.enable_dump,
-        max_batch=1  # 目前仅支持最大batch 1
+        max_batch=1  # only batch 1
     )
-    # 加载模型
-    infer.load(dpexec.model_dir)
 
-    in_datas = dpexec.get_datas(use_norm=False)  # 仅需要自行resize和cvtColor
+    infer.load(dpexec.model_dir, dpexec.enable_aipp)
+
+    in_datas = dpexec.get_datas(use_norm=False, force_cr=False)
 
     in_datas = [in_datas[key] for key in in_datas]
     outputs = infer.run(in_datas, to_file=True)
 
-    # 比对相似度
+    # compare
     for idx, chip_fixed_output in enumerate(outputs):
         tvm_float_out_path = os.path.join(dpexec.model_dir, "result", "host_tvm_float_out_{}.bin".format(idx))
         tvm_fixed_out_path = os.path.join(dpexec.model_dir, "result", "host_tvm_fixed_out_{}.bin".format(idx))
@@ -159,7 +148,7 @@ def test(cfg, dtype):
             mean=dpexec.mean(0),
             std=dpexec.std(0),
             use_norm=False,
-            use_rgb=True if dpexec.data_layout(0) == "RGB" else False,
+            use_rgb=True if dpexec.pixel_formats(0) == PixelFormat.RGB else False,
             resize_type=dpexec.resize_type(0),
             padding_value=dpexec.padding_value(0),
             padding_mode=dpexec.padding_mode(0),
@@ -175,6 +164,7 @@ def test(cfg, dtype):
             dpexec.model_dir,
             net_cfg_file="/DEngine/tyhcp/net.cfg",
             sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
+            enable_aipp=dpexec.enable_aipp,
             enable_dump=False,
             max_batch=1  # 目前仅支持最大batch 1
         )
@@ -229,7 +219,7 @@ def demo(cfg, dtype):
             mean=dpexec.mean(0),
             std=dpexec.std(0),
             use_norm=False,
-            use_rgb=True if dpexec.data_layout(0) == "RGB" else False,
+            use_rgb=True if dpexec.pixel_formats(0) == PixelFormat.RGB else False,
             resize_type=dpexec.resize_type(0),
             padding_value=dpexec.padding_value(0),
             padding_mode=dpexec.padding_mode(0),
@@ -244,6 +234,7 @@ def demo(cfg, dtype):
             dpexec.model_dir,
             net_cfg_file="/DEngine/tyhcp/net.cfg",
             sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
+            enable_aipp=dpexec.enable_aipp,
             enable_dump=False,
             max_batch=1  # 目前仅支持最大batch 1
         )
