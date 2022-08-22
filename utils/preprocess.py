@@ -9,6 +9,7 @@
 """
 import cv2
 import numpy as np
+from utils import logger
 from utils.enum_type import PaddingMode
 
 
@@ -22,7 +23,7 @@ def calc_padding_size(im, target_size, padding_mode):
     """
     top, bottom, left, right = 0, 0, 0, 0
 
-    th, tw = target_size
+    tw, th = target_size
     h, w = im.shape[0], im.shape[1]
     nh, nw = 0, 0
     if h > w:
@@ -35,7 +36,8 @@ def calc_padding_size(im, target_size, padding_mode):
             left = int((tw - nw) * 0.5)
             right = tw - nw - left
         else:
-            raise "Not support padding mode -> {}".format(padding_mode)
+            logger.error("Not support padding mode -> {}".format(padding_mode))
+            exit(-1)
     else:
         nw = tw
         s = float(w) / nw
@@ -47,7 +49,8 @@ def calc_padding_size(im, target_size, padding_mode):
             top = int((th - nh) * 0.5)
             bottom = th - nh - top
         else:
-            raise "Not support padding mode -> {}".format(padding_mode)
+            logger.error("Not support padding mode -> {}".format(padding_mode))
+            exit(-1)
 
     padding_size = [top, bottom, left, right]
     size =(nh, nw)
@@ -65,7 +68,10 @@ def resize(im, size, resize_type=0, padding_value=128, padding_mode=PaddingMode.
     :param interpolation:
     :return:
     """
-    assert resize_type in [0, 1, 2], "resize_type must be equal 0 or 1 or 2"
+    if resize_type not in [0, 1, 2]:
+        logger.error("resize_type must be equal 0 or 1 or 2")
+        exit(-1)
+
     if resize_type == 0:
         return cv2.resize(im, size, interpolation=interpolation)
 
@@ -78,10 +84,11 @@ def resize(im, size, resize_type=0, padding_value=128, padding_mode=PaddingMode.
         return cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=padding_value)
 
     if resize_type == 2:
-        raise "Not support yet"
+        logger.error("Not support yet")
+        exit(-1)
 
 
-def default_preprocess(im, size, mean=None, std=None, use_norm=True, use_rgb=False, resize_type=0,
+def default_preprocess(im, size, mean=None, std=None, use_norm=True, use_rgb=False, use_resize=True, resize_type=0,
                        interpolation=cv2.INTER_LINEAR, padding_value=128, padding_mode=PaddingMode.LEFT_TOP):
     """默认预处理函数
     :param im: BGR or GRAY图像
@@ -90,17 +97,24 @@ def default_preprocess(im, size, mean=None, std=None, use_norm=True, use_rgb=Fal
     :param std:
     :param use_norm:
     :param use_rgb:
+    :param use_resize:
     :param interpolation:
     :param resize_type:  0-长宽分别resize，1-长边等比例resize，2-短边等比例resize，默认为0
     :param padding_value:
     :param padding_mode:  目前仅支持左上角(LEFT_TOP)和中心点(CENTER)
     :return:
     """
-    assert im is not None, "Image is None, please check!"
-    im = resize(im, size, resize_type=resize_type,
-                padding_value=padding_value, padding_mode=padding_mode, interpolation=interpolation)
+    if im is None:
+        logger.error("Image is None, please check!")
+        exit(-1)
 
-    assert len(im.shape) in [2, 3], "Image must be 2d or 3d"
+    if use_resize:
+        im = resize(im, size, resize_type=resize_type,
+                    padding_value=padding_value, padding_mode=padding_mode, interpolation=interpolation)
+
+    if len(im.shape) not in [2, 3]:
+        logger.error("Image must be 2d or 3d")
+        exit(-1)
 
     if use_rgb and len(im.shape) == 3:
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)

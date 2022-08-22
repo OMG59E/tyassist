@@ -20,10 +20,15 @@ class ModelBase(object, metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def load(self, model_dir):
+    def load(self, model_dir, net_cfg_file, sdk_cfg_file, enable_aipp, enable_dump, max_batch):
         """
         加载模型
         :param model_dir: 模型目录
+        :param net_cfg_file: ip配置文件，127.0.0.1表示本机iss服务，实际ip表示evb开发板ip
+        :param sdk_cfg_file: sdk配置文件
+        :param enable_aipp: 是否使能aipp模块
+        :param enable_dump: 是否使能dump服务，进行逐层分析
+        :param max_batch: 目前仅支持1
         :return:
         """
         pass

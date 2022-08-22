@@ -35,9 +35,10 @@ class Classifier(ModelBase):
         self._padding_mode = padding_mode
         self._end2end_latency_ms = 0
         self._total = 0
+        self._enable_aipp = False
 
     def load(self, model_dir: str, net_cfg_file="/DEngine/tyhcp/net.cfg",
-             sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg", enable_dump=False, max_batch=1):
+             sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg", enable_aipp=False, enable_dump=False, max_batch=1):
         from src.infer import Infer
         self._infer = Infer(
             net_cfg_file=net_cfg_file,
@@ -45,7 +46,8 @@ class Classifier(ModelBase):
             enable_dump=enable_dump,
             max_batch=max_batch
         )
-        self._infer.load(model_dir)
+        self._enable_aipp = enable_aipp if self.is_fixed else False   # 浮点模型强制关闭aipp
+        self._infer.load(model_dir, self._enable_aipp)
 
     @property
     def is_fixed(self):
@@ -65,6 +67,7 @@ class Classifier(ModelBase):
             std=self._std,
             use_norm=self._use_norm if self.is_fixed else True,
             use_rgb=self._use_rgb,
+            use_resize=False if self._enable_aipp else True,
             resize_type=self._resize_type,
             interpolation=cv2.INTER_LINEAR,
             padding_value=self._padding_value,
