@@ -88,7 +88,7 @@ def resize(im, size, resize_type=0, padding_value=128, padding_mode=PaddingMode.
         exit(-1)
 
 
-def default_preprocess(im, size, mean=None, std=None, use_norm=True, use_rgb=False, resize_type=0,
+def default_preprocess(im, size, mean=None, std=None, use_norm=True, use_rgb=False, use_resize=True, resize_type=0,
                        interpolation=cv2.INTER_LINEAR, padding_value=128, padding_mode=PaddingMode.LEFT_TOP):
     """默认预处理函数
     :param im: BGR or GRAY图像
@@ -97,6 +97,7 @@ def default_preprocess(im, size, mean=None, std=None, use_norm=True, use_rgb=Fal
     :param std:
     :param use_norm:
     :param use_rgb:
+    :param use_resize:
     :param interpolation:
     :param resize_type:  0-长宽分别resize，1-长边等比例resize，2-短边等比例resize，默认为0
     :param padding_value:
@@ -107,8 +108,9 @@ def default_preprocess(im, size, mean=None, std=None, use_norm=True, use_rgb=Fal
         logger.error("Image is None, please check!")
         exit(-1)
 
-    im = resize(im, size, resize_type=resize_type,
-                padding_value=padding_value, padding_mode=padding_mode, interpolation=interpolation)
+    if use_resize:
+        im = resize(im, size, resize_type=resize_type,
+                    padding_value=padding_value, padding_mode=padding_mode, interpolation=interpolation)
 
     if len(im.shape) not in [2, 3]:
         logger.error("Image must be 2d or 3d")
