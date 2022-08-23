@@ -446,7 +446,7 @@ class DpExec(object):
         import deepeye
         from deepeye.relay_pass import dump_func_output
         input_info = dict()
-        for _input in self._inputs:
+        for idx, _input in enumerate(self._inputs):
             # 模型输入信息其key包含"layout", "resize_type", "padding_size", "padding_value"，都为可选参数，
             # 但如果配置了任意参数，则"layout"参数就必须设置为"RGB", "BGR"，"GRAY"三者之一
             # 开启dump功能，会禁止CR模块，需要将layout强设成NCHW来关闭CR功能
@@ -456,7 +456,7 @@ class DpExec(object):
                 input_info[_input["name"]] = {
                     "layout": _input["pixel_format"],
                     "resize_type": _input["resize_type"],
-                    "padding_size": _input["padding_size"],
+                    "padding_size": None if PaddingMode.CENTER == self.padding_mode(idx) else _input["padding_size"],
                     "padding_value": _input["padding_value"],
                 }
 
