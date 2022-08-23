@@ -58,6 +58,7 @@ link_directories(
 
 add_executable(${CMAKE_PROJECT_NAME}
     src/common/utils.cpp
+    src/common/random.cpp
     src/common/model_process.cpp
     src/common/device_process.cpp
     src/main.cpp)
