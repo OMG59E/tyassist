@@ -8,7 +8,7 @@ model: {
   save_dir: "./dp2000",
 
   # 模型权重路径，必须设置
-  weight: "/DEngine/tyexamples/models/onnx/onnx_squeezenet_v1.1/squeezenet1.1-7.onnx",
+  weight: "../../models/onnx/onnx_squeezenet_v1.1/squeezenet1.1-7.onnx",
 
   # 模型图结构定义路径，非caffe/mxnet框架模型可以不设置
   graph: "",

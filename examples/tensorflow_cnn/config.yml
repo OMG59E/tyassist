@@ -8,7 +8,7 @@ model: {
   save_dir: "./dp2000",
 
   # 模型权重路径，必须设置
-  weight: "/DEngine/test/models/tensorflow/tensorflow_cnn/cnn.pb",
+  weight: "../../models/tensorflow/tensorflow_cnn/cnn.pb",
 
   # 模型图结构定义路径，非caffe/mxnet框架模型可以不设置
   graph: "",

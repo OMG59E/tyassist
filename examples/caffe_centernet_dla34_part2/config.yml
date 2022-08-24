@@ -11,10 +11,10 @@ model: {
   save_dir: "./dp2000",
 
   # 模型权重路径，必须设置
-  weight: "/DEngine/tyexamples/models/caffe/caffe_centernet_dla34/invasion_dla34.caffemodel",
+  weight: "../../models/caffe/caffe_centernet_dla34/invasion_dla34.caffemodel",
 
   # 模型图结构定义路径，非caffe/mxnet框架模型可以不设置
-  graph: "/DEngine/tyexamples/models/caffe/caffe_centernet_dla34/caffe_centernet_dla34_part2.prototxt",
+  graph: "../../models/caffe/caffe_centernet_dla34/caffe_centernet_dla34_part2.prototxt",
 
   # 模型输入配置，存在多个输入，注意顺序
   # 目前不能分别设置多个输入的NHWC->NCHW的转换, 必须相同
