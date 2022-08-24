@@ -52,7 +52,7 @@ def calc_padding_size(im, target_size, padding_mode):
             logger.error("Not support padding mode -> {}".format(padding_mode))
             exit(-1)
 
-    padding_size = [top, bottom, left, right]
+    padding_size = [top, left, bottom, right]
     size =(nh, nw)
     return padding_size, size
 
@@ -79,7 +79,7 @@ def resize(im, size, resize_type=0, padding_value=128, padding_mode=PaddingMode.
         padding_size, nsize = calc_padding_size(im, size, padding_mode=padding_mode)
         h, w = nsize
         im = cv2.resize(im, (w, h), interpolation=interpolation)
-        top, bottom, left, right = padding_size
+        top, left, bottom, right = padding_size
 
         return cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=padding_value)
 
@@ -133,4 +133,3 @@ def default_preprocess(im, size, mean=None, std=None, use_norm=True, use_rgb=Fal
         im = np.expand_dims(im, 0)
 
     return im.transpose((0, 3, 1, 2))
-

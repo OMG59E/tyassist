@@ -14,6 +14,7 @@ import time
 import shutil
 from utils import logger
 from utils.utils import get_host_ip
+from utils.enum_type import PixelFormat
 from utils.compare import compare_dump_out
 
 
@@ -39,6 +40,7 @@ class Infer(object):
         self._dump_root_path = ""
         self._ave_latency_ms = 0
         self._total = 0
+        self._pixel_formats = [PixelFormat.RGB]  # 70
 
         if max_batch != 1:
             logger.error("Not support max_batch > 1 yet.")
@@ -111,6 +113,9 @@ class Infer(object):
         self._engine = self._sdk.create_model(self._max_batch)
         self._engine.load_model(netbin_file)
 
+    def set_pixel_format(self, pixel_formats):
+        self._pixel_formats = pixel_formats
+
     @property
     def ave_latency_ms(self):
         if self._total == 0:
@@ -128,13 +133,15 @@ class Infer(object):
                 shape = in_data.shape
                 h = shape[2]
                 w = shape[3]
+                image_format = 70
                 if shape[1] == 3:
-                    self._engine.set_aipp(batch_idx=0, input_idx=idx, image_format=70, image_size=[w, h])
+                    image_format = 70 if self._pixel_formats[idx] == PixelFormat.RGB else 71
                 elif shape[1] == 2:
-                    self._engine.set_aipp(batch_idx=0, input_idx=idx, image_format=0, image_size=[w, h])
+                    image_format = 0
                 else:
                     logger.error("Not support image shape -> {}".format(shape))
                     exit(-1)
+                self._engine.set_aipp(batch_idx=0, input_idx=idx, image_format=image_format, image_size=[w, h])
             self._engine.set_input(0, idx, in_data.copy())
 
         # logger.info("model is running...")

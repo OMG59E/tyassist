@@ -41,6 +41,7 @@ class DpExec(object):
         self._params_quant = None
         self._relay = None
         self._params = None
+        self._enable_aipp = True if cfg["build"].get("enable_aipp") else False
 
         self._data_layouts = list()
         self._pixel_formats = list()
@@ -151,8 +152,7 @@ class DpExec(object):
 
     @property
     def enable_aipp(self):
-        # return not (self._enable_dump or self.has_custom_preprocess)
-        return False  # tyassist 默认关闭
+        return (not (self._enable_dump or self.has_custom_preprocess)) and self._enable_aipp
 
     def x2relay(self):
         """任意框架转译至relay格式
@@ -284,7 +284,7 @@ class DpExec(object):
                             std=self.std(idx),
                             use_norm=use_norm,
                             use_rgb=use_rgb,
-                            use_resize=False if self.enable_aipp else True,
+                            use_resize=True,
                             resize_type=_input["resize_type"],
                             padding_value=_input["padding_value"],
                             padding_mode=self.padding_mode(idx)

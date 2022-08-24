@@ -88,6 +88,7 @@ def compare(cfg):
     )
 
     infer.load(dpexec.model_dir, dpexec.enable_aipp)
+    infer.set_pixel_format([dpexec.pixel_formats(idx) for idx in range(len(dpexec.input_names))])
 
     in_datas = dpexec.get_datas(use_norm=False, force_cr=False)
 
@@ -164,7 +165,7 @@ def test(cfg, dtype):
             dpexec.model_dir,
             net_cfg_file="/DEngine/tyhcp/net.cfg",
             sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-            enable_aipp=dpexec.enable_aipp,
+            enable_aipp=False,  # dpexec.enable_aipp
             enable_dump=False,
             max_batch=1  # 目前仅支持最大batch 1
         )
@@ -234,7 +235,7 @@ def demo(cfg, dtype):
             dpexec.model_dir,
             net_cfg_file="/DEngine/tyhcp/net.cfg",
             sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-            enable_aipp=dpexec.enable_aipp,
+            enable_aipp=False,  # dpexec.enable_aipp,
             enable_dump=False,
             max_batch=1  # 目前仅支持最大batch 1
         )
