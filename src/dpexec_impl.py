@@ -394,7 +394,7 @@ class DpExec(object):
         """加载
         :return:
         """
-        quan_json_path = os.path.join(self._model_dir, "quantized.json")
+        quan_json_path = os.path.join(self._result_dir, "quantized.json")
         if not os.path.exists(quan_json_path):
             logger.error("Not found quant_json")
             exit(-1)
