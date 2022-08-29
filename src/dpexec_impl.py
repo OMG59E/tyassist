@@ -41,7 +41,7 @@ class DpExec(object):
         self._params_quant = None
         self._relay = None
         self._params = None
-        self._enable_aipp = True if cfg["build"].get("enable_aipp") else False
+        self._enable_aipp = cfg["build"].get("enable_aipp") if "enable_aipp" in cfg["build"] else True
 
         self._data_layouts = list()
         self._pixel_formats = list()
