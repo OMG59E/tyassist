@@ -103,6 +103,14 @@ class DpExec(object):
         # 设置自定义预处理
         self.set_custom_preprocess()
 
+        try:
+            import deepeye
+            tytvm_version = deepeye.util.get_version()
+            logger.info("TyTVM Version: {}".format(tytvm_version))
+        except Exception as e:
+            logger.error("Failed to get tytvm version -> {}".format(e))
+            exit(-1)
+
     @property
     def has_custom_preprocess(self):
         return True if self._custom_preprocess_cls else False
