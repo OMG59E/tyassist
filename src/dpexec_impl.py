@@ -481,7 +481,7 @@ class DpExec(object):
         )
 
         iss_fixed_outputs = None
-        if self._target.startswith("nnp3"):
+        if self._target.startswith("nnp3") and self._enable_dump:
             from deepeye.run_net_bin.run_net_bin import run_net_bin
             netbin_file = os.path.join(self._model_dir, "net_combine.bin")
             if not os.path.exists(netbin_file):
