@@ -40,6 +40,14 @@ def set_logger(op, log_dir, filename):
 
 
 def build(cfg):
+    try:
+        import deepeye
+        tytvm_version = deepeye.util.get_version()
+        logger.info("TyTVM Version: {}".format(tytvm_version))
+    except Exception as e:
+        logger.error("Failed to get tytvm version -> {}".format(e))
+        exit(-1)
+
     dpexec = DpExec(cfg)
 
     in_datas = dpexec.get_datas(use_norm=True, force_cr=True)
