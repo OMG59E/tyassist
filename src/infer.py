@@ -136,7 +136,7 @@ class Infer(object):
                 image_format = 70
                 if shape[1] == 3:
                     image_format = 70 if self._pixel_formats[idx] == PixelFormat.RGB else 71
-                elif shape[1] == 2:
+                elif shape[1] == 1:
                     image_format = 0
                 else:
                     logger.error("Not support image shape -> {}".format(shape))
