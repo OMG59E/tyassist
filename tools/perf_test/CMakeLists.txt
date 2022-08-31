@@ -33,6 +33,7 @@ set(SDK_INC_PATH "$ENV{DENGINE_ROOT}/tyhcp/include")
 
 if ("${RUN_TYPE}" STREQUAL "FULLHAN")
     set(SDK_LIB_PATH "$ENV{DENGINE_ROOT}/tyhcp/platform/$ENV{CROSS_PLAT}/lib/dynamic")
+    set(3RD_LIB_PATH "$ENV{DENGINE_ROOT}/tyexamples/3rdparty/fullhan/$ENV{CROSS_PLAT}/lib/dynamic")
     add_definitions(-DDP2000)
 else()
     set(SDK_LIB_PATH "$ENV{DENGINE_ROOT}/tyhcp/platform/$ENV{HOST_PLAT}/lib/dynamic")
@@ -54,6 +55,7 @@ include_directories(
 # add host lib path
 link_directories(
     ${SDK_LIB_PATH}
+    ${3RD_LIB_PATH}
 )
 
 add_executable(${CMAKE_PROJECT_NAME}
