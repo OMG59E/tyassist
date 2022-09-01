@@ -364,8 +364,6 @@ if __name__ == "__main__":
                         help="Please specify a configuration file")
     parser.add_argument("--dtype", "-t", type=str, default="int8",
                         help="Please specify a type(int8, tvm-fp32, tvm-int8)")
-    parser.add_argument("--runtime", "-rt", type=str, default="chip",
-                        help="Please specify a type(chip, iss, tvm)")
     parser.add_argument("--log_dir", type=str, default="./logs",
                         help="Please specify a log dir, default ./logs")
 
