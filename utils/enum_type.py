@@ -31,4 +31,11 @@ class DataLayout(Enum):
 
 class DataType(Enum):
     UINT8 = 0
-    FLOAT32 = 1
+    INT8 = 1
+    FLOAT16 = 2
+    FLOAT32 = 3
+    TVM_UINT8 = 4
+    TVM_INT8 = 5
+    TVM_FLOAT16 = 6
+    TVM_FLOAT32 = 7
+

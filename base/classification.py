@@ -8,6 +8,8 @@
 @Software: PyCharm
 """
 import time
+from abc import ABC
+
 import numpy as np
 import os
 import cv2
@@ -16,10 +18,10 @@ import tqdm
 from .model_base import ModelBase
 from utils import logger
 from utils.preprocess import default_preprocess
-from utils.enum_type import PaddingMode
+from utils.enum_type import PaddingMode, DataType
 
 
-class Classifier(ModelBase):
+class Classifier(ModelBase, ABC):
     def __init__(self, input_size: tuple, mean: tuple, std: tuple, use_rgb=False, use_norm=False,
                  resize_type=0, padding_value=128, padding_mode=PaddingMode.LEFT_TOP, dataset=None, test_num=0):
         self._dataset = dataset
@@ -36,6 +38,8 @@ class Classifier(ModelBase):
         self._end2end_latency_ms = 0
         self._total = 0
         self._enable_aipp = False
+        self._model_dir = ""
+        self._dtype = DataType.INT8
 
     def load(self, model_dir: str, net_cfg_file="/DEngine/tyhcp/net.cfg",
              sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg", enable_aipp=False, enable_dump=False, max_batch=1):
@@ -46,18 +50,31 @@ class Classifier(ModelBase):
             enable_dump=enable_dump,
             max_batch=max_batch
         )
-        self._enable_aipp = enable_aipp if self.is_fixed else False   # 浮点模型强制关闭aipp
+        self._enable_aipp = enable_aipp if DataType.INT8 == self._dtype else False   # 浮点模型强制关闭aipp
         self._infer.load(model_dir, self._enable_aipp)
 
-    @property
-    def is_fixed(self):
-        from src.infer_relay import InferRelay
-        return not isinstance(self._infer, InferRelay)
+    def set_dtype(self, dtype=DataType.INT8):
+        self._dtype = dtype
 
-    def load_relay(self, input_names: list, callback):
+    @property
+    def dtype(self):
+        return self._dtype
+
+    @property
+    def use_norm(self):
+        if DataType.INT8 == self._dtype or DataType.TVM_INT8 == self._dtype:
+            return False
+        return True
+
+    def load_relay_from_mem(self, input_names: list, callback):
         from src.infer_relay import InferRelay
         self._infer = InferRelay(input_names)
-        self._infer.load(callback)
+        self._infer.load_from_mem(callback)
+
+    def load_relay_from_json(self, input_names: list, filepath):
+        from src.infer_relay import InferRelay
+        self._infer = InferRelay(input_names)
+        self._infer.load_from_json(filepath)
 
     def _preprocess(self, cv_image):
         return default_preprocess(
@@ -65,7 +82,7 @@ class Classifier(ModelBase):
             self._input_size,
             mean=self._mean,
             std=self._std,
-            use_norm=self._use_norm if self.is_fixed else True,
+            use_norm=self.use_norm,
             use_rgb=self._use_rgb,
             use_resize=False if self._enable_aipp else True,
             resize_type=self._resize_type,

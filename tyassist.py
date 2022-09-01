@@ -19,7 +19,7 @@ from utils import logger
 from utils.glog_format import GLogFormatter
 from utils.parser import read_yaml_to_dict
 from utils.dist_metrics import cosine_distance
-from utils.enum_type import PixelFormat
+from utils.enum_type import PixelFormat, DataType
 from utils.check import (
     check_config,
     check_demo_config,
@@ -177,11 +177,19 @@ def test(cfg, dtype):
             enable_dump=False,
             max_batch=1  # 目前仅支持最大batch 1
         )
-    elif dtype == "fp32":
-        model.load_relay(
+        model.set_dtype(DataType.INT8)
+    elif dtype == "tvm-fp32":
+        model.load_relay_from_mem(
             dpexec.input_names,
             dpexec.x2relay
         )
+        model.set_dtype(DataType.TVM_FLOAT32)
+    elif dtype == "tvm-int8":
+        model.load_relay_from_json(
+            dpexec.input_names,
+            os.path.join(dpexec.model_dir, "result", "quantized.json")
+        )
+        model.set_dtype(DataType.TVM_INT8)
     else:
         logger.error("Not support dtype -> {}".format(dtype))
         exit(-1)
@@ -247,11 +255,19 @@ def demo(cfg, dtype):
             enable_dump=False,
             max_batch=1  # 目前仅支持最大batch 1
         )
-    elif dtype == "fp32":
-        model.load_relay(
+        model.set_dtype(DataType.INT8)
+    elif dtype == "tvm-fp32":
+        model.load_relay_from_mem(
             dpexec.input_names,
             dpexec.x2relay
         )
+        model.set_dtype(DataType.TVM_FLOAT32)
+    elif dtype == "tvm-int8":
+        model.load_relay_from_json(
+            dpexec.input_names,
+            os.path.join(dpexec.model_dir, "result", "quantized.json")
+        )
+        model.set_dtype(DataType.TVM_INT8)
     else:
         logger.error("Not support dtype -> {}".format(dtype))
         exit(-1)
@@ -347,7 +363,9 @@ if __name__ == "__main__":
     parser.add_argument("--config", "-c", type=str, required=True,
                         help="Please specify a configuration file")
     parser.add_argument("--dtype", "-t", type=str, default="int8",
-                        help="Please specify a dtype(int8, fp32)")
+                        help="Please specify a type(int8, tvm-fp32, tvm-int8)")
+    parser.add_argument("--runtime", "-rt", type=str, default="chip",
+                        help="Please specify a type(chip, iss, tvm)")
     parser.add_argument("--log_dir", type=str, default="./logs",
                         help="Please specify a log dir, default ./logs")
 
