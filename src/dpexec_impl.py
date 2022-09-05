@@ -355,7 +355,7 @@ class DpExec(object):
             # 使用校准数据数量
             prof_img_num=self._quant_cfg["prof_img_num"],
             # 此配置仅在 dataset 配置为图片集路径（即使用云天自带的预处理），且输入为3通道时有效，对生成芯片模型无效
-            rgb_en=1 if (self.num_inputs == 1 and self._pixel_formats[0] == PixelFormat.RGB) else 0,
+            rgb_en=1 if (self.num_inputs == 1 and self._pixel_formats[0] == PixelFormat.RGB and (not self._custom_preprocess_cls)) else 0,
             # 均值方差，对生成芯片模型生效
             norm=norm,
             # 量化配置
