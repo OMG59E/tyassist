@@ -40,6 +40,8 @@ class Classifier(ModelBase, ABC):
         self._enable_aipp = False
         self._model_dir = ""
         self._dtype = DataType.INT8
+        self._input_enable_aipps = None
+        self._input_pixel_format = None
 
     def load(self, model_dir: str, net_cfg_file="/DEngine/tyhcp/net.cfg",
              sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg", enable_aipp=False, enable_dump=False, max_batch=1):
@@ -50,11 +52,20 @@ class Classifier(ModelBase, ABC):
             enable_dump=enable_dump,
             max_batch=max_batch
         )
-        self._enable_aipp = enable_aipp if DataType.INT8 == self._dtype else False   # 浮点模型强制关闭aipp
+        self._enable_aipp = enable_aipp if DataType.INT8 == self._dtype else False   # 除芯片定点外强制关闭aipp
         self._infer.load(model_dir, self._enable_aipp)
 
     def set_dtype(self, dtype=DataType.INT8):
         self._dtype = dtype
+
+    def set_input_enable_aipps(self, input_enable_aipps):
+        """设置传入每个输入的aipp使能情况，支持进行aipp推理"""
+        self._input_enable_aipps = input_enable_aipps
+
+    def set_input_pixel_format(self, pixel_format: list):
+        """传入每个输入的像素格式，支持进行aipp推理"""
+        self._input_pixel_format = pixel_format
+        self._infer.set_pixel_format(pixel_format)
 
     @property
     def dtype(self):
@@ -111,7 +122,7 @@ class Classifier(ModelBase, ABC):
     def inference(self, cv_image):
         t_start = time.time()
         data = self._preprocess(cv_image)
-        outputs = self._infer.run([data])
+        outputs = self._infer.run([data], self._input_enable_aipps)
         output = self._postprocess(outputs, cv_image)
         end2end_cost = time.time() - t_start
         self._end2end_latency_ms += (end2end_cost * 1000)

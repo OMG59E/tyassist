@@ -25,6 +25,7 @@ class PixelFormat(Enum):
 
 
 class DataLayout(Enum):
+    NONE = -1
     NCHW = 0
     NHWC = 1
 

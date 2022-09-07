@@ -87,7 +87,7 @@ class Infer(object):
     def load(self, model_dir, enable_aipp=False):
         """加载芯片模型
         :param model_dir:
-        :param enable_aipp:
+        :param enable_aipp: 是否使能aipp
         :return:
         """
         self._enable_aipp = enable_aipp
@@ -122,18 +122,27 @@ class Infer(object):
             return 0
         return self._ave_latency_ms / self._total
 
-    def run(self, in_datas: list, to_file=False):
+    def run(self, in_datas: list, input_enable_aipps=None, to_file=False):
         """推理
         :param in_datas: list表示多输入
+        :param input_enable_aipps: 每个输入的aipp使能情况
         :param to_file: 表示是否将结果输出至文件
         :return:
         """
+        if input_enable_aipps:
+            if len(in_datas) != len(input_enable_aipps):
+                logger.error("len(in_datas) must == len(input_enable_aipps) -> {} vs {}".format(
+                    len(in_datas), len(input_enable_aipps)))
+                exit(-1)
+        else:
+            input_enable_aipps = [False for _ in in_datas]  # 不传入aipp使能情况，默认关闭
+
         for idx, in_data in enumerate(in_datas):
-            if self._enable_aipp:
+            if self._enable_aipp and input_enable_aipps[idx]:
                 shape = in_data.shape
                 h = shape[2]
                 w = shape[3]
-                image_format = 70
+                image_format = 70  # 70 -> RGB888, 71 -> BGR888
                 if shape[1] == 3:
                     image_format = 70 if self._pixel_formats[idx] == PixelFormat.RGB else 71
                 elif shape[1] == 1:
