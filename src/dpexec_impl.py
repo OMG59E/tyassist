@@ -41,11 +41,10 @@ class DpExec(object):
         self._params_quant = None
         self._relay = None
         self._params = None
-        self._enable_aipp = cfg["build"].get("enable_aipp") if "enable_aipp" in cfg["build"] else True
 
+        self._input_enable_aipps = list()
         self._data_layouts = list()
         self._pixel_formats = list()
-        # self._data_types = list()
         self._resize_types = list()
         self._padding_modes = list()
         self._padding_values = list()
@@ -53,8 +52,29 @@ class DpExec(object):
         self._means = list()
         self._stds = list()
         for idx, _input in enumerate(self._inputs):
+            _input["support"] = False if "None" == _input["pixel_format"] or "None" == _input["layout"] else True
+
+            if _input["support"]:
+                if "enable_aipp" not in _input:
+                    _input["enable_aipp"] = True
+            else:
+                _input["enable_aipp"] = False
+
+            if self._enable_dump:
+                logger.warning("enable_dump will disable aipp")
+                _input["enable_aipp"] = False
+
+            self._input_enable_aipps.append(_input["enable_aipp"])
+
             # data layout
-            layout = DataLayout.NCHW if _input["layout"] == "NCHW" else DataLayout.NHWC
+            layout = DataLayout.NCHW
+            if _input["layout"] == "NCHW":
+                pass
+            elif "NHWC" == DataLayout.NHWC:
+                layout = DataLayout.NHWC
+            else:
+                layout = DataLayout.NONE
+
             self._data_layouts.append(layout)
 
             # shape
@@ -90,11 +110,6 @@ class DpExec(object):
                 exit(-1)
             self._pixel_formats.append(pixel_format)
 
-            # data type
-            # dtype = np.uint8 if _input["pixel_format"] in ["RGB", "BGR", "GRAY"] else np.float32
-            # _input["dtype"] = dtype
-            # self._data_types.append(dtype)
-
         self._model_dir = cfg["model"]["save_dir"]
         self._result_dir = os.path.join(self._model_dir, "result")
         if not os.path.exists(self._result_dir):
@@ -123,6 +138,14 @@ class DpExec(object):
     def num_inputs(self):
         return len(self._inputs)
 
+    @property
+    def input_enable_aipps(self):
+        return self._input_enable_aipps
+
+    @property
+    def enable_aipp(self):
+        return not self._enable_dump
+
     def mean(self, idx):
         return self._means[idx]
 
@@ -131,9 +154,6 @@ class DpExec(object):
 
     def shape(self, idx):
         return self._shapes[idx]
-
-    # def data_type(self, idx):
-    #     return self._data_types[idx]
 
     def data_layout(self, idx):
         return self._data_layouts[idx]
@@ -149,10 +169,6 @@ class DpExec(object):
 
     def padding_mode(self, idx):
         return self._padding_modes[idx]
-
-    @property
-    def enable_aipp(self):
-        return (not (self._enable_dump or self.has_custom_preprocess)) and self._enable_aipp
 
     def x2relay(self):
         """任意框架转译至relay格式
@@ -257,25 +273,24 @@ class DpExec(object):
                 exit(-1)
 
     def get_datas(self, use_norm=False, force_cr=False, to_file=True):
-        """获取处理数据, 外部归一化，输出数据类型为float32，否则使用uint8
+        """获取量化/编译阶段处理数据
         :return:
         """
-        in_datas = collections.OrderedDict()
+        in_datas = collections.OrderedDict()  # 保证输入顺序一致
         for idx, _input in enumerate(self._inputs):
             data_path = _input["data_path"]
             n, c, h, w = self.shape(idx)
-            use_rgb = True if self._pixel_formats[idx] == PixelFormat.RGB else False
             if data_path:
                 if not os.path.exists(data_path):
                     logger.error("Not found data_path -> {}".format(data_path))
                     return None
-                if self._custom_preprocess_cls:
-                    # use custom preprocess
-                    in_datas[_input["name"]] = self._custom_preprocess_cls.get_single_data(data_path)
+                if not _input["support"]:
+                    # not support will use custom preprocess
+                    in_datas[_input["name"]] = self._custom_preprocess_cls.get_single_data(data_path, idx)
                 else:
                     # default preprocess，only image channel 1 or 3
                     im = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE if self._pixel_formats[idx] == PixelFormat.GRAY else cv2.IMREAD_COLOR)
-                    if (not self.enable_aipp) or force_cr:
+                    if (not _input["enable_aipp"]) or force_cr:
                         _input["padding_size"], _ = calc_padding_size(im, (w, h), self.padding_mode(idx))
                         in_datas[_input["name"]] = default_preprocess(
                             im,
@@ -283,7 +298,7 @@ class DpExec(object):
                             mean=self.mean(idx),
                             std=self.std(idx),
                             use_norm=use_norm,
-                            use_rgb=use_rgb,
+                            use_rgb=True if self._pixel_formats[idx] == PixelFormat.RGB else False,
                             use_resize=True,
                             resize_type=_input["resize_type"],
                             padding_value=_input["padding_value"],
@@ -303,6 +318,7 @@ class DpExec(object):
                             im = np.expand_dims(im, axis=0)
                         in_datas[_input["name"]] = im.transpose((0, 3, 1, 2))  # hwc -> chw, BGR888
             else:
+                logger.warning("Not set data_path, will use random data")
                 # 采用随机数据
                 if use_norm:
                     in_datas[_input["name"]] = np.random.randn(n, c, h, w).astype(dtype=np.float32)
@@ -311,7 +327,7 @@ class DpExec(object):
             if to_file:
                 # save data
                 in_datas[_input["name"]].tofile(os.path.join(self._result_dir, "data_{}_CRN.bin".format(idx)))
-                in_datas[_input["name"]].tofile(os.path.join(self._result_dir, "data_{}_CRN0.txt".format(idx)), sep="\n")
+                in_datas[_input["name"]].tofile(os.path.join(self._result_dir, "data_{}_CRN.txt".format(idx)), sep="\n")
 
         return in_datas
 
@@ -332,6 +348,7 @@ class DpExec(object):
             else:
                 logger.error("Input dtype not support -> {}".format(in_datas[_input["name"]].dtype))
                 exit(-1)
+            # 与最终量化后的模型输入数据类型相对应
             in_dtypes[_input["name"]] = data_type if self.has_custom_preprocess else "uint8"
             norm[_input["name"]] = {"mean": self.mean(idx), "std": self.std(idx), "axis": 1}
 
@@ -355,7 +372,7 @@ class DpExec(object):
             # 使用校准数据数量
             prof_img_num=self._quant_cfg["prof_img_num"],
             # 此配置仅在 dataset 配置为图片集路径（即使用云天自带的预处理），且输入为3通道时有效，对生成芯片模型无效
-            rgb_en=1 if (self.num_inputs == 1 and self._pixel_formats[0] == PixelFormat.RGB and (not self._custom_preprocess_cls)) else 0,
+            rgb_en=1 if (self.num_inputs == 1 and self._pixel_formats[0] == PixelFormat.RGB and (not self.has_custom_preprocess)) else 0,
             # 均值方差，对生成芯片模型生效
             norm=norm,
             # 量化配置
@@ -443,6 +460,7 @@ class DpExec(object):
         :param in_datas:
         :return:
         """
+        logger.info("################### build start ####################")
         import deepeye
         from deepeye.relay_pass import dump_func_output
         input_info = dict()
@@ -450,7 +468,8 @@ class DpExec(object):
             # 模型输入信息其key包含"layout", "resize_type", "padding_size", "padding_value"，都为可选参数，
             # 但如果配置了任意参数，则"layout"参数就必须设置为"RGB", "BGR"，"GRAY"三者之一
             # 开启dump功能，会禁止CR模块，需要将layout强设成NCHW来关闭CR功能
-            if not self.enable_aipp:
+            if not _input["enable_aipp"]:
+                logger.info("input: {}, disable_aipp".format(_input["name"]))
                 input_info[_input["name"]] = {"layout": "NCHW"}
             else:
                 input_info[_input["name"]] = {
@@ -459,6 +478,8 @@ class DpExec(object):
                     "padding_size": None if PaddingMode.CENTER == self.padding_mode(idx) else _input["padding_size"],
                     "padding_value": _input["padding_value"],
                 }
+                logger.info("input: {}, enable_aipp".format(_input["name"]))
+                logger.info("{}".format(input_info[_input["name"]]))
 
         deepeye.make_netbin(
             self._relay_quant,  # 提供输入数据类型信息
@@ -471,6 +492,7 @@ class DpExec(object):
             opt_cfg=None,
             extra_info=""
         )
+        logger.info("################### build end ####################")
 
         iss_fixed_outputs = None
         if self._target.startswith("nnp3") and self._enable_dump:

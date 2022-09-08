@@ -101,7 +101,7 @@ def compare(cfg):
     in_datas = dpexec.get_datas(use_norm=False, force_cr=False)
 
     in_datas = [in_datas[key] for key in in_datas]
-    outputs = infer.run(in_datas, to_file=True)
+    outputs = infer.run(in_datas, dpexec.input_enable_aipps, to_file=True)
 
     # compare
     for idx, chip_fixed_output in enumerate(outputs):
@@ -173,11 +173,13 @@ def test(cfg, dtype):
             dpexec.model_dir,
             net_cfg_file="/DEngine/tyhcp/net.cfg",
             sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-            enable_aipp=False,  # dpexec.enable_aipp
+            enable_aipp=False,  # dpexec.enable_aipp,  测试和demo默认关闭aipp
             enable_dump=False,
             max_batch=1  # 目前仅支持最大batch 1
         )
         model.set_dtype(DataType.INT8)
+        model.set_input_enable_aipps(dpexec.input_enable_aipps)
+        model.set_input_pixel_format([dpexec.pixel_formats(idx) for idx in range(len(dpexec.input_names))])
     elif dtype == "tvm-fp32":
         model.load_relay_from_mem(
             dpexec.input_names,
@@ -251,11 +253,13 @@ def demo(cfg, dtype):
             dpexec.model_dir,
             net_cfg_file="/DEngine/tyhcp/net.cfg",
             sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-            enable_aipp=False,  # dpexec.enable_aipp,
+            enable_aipp=False,  # dpexec.enable_aipp,  测试和demo默认关闭aipp
             enable_dump=False,
             max_batch=1  # 目前仅支持最大batch 1
         )
         model.set_dtype(DataType.INT8)
+        model.set_input_enable_aipps(dpexec.input_enable_aipps)
+        model.set_input_pixel_format([dpexec.pixel_formats(idx) for idx in range(len(dpexec.input_names))])
     elif dtype == "tvm-fp32":
         model.load_relay_from_mem(
             dpexec.input_names,
