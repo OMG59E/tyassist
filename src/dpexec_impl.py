@@ -61,7 +61,7 @@ class DpExec(object):
                 _input["enable_aipp"] = False
 
             if self._enable_dump:
-                logger.warning("enable_dump will disable aipp")
+                logger.info("enable_dump: true")
                 _input["enable_aipp"] = False
 
             self._input_enable_aipps.append(_input["enable_aipp"])
@@ -334,6 +334,7 @@ class DpExec(object):
     def relay_quantization(self, in_datas):
         """量化，将浮点relay函数转为成定点relay函数
         """
+        logger.info("################   quantization start  ######################")
         from tvm.relay.quantization import quantize, get_quantize_config
         from tvm.contrib.export import RelayExporter
 
@@ -351,6 +352,8 @@ class DpExec(object):
             # 与最终量化后的模型输入数据类型相对应
             in_dtypes[_input["name"]] = data_type if self.has_custom_preprocess else "uint8"
             norm[_input["name"]] = {"mean": self.mean(idx), "std": self.std(idx), "axis": 1}
+            logger.info("Input({}) dtype -> {}".format(_input["name"], in_dtypes[_input["name"]]))
+            logger.info("Input({}) mean/std -> {}".format(_input["name"], norm[_input["name"]]))
 
         quantize_config = get_quantize_config(self._target, in_dtypes)
         quantize_config["calib_method"] = self._quant_cfg["calib_method"]
@@ -360,6 +363,7 @@ class DpExec(object):
             quantize_config["float_list"].extend(self._quant_cfg["skip_layer_idxes"])
         if self._quant_cfg["skip_layer_types"]:
             quantize_config["float_list"].extend(self._quant_cfg["skip_layer_types"])
+        logger.info("quantize_config -> {}".format(quantize_config))
 
         # 保存路径设置
         self._relay_quant = quantize(
@@ -399,6 +403,8 @@ class DpExec(object):
         quan_model_path = os.path.join(self._result_dir, "quantized.model")
         tvm.relay.quantize.save_deepeye_quan_model(self._relay_quant, quan_json_path)  # 将relay_func存为json
         RelayExporter().save(self._relay_quant, quan_model_path)  # 生成Netron模型可视化文件
+        logger.info("save quant json to {}".format(quan_json_path))
+        logger.info("save quant model to {}".format(quan_model_path))
 
         # 是否输出量化调试张量
         if self._quant_cfg["debug_level"] == 1:
@@ -406,6 +412,8 @@ class DpExec(object):
             # 所以尽可能使用了原始浮点模型自带的op_name，但实际处理会获取不到原始模型的op_name，
             # 此时会使用opt_ir.pdf中的op_name)，相应的value为浮点和定点结果的组成的list
             layer_outs = tvm.relay.quantization.compare_layer_outputs(self._result_dir)
+
+        logger.info("################   quantization end  ######################")
 
     def load_relay_quant_from_json(self):
         """加载
@@ -469,7 +477,7 @@ class DpExec(object):
             # 但如果配置了任意参数，则"layout"参数就必须设置为"RGB", "BGR"，"GRAY"三者之一
             # 开启dump功能，会禁止CR模块，需要将layout强设成NCHW来关闭CR功能
             if not _input["enable_aipp"]:
-                logger.info("input: {}, disable_aipp".format(_input["name"]))
+                logger.warning("Input({}) will disable_aipp".format(_input["name"]))
                 input_info[_input["name"]] = {"layout": "NCHW"}
             else:
                 input_info[_input["name"]] = {
@@ -478,8 +486,8 @@ class DpExec(object):
                     "padding_size": None if PaddingMode.CENTER == self.padding_mode(idx) else _input["padding_size"],
                     "padding_value": _input["padding_value"],
                 }
-                logger.info("input: {}, enable_aipp".format(_input["name"]))
-                logger.info("{}".format(input_info[_input["name"]]))
+                logger.info("Input({}): will enable_aipp".format(_input["name"]))
+            logger.info("Input({}) info -> {}".format(input_info[_input["name"]], input_info[_input["name"]]))
 
         deepeye.make_netbin(
             self._relay_quant,  # 提供输入数据类型信息

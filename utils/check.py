@@ -26,12 +26,44 @@ def check_config(cfg):
         return False
 
     if "weight" not in cfg["model"]:
-        logger.error("The key(weight) must be in cfg")
+        logger.error("The key(weight) must be in cfg[model]")
         return False
 
     if "enable_quant" not in cfg["build"]:
-        logger.error("The key(enable_quant) must be in cfg")
+        logger.error("The key(enable_quant) must be in cfg[build]")
         return False
+
+    if "enable_dump" not in cfg["build"]:
+        logger.error("The key(enable_dump) must be in cfg[build]")
+        return False
+
+    if "target" not in cfg["build"]:
+        logger.error("The key(target) must be in cfg")
+        return False
+
+    if "quant" not in cfg["build"]:
+        logger.error("The key(quant) must be in cfg[build]")
+        return False
+
+    if "debug_level" not in cfg["build"]["quant"]:
+        logger.error("The key(debug_level) must be in cfg[build][quant]")
+        return False
+
+    if cfg["build"]["quant"]["debug_level"] not in [-1, 0, 1, 2, 3]:
+        logger.error("debug_level({}) must be in [-1, 0, 1, 2, 3]".format(cfg["build"]["quant"]["debug_level"]))
+        return False
+
+    if "calib_method" not in cfg["build"]["quant"]:
+        logger.error("The key(calib_method) must be in cfg[build][quant]")
+        return False
+
+    calib_method = cfg["build"]["quant"]["calib_method"]
+    if calib_method.startswith("percentile_"):
+        pass
+    else:
+        if calib_method not in ["kld", "min_max", "l2norm"]:
+            logger.error("calib_method({}) must be in [kld, min_max, l2norm, percentile_0.99]".format(calib_method))
+            return False
 
     if not os.path.exists(cfg["model"]["weight"]):
         logger.error("The model weight not exist -> {}".format(cfg["model"]["weight"]))
@@ -45,6 +77,33 @@ def check_config(cfg):
     for _input in cfg["model"]["inputs"]:
         if _input["layout"] not in ["NCHW", "NHWC"]:
             logger.error("layout must be in [NCHW, NHWC]")
+            return False
+
+        if "shape" not in _input:
+            logger.error("shape must be in cfg[model][inputs]")
+            return False
+
+        mean = _input["mean"]
+        if "mean" not in _input:
+            logger.error("mean must be in cfg[model][inputs]")
+            return False
+
+        std = _input["std"]
+        if "std" not in _input:
+            logger.error("std must be in cfg[model][inputs]")
+            return False
+
+        shape = _input["shape"]
+        if len(shape) != 4:
+            logger.error("input dim must be equal 4")
+            return False
+
+        n, c, h, w = shape
+        if _input["layout"] == "NHWC":
+            n, h, w, c = shape
+            
+        if c != len(mean) or c != len(std) or len(mean) != len(std):
+            logger.error("input channel must be equal len(mean/std)")
             return False
 
         if _input["pixel_format"] not in ["None", "RGB", "BGR", "GRAY"]:
