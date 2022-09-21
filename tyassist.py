@@ -95,7 +95,7 @@ def compare(cfg):
         max_batch=1  # only batch 1
     )
 
-    infer.load(dpexec.model_dir, dpexec.enable_aipp)
+    infer.load(dpexec.model_dir, True)
     infer.set_pixel_format([dpexec.pixel_formats(idx) for idx in range(len(dpexec.input_names))])
 
     in_datas = dpexec.get_datas(use_norm=False, force_cr=False)

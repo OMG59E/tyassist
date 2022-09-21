@@ -60,9 +60,9 @@ class DpExec(object):
             else:
                 _input["enable_aipp"] = False
 
-            if self._enable_dump:
-                logger.info("enable_dump: true")
-                _input["enable_aipp"] = False
+            # if self._enable_dump:
+            #     logger.info("enable_dump: true")
+            #     _input["enable_aipp"] = False
 
             self._input_enable_aipps.append(_input["enable_aipp"])
 
@@ -142,9 +142,9 @@ class DpExec(object):
     def input_enable_aipps(self):
         return self._input_enable_aipps
 
-    @property
-    def enable_aipp(self):
-        return not self._enable_dump
+    # @property
+    # def enable_aipp(self):
+    #     return not self._enable_dump
 
     def mean(self, idx):
         return self._means[idx]
@@ -510,6 +510,7 @@ class DpExec(object):
                 logger.error("Not found netbin_file -> {}".format(netbin_file))
                 exit(-1)
 
+            in_datas = self.get_datas(use_norm=False, force_cr=True)
             in_datas_list = [in_datas[key] for key in in_datas]
             iss_fixed_outputs = run_net_bin(netbin_file, in_datas_list)
             for idx, output in enumerate(iss_fixed_outputs):
