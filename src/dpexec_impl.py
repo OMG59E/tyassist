@@ -510,7 +510,7 @@ class DpExec(object):
                 logger.error("Not found netbin_file -> {}".format(netbin_file))
                 exit(-1)
 
-            in_datas = self.get_datas(use_norm=False, force_cr=True)
+            # in_datas = self.get_datas(use_norm=False, force_cr=True)
             in_datas_list = [in_datas[key] for key in in_datas]
             iss_fixed_outputs = run_net_bin(netbin_file, in_datas_list)
             for idx, output in enumerate(iss_fixed_outputs):
