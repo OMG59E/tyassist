@@ -48,6 +48,8 @@ def build(cfg):
         logger.error("Failed to get tytvm version -> {}".format(e))
         exit(-1)
 
+    logger.info("{}".format(cfg))
+
     dpexec = DpExec(cfg)
 
     in_datas = dpexec.get_datas(use_norm=True, force_cr=True)
@@ -253,7 +255,7 @@ def demo(cfg, dtype):
             dpexec.model_dir,
             net_cfg_file="/DEngine/tyhcp/net.cfg",
             sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-            enable_aipp=False,  # dpexec.enable_aipp,  测试和demo默认关闭aipp
+            enable_aipp=True,  # dpexec.enable_aipp,  测试和demo默认关闭aipp
             enable_dump=False,
             max_batch=1  # 目前仅支持最大batch 1
         )
