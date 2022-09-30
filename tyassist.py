@@ -375,6 +375,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    from version import VERSION
+    logger.info("TyAssist version: {}".format(VERSION))
+
     if args.type == "benchmark":
         benchmark(args.config, args.dtype, args.log_dir)
     else:
