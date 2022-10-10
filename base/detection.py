@@ -71,6 +71,9 @@ class Detector(Classifier):
             logger.error("The dataset is null")
             exit(-1)
 
+        self._iou_threshold = 0.65
+        self._conf_threshold = 0.01
+
         img_paths = self._dataset.get_datas(num=self._test_num)
 
         save_results = "results"
