@@ -301,9 +301,8 @@ def run(config_filepath, phase, dtype, log_dir):
     sys.path.insert(0, config_dir)  # 自定义模块环境变量
 
     config = read_yaml_to_dict(config_abspath)
-    if not check_config(config):
+    if not check_config(config, phase):
         exit(-1)
-
     res = dict()
     if phase == "build":
         build(config)

@@ -9,11 +9,20 @@
 """
 import os
 from utils import logger
+from enum import Enum
 
 
-def check_config(cfg):
+class Phase(Enum):
+    BUILD = 0
+    COMPARE = 1
+    DEMO = 2
+    TEST = 3
+
+
+def check_config(cfg, phase="build"):
     """配置文件参数合法性检查
     :param cfg:
+    :param phase:
     :return:
     """
     # 检查是否缺少关键字
@@ -65,9 +74,10 @@ def check_config(cfg):
             logger.error("calib_method({}) must be in [kld, min_max, l2norm, percentile_0.99]".format(calib_method))
             return False
 
-    if not os.path.exists(cfg["model"]["weight"]):
-        logger.error("The model weight not exist -> {}".format(cfg["model"]["weight"]))
-        return False
+    if phase == "build":
+        if not os.path.exists(cfg["model"]["weight"]):
+            logger.error("The model weight not exist -> {}".format(cfg["model"]["weight"]))
+            return False
 
     # 多输入必须定义预处理
     if len(cfg["model"]["inputs"]) > 1 and not cfg["build"]["quant"]["custom_preprocess_cls"]:
