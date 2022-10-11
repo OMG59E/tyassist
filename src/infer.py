@@ -180,12 +180,12 @@ class Infer(object):
         return outputs
 
     def _compare_dump_out(self):
-        # model_name = os.path.basename(model_path)
-        filename_list = os.listdir(self._dump_root_path)
-        if len(filename_list) != 1:
-            logger.error("dump_root_path file num must be == 1")
-            exit(-1)
-        model_name = filename_list[0]
+        model_name = "opt_ir"
+        # filename_list = os.listdir(self._dump_root_path)
+        # if len(filename_list) != 1:
+        #     logger.error("dump_root_path file num must be == 1")
+        #     exit(-1)
+        # model_name = filename_list[0]
 
         src = os.path.join(self._dump_root_path, model_name)
         if not os.path.exists(src):
@@ -217,7 +217,6 @@ class Infer(object):
         if tvm_fp32_dump_out and tvm_fixed_dump_out:
             logger.info("###################### TVM(fixed) vs TVM(float) #######################")
             compare_dump_out2(tvm_fp32_dump_out, tvm_fixed_dump_out)
-
 
     def __del__(self):
         if self._engine:

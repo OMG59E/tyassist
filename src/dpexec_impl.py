@@ -495,6 +495,7 @@ class DpExec(object):
             self._model_dir,
             input_info,
             params=None,
+            model_name="opt_ir",
             return_buffer=False,
             debug_level=1 if self._enable_dump else 0,
             opt_cfg=None,
