@@ -30,7 +30,12 @@ class Infer(object):
         self._port = 9090
         self._net_cfg_file = net_cfg_file
         self._sdk_cfg_file = sdk_cfg_file
-        self._enable_dump = enable_dump
+        self._enable_dump = False
+        if enable_dump:
+            if self._ip == "127.0.0.1":   # TODO 非127.0.0.1的地址也可能是ISS服务
+                logger.warning("ISS mode not support dump server")
+            else:
+                self._enable_dump = True
         self._engine = None
         self._sdk = None
         self._max_batch = max_batch
@@ -81,7 +86,7 @@ class Infer(object):
             self._sdk.sdk_init(self._sdk_cfg_file)
             logger.info("tyhcp init succeed.")
         except Exception as e:
-            logger.error("Import failed -> {}, please run in tyhcp".format(e))
+            logger.error("Import failed -> {}, please run in TyHCP".format(e))
             exit(-1)
 
     def load(self, model_dir, enable_aipp=False):
@@ -206,11 +211,11 @@ class Infer(object):
         compare_dump_out(chip_dump_out, iss_fixed_dump_out)
 
         tvm_fixed_dump_out = os.path.join(self._result_dir, "quant", "output_tensors.params")
-        if not os.path.join(tvm_fixed_dump_out):
+        if not os.path.exists(tvm_fixed_dump_out):
             logger.warning("Not found tvm_fixed_dump_out -> {}".format(tvm_fixed_dump_out))
             tvm_fixed_dump_out = None
         tvm_fp32_dump_out = os.path.join(self._result_dir, "fp32", "output_tensors.params")
-        if not os.path.join(tvm_fp32_dump_out):
+        if not os.path.exists(tvm_fp32_dump_out):
             logger.warning("Not found tvm_fp32_dump_out -> {}".format(tvm_fp32_dump_out))
             tvm_fp32_dump_out = None
 
