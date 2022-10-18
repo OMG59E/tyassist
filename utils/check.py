@@ -30,6 +30,10 @@ def check_config(cfg, phase="build"):
         logger.error("The key(model) must be in cfg")
         return False
 
+    if "framework" not in cfg["model"]:
+        logger.error("The key(framework) must be in cfg[model]")
+        return False
+
     if "build" not in cfg:
         logger.error("The key(build) must be in cfg")
         return False
@@ -49,6 +53,10 @@ def check_config(cfg, phase="build"):
     if "target" not in cfg["build"]:
         logger.error("The key(target) must be in cfg")
         return False
+    else:
+        if cfg["build"]["target"].startswith("nnp4") and cfg["model"]["framework"] not in ["onnx"]:
+            logger.error("tytvm only support onnx framework")
+            return False
 
     if "quant" not in cfg["build"]:
         logger.error("The key(quant) must be in cfg[build]")

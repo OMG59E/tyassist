@@ -40,23 +40,17 @@ def set_logger(op, log_dir, filename):
 
 
 def build(cfg):
-    try:
-        import deepeye
-        tytvm_version = deepeye.util.get_version()
-        logger.info("TyTVM Version: {}".format(tytvm_version))
-    except Exception as e:
-        logger.error("Failed to get tytvm version -> {}".format(e))
-        exit(-1)
-
     logger.info("{}".format(cfg))
 
     dpexec = DpExec(cfg)
+
+    dpexec.print_tvm_version()
 
     in_datas = dpexec.get_datas(use_norm=True, force_cr=True)
 
     dpexec.x2relay()
 
-    host_tvm_float_output = dpexec.tvm_float_output(in_datas)
+    tvm_float_output = dpexec.tvm_float_output(in_datas)
 
     in_datas = dpexec.get_datas(use_norm=False, force_cr=True)  # tvm iss not support CR
 
@@ -65,24 +59,29 @@ def build(cfg):
     else:
         dpexec.load_relay_quant_from_json()
 
-    host_iss_fixed_output = dpexec.make_netbin(in_datas)
+    iss_fixed_output = dpexec.make_netbin(in_datas)
 
-    host_tvm_fixed_output = dpexec.tvm_fixed_output(in_datas)
+    tvm_fixed_output = dpexec.tvm_fixed_output(in_datas)
 
     # 计算相似度
-    for idx in range(len(host_tvm_float_output)):
-        dist = cosine_distance(host_tvm_float_output[idx], host_tvm_fixed_output[idx])
+    for idx in range(len(tvm_float_output)):
+        dist = cosine_distance(tvm_float_output[idx], tvm_fixed_output[idx])
         logger.info("[runoncpu] float(tvm) output tensor [{}] shape:{} dtype:{}".format(
-            idx, host_tvm_float_output[idx].shape, host_tvm_float_output[idx].dtype))
+            idx, tvm_float_output[idx].shape, tvm_float_output[idx].dtype))
         logger.info("[runoncpu] fixed(tvm) output tensor [{}] shape:{} dtype:{}".format(
-            idx, host_tvm_fixed_output[idx].shape, host_tvm_fixed_output[idx].dtype))
-        if host_iss_fixed_output:
+            idx, tvm_fixed_output[idx].shape, tvm_fixed_output[idx].dtype))
+        if iss_fixed_output:
             logger.info("[runoncpu] fixed(iss) output tensor [{}] shape:{} dtype:{}".format(
-                idx, host_iss_fixed_output[idx].shape, host_iss_fixed_output[idx].dtype))
-        logger.info("[runoncpu] float(tvm) vs fixed(tvm) output tensor [{}] similarity: {:.6f}".format(idx, dist))
-        if host_iss_fixed_output:
-            dist = cosine_distance(host_tvm_float_output[idx], host_iss_fixed_output[idx])
-            logger.info("[runoncpu] float(tvm) vs fixed(iss) output tensor [{}] similarity: {:.6f}".format(idx, dist))
+                idx, iss_fixed_output[idx].shape, iss_fixed_output[idx].dtype))
+        logger.info("[runoncpu] float(tvm) vs fixed(tvm) output tensor [{}] similarity={:.6f}".format(idx, dist))
+        if iss_fixed_output:
+            dist = cosine_distance(tvm_float_output[idx], iss_fixed_output[idx])
+            logger.info("[runoncpu] float(tvm) vs fixed(iss) output tensor [{}] similarity={:.6f}".format(idx, dist))
+
+    for idx in range(len(tvm_fixed_output)):
+        if iss_fixed_output:
+            dist = cosine_distance(tvm_fixed_output[idx], iss_fixed_output[idx])
+            logger.info("[runoncpu] fixed(tvm) vs fixed(iss) output tensor [{}] similarity={:.6f}".format(idx, dist))
 
 
 def compare(cfg):
@@ -375,7 +374,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     from version import VERSION
-    logger.info("TyAssist version: {}".format(VERSION))
+    logger.info("TyAssist version: v{}".format(VERSION))
 
     if args.type == "benchmark":
         benchmark(args.config, args.dtype, args.log_dir)
