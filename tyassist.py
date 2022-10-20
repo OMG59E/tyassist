@@ -382,6 +382,6 @@ if __name__ == "__main__":
         logger.info("{} with TyAssist version: {}".format(args.type, VERSION))
 
     if args.type == "benchmark":
-        benchmark(args.config, args.dtype, args.log_dir)
+        benchmark(args.config, args.dtype)
     else:
-        _ = run(args.config, args.type, args.dtype, args.log_dir)
+        _ = run(args.config, args.type, args.dtype)
