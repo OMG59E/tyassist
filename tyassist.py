@@ -373,8 +373,13 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    from version import VERSION
-    logger.info("{} with TyAssist v{}.".format(args.type, VERSION))
+    dirname, filename = os.path.split(os.path.abspath(__file__))
+    version_path = os.path.join(dirname, "version")
+    if not os.path.exists(version_path):
+        logger.warning("Not found version file")
+    with open(version_path, "rb") as f:
+        VERSION = f.readline().decode("gbk")
+        logger.info("{} with TyAssist version: {}".format(args.type, VERSION))
 
     if args.type == "benchmark":
         benchmark(args.config, args.dtype, args.log_dir)
