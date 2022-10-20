@@ -289,11 +289,7 @@ def demo(cfg, dtype):
     logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
 
 
-def run(config_filepath, phase, dtype, log_dir):
-    check_file_exist(config_filepath)
-    basename, _ = os.path.splitext(os.path.basename(config_filepath))
-    set_logger(phase, log_dir, basename)
-
+def run(config_filepath, phase, dtype):
     # 补充自定义预处理文件所在目录，必须与配置文件同目录
     config_abspath = os.path.abspath(config_filepath)
     config_dir = os.path.dirname(config_abspath)
@@ -317,7 +313,7 @@ def run(config_filepath, phase, dtype, log_dir):
     return res
 
 
-def benchmark(mapping_file, dtype, log_dir):
+def benchmark(mapping_file, dtype):
     import csv
     from prettytable import PrettyTable
 
@@ -343,7 +339,7 @@ def benchmark(mapping_file, dtype, log_dir):
             continue
 
         os.chdir(config_dir)  # 切换至模型目录
-        res = run(config_abspath, "test", dtype, log_dir)
+        res = run(config_abspath, "test", dtype)
         # logger.info("{}".format(res))
         os.chdir(root)  # 切换根目录
 
@@ -373,10 +369,19 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    from version import VERSION
-    logger.info("{} with TyAssist v{}.".format(args.type, VERSION))
+    check_file_exist(args.config)
+    basename, _ = os.path.splitext(os.path.basename(args.config))
+    set_logger(args.type, args.log_dir, basename)
+
+    dirname, filename = os.path.split(os.path.abspath(__file__))
+    version_path = os.path.join(dirname, "version")
+    if not os.path.exists(version_path):
+        logger.warning("Not found version file")
+    with open(version_path, "rb") as f:
+        VERSION = f.readline().decode("gbk").strip()
+        logger.info("{} with TyAssist version: {}".format(args.type, VERSION))
 
     if args.type == "benchmark":
-        benchmark(args.config, args.dtype, args.log_dir)
+        benchmark(args.config, args.dtype)
     else:
-        _ = run(args.config, args.type, args.dtype, args.log_dir)
+        _ = run(args.config, args.type, args.dtype)
