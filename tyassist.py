@@ -378,7 +378,7 @@ if __name__ == "__main__":
     if not os.path.exists(version_path):
         logger.warning("Not found version file")
     with open(version_path, "rb") as f:
-        VERSION = f.readline().decode("gbk")
+        VERSION = f.readline().decode("gbk").strip()
         logger.info("{} with TyAssist version: {}".format(args.type, VERSION))
 
     if args.type == "benchmark":
