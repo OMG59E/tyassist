@@ -62,6 +62,14 @@ def check_config(cfg, phase="build"):
         logger.error("The key(quant) must be in cfg[build]")
         return False
 
+    if "prof_img_num" not in cfg["build"]["quant"]:
+        logger.error("The key(prof_img_num) must be in cfg[build][quant]")
+        return False
+
+    if "similarity_img_num" not in cfg["build"]["quant"]:
+        logger.error("The key(similarity_img_num) must be in cfg[build][quant]")
+        return False
+
     if "debug_level" not in cfg["build"]["quant"]:
         logger.error("The key(debug_level) must be in cfg[build][quant]")
         return False
@@ -101,14 +109,37 @@ def check_config(cfg, phase="build"):
             logger.error("shape must be in cfg[model][inputs]")
             return False
 
-        mean = _input["mean"]
         if "mean" not in _input:
             logger.error("mean must be in cfg[model][inputs]")
             return False
 
-        std = _input["std"]
         if "std" not in _input:
             logger.error("std must be in cfg[model][inputs]")
+            return False
+
+        if "resize_type" not in _input:
+            logger.error("resize_type must be in cfg[model][inputs]")
+            return False
+
+        if "pixel_format" not in _input:
+            logger.error("pixel_format must be in cfg[model][inputs]")
+            return False
+
+        if "layout" not in _input:
+            logger.error("layout must be in cfg[model][inputs]")
+            return False
+
+        if "padding_value" not in _input:
+            logger.error("padding_value must be in cfg[model][inputs]")
+            return False
+
+        if "padding_mode" not in _input:
+            logger.error("padding_mode must be in cfg[model][inputs]")
+            return False
+
+        resize_type = _input["resize_type"]
+        if resize_type not in [0, 1]:
+            logger.error("resize_type must be in [0, 1]")
             return False
 
         shape = _input["shape"]
@@ -119,7 +150,14 @@ def check_config(cfg, phase="build"):
         n, c, h, w = shape
         if _input["layout"] == "NHWC":
             n, h, w, c = shape
-            
+
+        mean = _input["mean"]
+        std = _input["std"]
+        if mean is None:
+            mean = [0 for _ in range(c)]
+        if std is None:
+            std = [1.0 for _ in range(c)]
+
         if c != len(mean) or c != len(std) or len(mean) != len(std):
             logger.error("input channel must be equal len(mean/std)")
             return False
