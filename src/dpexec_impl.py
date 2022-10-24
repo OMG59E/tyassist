@@ -70,7 +70,7 @@ class DpExec(object):
             layout = DataLayout.NCHW
             if _input["layout"] == "NCHW":
                 pass
-            elif "NHWC" == DataLayout.NHWC:
+            elif "NHWC" == _input["layout"]:
                 layout = DataLayout.NHWC
             else:
                 layout = DataLayout.NONE
