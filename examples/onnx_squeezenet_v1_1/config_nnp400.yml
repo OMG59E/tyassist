@@ -27,7 +27,7 @@ model: {
       padding_value: 128,  # resize图像不足部分将自动padding，仅等比例resize生效
       padding_mode: 0,  # 目前仅支持 0: 左上角(LEFT_TOP), 1: 中心点(CENTER)，仅等比例resize生效
       # 用于比较各阶段输出的相似度，空表示采用随机数
-      data_path: "/DEngine/tyassist/data/datasets/ILSVRC2012/ILSVRC2012_img_val/ILSVRC2012_val_00000001.JPEG",
+      data_path: "/DEngine/tyexamples/data/datasets/ILSVRC2012/ILSVRC2012_img_val/ILSVRC2012_val_00000001.JPEG",
     }
   ],
 
@@ -55,7 +55,7 @@ build: {
   # 量化配置参数，仅在enable_quant为true生效
   quant: {
     # 量化输入数据路径(必须设置)
-    data_dir: "/DEngine/tyassist/data/datasets/ILSVRC2012/ILSVRC2012_img_val",
+    data_dir: "/DEngine/tyexamples/data/datasets/ILSVRC2012/ILSVRC2012_img_val",
 
     # 量化使用的数据数量，0表示使用所有数据
     prof_img_num: 50,
@@ -80,7 +80,7 @@ build: {
     # 2 - 输出整体余弦相似度、输出逐层余弦相似度、逐层保存浮点定点的对比PNG图
     # 3 - 输出整体余弦相似度、输出逐层余弦相似度
     #-1 - 不输出debug信息
-    debug_level: 0,
+    debug_level: 1,
 
     # 校准方法 "kld", "min_max", "percentile_0.99..", "l2norm"
     calib_method: "kld",

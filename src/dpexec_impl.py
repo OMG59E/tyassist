@@ -17,6 +17,13 @@ import json
 from utils import logger
 from utils.preprocess import default_preprocess, calc_padding_size
 from utils.enum_type import PaddingMode, PixelFormat, DataLayout
+from utils.nnp_func import (
+    nnp3xx_load_from_json,
+    nnp4xx_load_from_json,
+    nnp3xx_build_lib,
+    nnp4xx_build_lib,
+    nnp4xx_inference
+)
 
 import tvm
 
@@ -117,6 +124,10 @@ class DpExec(object):
 
         # 设置自定义预处理
         self.set_custom_preprocess()
+
+    @property
+    def target(self):
+        return self._target
 
     @property
     def has_custom_preprocess(self):
@@ -437,23 +448,25 @@ class DpExec(object):
             quantize_config["float_list"].extend(self._quant_cfg["skip_layer_types"])
         logger.info("quantize_config -> {}".format(quantize_config))
 
+        quan_json_path = os.path.join(self._result_dir, "quantized.json")
+        quan_model_path = os.path.join(self._result_dir, "quantized.model")
         if self._target.startswith("nnp3"):
             self._relay_quant = self._nnp3xx_quantization(quantize_config, norm)
-            quan_json_path = os.path.join(self._result_dir, "quantized.json")
-            quan_model_path = os.path.join(self._result_dir, "quantized.model")
             tvm.relay.quantize.save_deepeye_quan_model(self._relay_quant, quan_json_path)  # 将relay_func存为json
             from tvm.contrib.export import RelayExporter
             RelayExporter().save(self._relay_quant, quan_model_path)  # 生成Netron模型可视化文件
-            logger.info("save quant json to {}".format(quan_json_path))
             logger.info("save quant model to {}".format(quan_model_path))
-            if self._quant_cfg["debug_level"] == 1:
-                # layer_outs: dict，key为每层的name(为方便用户获知原始浮点模型每一层的数据状况，
-                # 所以尽可能使用了原始浮点模型自带的op_name，但实际处理会获取不到原始模型的op_name，
-                # 此时会使用opt_ir.pdf中的op_name)，相应的value为浮点和定点结果的组成的list
-                layer_outs = tvm.relay.quantization.compare_layer_outputs(self._result_dir)
         elif self._target.startswith("nnp4"):
             self._relay_quant, self._params_quant = self._nnp4xx_quantization(quantize_config, norm)
-            logger.warning("nnp4xx not support save quant model yet")
+            tvm.relay.quantization.save_ir_to_json(quan_json_path, self._relay_quant, self._params_quant)
+
+        if self._quant_cfg["debug_level"] == 1:
+            # layer_outs: dict，key为每层的name(为方便用户获知原始浮点模型每一层的数据状况，
+            # 所以尽可能使用了原始浮点模型自带的op_name，但实际处理会获取不到原始模型的op_name，
+            # 此时会使用opt_ir.pdf中的op_name)，相应的value为浮点和定点结果的组成的list
+            layer_outs = tvm.relay.quantization.compare_layer_outputs(self._result_dir)
+
+        logger.info("save quant json to {}".format(quan_json_path))
         logger.info("################   quantization end  ######################")
 
     def load_relay_quant_from_json(self):
@@ -464,8 +477,10 @@ class DpExec(object):
         if not os.path.exists(quan_json_path):
             logger.error("Not found quant_json")
             exit(-1)
-        with open(quan_json_path, "rb") as f:
-            self._relay_quant = tvm.load_json(json.load(f))
+        if self._target.startswith("nnp3"):
+            self._relay_quant, self._params_quant = nnp3xx_load_from_json(quan_json_path)
+        elif self._target.startswith("nnp4"):
+            self._relay_quant, self._params_quant = nnp4xx_load_from_json(quan_json_path)
 
     @staticmethod
     def _nnp3xx_eval_relay(relay_func, params, in_datas):
@@ -488,7 +503,7 @@ class DpExec(object):
         if self._target.startswith("nnp3"):
             outputs = self._nnp3xx_eval_relay(self._relay_quant, {}, in_datas)
         elif self._target.startswith("nnp4"):
-            outputs = self.nnp4xx_tvm_fixed(in_datas)
+            outputs = self._nnp4xx_tvm_fixed(in_datas)
         if to_file and len(outputs) > 0:
             for idx, output in enumerate(outputs):
                 output.tofile(os.path.join(self._result_dir, "host_tvm_fixed_out_{}.bin".format(idx)))
@@ -505,7 +520,7 @@ class DpExec(object):
         if self._target.startswith("nnp3"):
             outputs = self._nnp3xx_eval_relay(self._relay, self._params, in_datas)
         elif self._target.startswith("nnp4"):
-            logger.warning("nnp4xx not support float inference yet")
+            outputs = self._nnp4xx_tvm_float(in_datas)
         if to_file and len(outputs) > 0:
             for idx, output in enumerate(outputs):
                 output.tofile(os.path.join(self._result_dir, "host_tvm_float_out_{}.bin".format(idx)))
@@ -586,31 +601,17 @@ class DpExec(object):
         from tvm.contrib.edgex import estimate_cycles
         estimate_cycles(self._relay_quant)
 
-    @staticmethod
-    def nnp4xx_inference(module, in_datas):
-        for input_name in in_datas:
-            module.set_input(input_name, tvm.nd.array(in_datas[input_name]))
-        module.run()
-        outputs = list()
-        for idx in range(len(in_datas)):
-            output = module.get_output(idx)
-            outputs.append(output.numpy())
-        return outputs
-
     def nnp4xx_iss_fixed(self, lib, in_datas):
         from tvm.contrib import graph_executor
         logger.info("Executing model on edgex...")
         edgex_module = graph_executor.GraphModule(lib["default"](tvm.edgex(), tvm.cpu()))
-        return self.nnp4xx_inference(edgex_module, in_datas)
+        return nnp4xx_inference(edgex_module, in_datas)
 
-    def nnp4xx_tvm_fixed(self, in_datas):
-        from tvm.contrib import graph_executor
-        from tvm.relay import build
-        cpu_target = tvm.target.Target("llvm")
-        with tvm.transform.PassContext(opt_level=3):
-            cpu_lib = build(self._relay_quant, target=cpu_target, params=self._params_quant)
-        cpu_module = graph_executor.GraphModule(cpu_lib["default"](tvm.cpu()))
-        return self.nnp4xx_inference(cpu_module, in_datas)
+    def _nnp4xx_tvm_fixed(self, in_datas):
+        return nnp4xx_inference(nnp4xx_build_lib(self._relay_quant, self._params_quant), in_datas)
+
+    def _nnp4xx_tvm_float(self, in_datas):
+        return nnp4xx_inference(nnp4xx_build_lib(self._relay, self._params), in_datas)
 
     def _nnp4xx_make_netbin(self, in_datas):
         from tvm.contrib.edgex import compile_nnp_model
