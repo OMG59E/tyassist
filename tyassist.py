@@ -184,13 +184,15 @@ def test(cfg, dtype):
     elif dtype == "tvm-fp32":
         model.load_relay_from_mem(
             dpexec.input_names,
-            dpexec.x2relay
+            dpexec.x2relay,
+            target=dpexec.target
         )
         model.set_dtype(DataType.TVM_FLOAT32)
     elif dtype == "tvm-int8":
         model.load_relay_from_json(
             dpexec.input_names,
-            os.path.join(dpexec.model_dir, "result", "quantized.json")
+            os.path.join(dpexec.model_dir, "result", "quantized.json"),
+            target=dpexec.target
         )
         model.set_dtype(DataType.TVM_INT8)
     else:
@@ -264,13 +266,15 @@ def demo(cfg, dtype):
     elif dtype == "tvm-fp32":
         model.load_relay_from_mem(
             dpexec.input_names,
-            dpexec.x2relay
+            dpexec.x2relay,
+            target=dpexec.target
         )
         model.set_dtype(DataType.TVM_FLOAT32)
     elif dtype == "tvm-int8":
         model.load_relay_from_json(
             dpexec.input_names,
-            os.path.join(dpexec.model_dir, "result", "quantized.json")
+            os.path.join(dpexec.model_dir, "result", "quantized.json"),
+            target=dpexec.target
         )
         model.set_dtype(DataType.TVM_INT8)
     else:

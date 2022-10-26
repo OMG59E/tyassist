@@ -77,15 +77,15 @@ class Classifier(ModelBase, ABC):
             return False
         return True
 
-    def load_relay_from_mem(self, input_names: list, callback):
+    def load_relay_from_mem(self, input_names: list, callback, target="nnp300"):
         from src.infer_relay import InferRelay
         self._infer = InferRelay(input_names)
-        self._infer.load_from_mem(callback)
+        self._infer.load_from_mem(callback, target)
 
-    def load_relay_from_json(self, input_names: list, filepath):
+    def load_relay_from_json(self, input_names: list, filepath, target="nnp300"):
         from src.infer_relay import InferRelay
         self._infer = InferRelay(input_names)
-        self._infer.load_from_json(filepath)
+        self._infer.load_from_json(filepath, target)
 
     def _preprocess(self, cv_image):
         return default_preprocess(
