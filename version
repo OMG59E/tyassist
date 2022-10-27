@@ -1,5 +1,5 @@
 v1.1.0(2022.10.31)
-1. 增加支持edgex芯片量化编译，tvm定点推理，iss定点推理
+1. 增加支持edgex芯片量化编译，tvm/iss仿真推理
 2. 修复ISS模式不支持逐层dump功能问题
 3. 增加tvm浮点与定点的逐层比较
 4. detection模型评估固定iou_thresh=0.65/conf_thresh=0.01

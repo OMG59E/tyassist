@@ -44,7 +44,7 @@ build: {
   # 目标平台，必须设置
   target: "nnp300",
 
-  # 是否跳过量化编译过程，仅做CPU端的浮点和定点仿真，默认为true
+  # 是否跳过量化编译过程，仅做CPU端的浮点和定点仿真
   # 注意disable之前必须已经生成量化模型
   enable_quant: true,
 
@@ -53,10 +53,12 @@ build: {
     # 量化输入数据路径(必须设置)
     data_dir: "/DEngine/tyexamples/data/pic/rgbd",
 
-    # 量化使用的数据数量，0表示使用所有数据，默认为0
+    # 量化使用的数据数量，0表示使用所有数据
     prof_img_num: 50,
 
-    # 进行check_similarity的图片的张数，默认为1。如果大于1，最终会输出所有图片的平均相似度；如果等于0，则会处理similarity_dataset中所有图片
+    # 进行check_similarity的图片的张数
+    # 如果大于1，最终会输出所有图片的平均相似度
+    # 如果等于0，则会处理similarity_dataset中所有图片
     similarity_img_num: 1,
 
     # 进行相似度比对的输入数据，配置为空，则默认取前述dataset接口表示的输入。具体配置参照dataset，可定义为图片集路径，或用户自定义的预处理。
@@ -67,7 +69,7 @@ build: {
     custom_preprocess_module: "custom_preprocess",
     custom_preprocess_cls: "CustomTensorFlowImgD",
 
-    # 量化调试等级, 默认为1
+    # 量化调试等级
     # 0 - 输出整体余弦相似度,
     # 1 - 输出整体余弦相似度、输出逐层余弦相似度、逐层保存浮点模型和定点模型的数据、逐层保存浮点定点的对比PNG图
     # 2 - 输出整体余弦相似度、输出逐层余弦相似度、逐层保存浮点定点的对比PNG图
@@ -75,17 +77,17 @@ build: {
     #-1 - 不输出debug信息
     debug_level: 0,
 
-    # 校准方法 "kld", "min_max", "percentile_0.99..", "l2norm", 可以缺省此项，默认kld
+    # 校准方法 "kld", "min_max", "percentile_0.99..", "l2norm"
     calib_method: "kld",
 
-    # 可配置为 op 的索引，可单个配置也可组成 list, 可以缺省此项
+    # 可配置为 op 的索引，可单个配置也可组成 list,
     skip_layer_idxes: [ 3, 131 ],
 
-    # 可配置为op的类型，可单个配置也可组成 list, 可以为空list或缺省此项
+    # 可配置为op的类型，可单个配置也可组成 list
     skip_layer_types: [ ],   # 例子 ["nn.conv2d", "nn.conv2d"]
   },
 
-  # 是否使能进行逐层dump结果，默认为0。注意：为0时模型不支持软仿/iss
+  # 是否使能进行逐层dump结果，注意：为0时模型不支持软仿/iss
   enable_dump: 0,
 }
 

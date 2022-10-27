@@ -50,7 +50,7 @@ class InferRelay(object):
         elif target.startswith("nnp4"):
             self._relay, self._params = nnp4xx_load_from_json(filepath)
 
-        self._build_model()
+        self._build_model(target)
 
     def _build_model(self, target="nnp300"):
         if target.startswith("nnp3"):

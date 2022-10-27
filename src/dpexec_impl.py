@@ -623,7 +623,11 @@ class DpExec(object):
             opt_level=2,
         )
         logger.info("Executing model on edgex...")
-        return self.nnp4xx_iss_fixed(edgex_lib, in_datas)
+        iss_fixed_outputs = self.nnp4xx_iss_fixed(edgex_lib, in_datas)
+        for idx, output in enumerate(iss_fixed_outputs):
+            output.tofile(os.path.join(self._result_dir, "host_iss_fixed_out_{}.bin".format(idx)))
+            output.tofile(os.path.join(self._result_dir, "host_iss_fixed_out_{}.txt".format(idx)), sep="\n")
+        return iss_fixed_outputs
 
     @staticmethod
     def _set_nnp4xx_env():

@@ -28,8 +28,13 @@ def nnp3xx_load_from_json(filepath):
 
 def nnp4xx_load_from_json(filepath):
     try:
-        relay_func = tvm.relay.quantization.load_json_to_ir(filepath)
-        return relay_func
+        with open(filepath) as file_obj:
+            json_str = json.load(file_obj)
+            if "ir" not in tvm.__dict__:
+                logger.error("Not found ir in tvm")
+                exit(-1)
+            relay_func = tvm.ir.load_json(json_str)
+            return relay_func, {}
     except Exception as e:
         logger.error("Failed to load model from json -> {}".format(e))
         exit(-1)

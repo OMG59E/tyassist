@@ -70,10 +70,11 @@ class CustomTensorFlowImgD(BaseCustomPreprocess):
         out = np.expand_dims(out.transpose((2, 0, 1)), axis=0)
         return out
 
-    def get_single_data(self, filepath):
+    def get_single_data(self, filepath, idx):
         """用于处理指定输入图片的预处理，一般用于推理计算相似度
             不需要norm归一化，工具链会根据配置文件，内部进行norm
         :param filepath:
+        :param idx:  不支持输入的索引
         :return:
         """
         not_ext_path, ext = os.path.splitext(filepath)
