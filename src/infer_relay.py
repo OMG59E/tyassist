@@ -9,10 +9,16 @@
 @software: PyCharm 
 """
 import os
-import json
 import time
+import tvm
 
 from utils import logger
+from utils.nnp_func import (
+    nnp3xx_load_from_json,
+    nnp4xx_load_from_json,
+    nnp3xx_build_lib,
+    nnp4xx_build_lib
+)
 
 
 class InferRelay(object):
@@ -23,48 +29,34 @@ class InferRelay(object):
         self._engine = None
         self._ave_latency_ms = 0
         self._total = 0
+        self._target = "nnp300"
 
-    def load_from_mem(self, callback=None):
+    def load_from_mem(self, callback=None, target="nnp300"):
         """从内存加载浮点模型
-        :param callback:
-        :return:
         """
+        self._target = target
         self._relay, self._params = callback()
-        self._load_model()
+        self._build_model(target)
 
-    def load_from_json(self, filepath):
+    def load_from_json(self, filepath, target="nnp300"):
         """从json文件加载模型
-        :param filepath:  模型文件路径
-        :return:
         """
+        self._target = target
         if not os.path.exists(filepath):
             logger.error("Not found model file -> {}".format(filepath))
             exit(-1)
-        with open(filepath, "rb") as f:
-            import tvm
-            from tvm import relay
-            self._relay = tvm.load_json(json.load(f))
-            self._relay = relay.ir_pass.infer_type(self._relay)
-            self._params = {}
-            self._load_model()
+        if target.startswith("nnp3"):
+            self._relay, self._params = nnp3xx_load_from_json(filepath)
+        elif target.startswith("nnp4"):
+            self._relay, self._params = nnp4xx_load_from_json(filepath)
 
-    def _load_model(self):
-        try:
-            import tvm
-            from tvm import relay
-            from tvm.contrib import graph_runtime
-            from deepeye.relay_pass import rewrite_for_cpu
-            relay_func = relay.relay_pass.bind_params(self._relay, self._params)
-            relay_func.ret_type = None
-            relay_func, cpu_params = rewrite_for_cpu(relay_func, sim_target="nnp300")
-            ctx = tvm.cpu(0)
-            with relay.build_config(opt_level=3):
-                graph, lib, cpu_params = relay.build(relay_func, "llvm", params=cpu_params)
-            self._engine = graph_runtime.create(graph, lib, ctx)
-            self._engine.set_input(**cpu_params)
-        except Exception as e:
-            logger.error("Failed to load model -> {}".format(e))
-            exit(-1)
+        self._build_model(target)
+
+    def _build_model(self, target="nnp300"):
+        if target.startswith("nnp3"):
+            self._engine = nnp3xx_build_lib(self._relay, self._params)
+        elif target.startswith("nnp4"):
+            self._engine = nnp4xx_build_lib(self._relay, self._params)
 
     @property
     def ave_latency_ms(self):
@@ -82,7 +74,7 @@ class InferRelay(object):
             pass
         _in_datas = dict()
         for idx in range(len(in_datas)):
-            _in_datas[self._input_names[idx]] = in_datas[idx]
+            _in_datas[self._input_names[idx]] = in_datas[idx] if self._target.startswith("npp3") else tvm.nd.array(in_datas[idx])
         self._total += 1
         t_start = time.time()
         self._engine.set_input(**_in_datas)

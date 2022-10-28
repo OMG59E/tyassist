@@ -15,9 +15,10 @@ class CustomCenterNetDLA34Part2(BaseCustomPreprocess):
         self._calib_num = calib_num
         self._data_dir = data_dir
 
-    def get_single_data(self, filepath):
+    def get_single_data(self, filepath, idx):
         """用于处理模型输入图片的预处理
         :param filepath:
+        :param idx:  不支持输入的索引
         :return:
         """
         pass
