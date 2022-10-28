@@ -93,7 +93,7 @@ build: {
   },
 
   # 是否使能进行逐层dump结果，注意：为0时模型不支持软仿/iss
-  enable_dump: 0,
+  enable_dump: 1,
 }
 
 # test时必须设置以下字段
