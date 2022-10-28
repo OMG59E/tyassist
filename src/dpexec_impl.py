@@ -49,6 +49,9 @@ class DpExec(object):
         self._relay = None
         self._params = None
 
+        if self._target.startswith("nnp4"):
+            self.set_nnp4xx_env()
+
         self._input_enable_aipps = list()
         self._data_layouts = list()
         self._pixel_formats = list()
@@ -630,7 +633,7 @@ class DpExec(object):
         return iss_fixed_outputs
 
     @staticmethod
-    def _set_nnp4xx_env():
+    def set_nnp4xx_env():
         dep_path = "{}/de-dcl/client/lib".format(tvm.__path__[0])
         ld_path = os.getenv("LD_LIBRARY_PATH")
         ld_path = dep_path if ld_path is None else dep_path + ":" + ld_path
@@ -642,5 +645,4 @@ class DpExec(object):
         if self._target.startswith("nnp3"):
             return self._nnp3xx_make_netbin(in_datas)
         elif self._target.startswith("nnp4"):
-            self._set_nnp4xx_env()
             return self._nnp4xx_make_netbin(in_datas)
