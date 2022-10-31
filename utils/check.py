@@ -34,6 +34,12 @@ def check_config(cfg, phase="build"):
         logger.error("The key(framework) must be in cfg[model]")
         return False
 
+    framework = cfg["model"]["framework"]
+    framework_lists = ["caffe", "onnx", "pytorch", "mxnet", "tensorflow"]
+    if framework not in framework_lists:
+        logger.error("framework({}) must be in {}".format(framework, framework_lists))
+        return False
+
     if "build" not in cfg:
         logger.error("The key(build) must be in cfg")
         return False
@@ -53,10 +59,16 @@ def check_config(cfg, phase="build"):
     if "target" not in cfg["build"]:
         logger.error("The key(target) must be in cfg")
         return False
-    else:
-        if cfg["build"]["target"].startswith("nnp4") and cfg["model"]["framework"] not in ["onnx"]:
-            logger.error("tytvm only support onnx framework")
-            return False
+
+    target = cfg["build"]["target"]
+    target_lists = ["nnp300", "nnp400"]
+    if target not in target_lists:
+        logger.error("target({}) not in {}".format(target, target_lists))
+        return False
+
+    if target.startswith("nnp4") and framework not in ["onnx"]:
+        logger.error("tytvm only support onnx framework")
+        return False
 
     if "quant" not in cfg["build"]:
         logger.error("The key(quant) must be in cfg[build]")
@@ -74,8 +86,10 @@ def check_config(cfg, phase="build"):
         logger.error("The key(debug_level) must be in cfg[build][quant]")
         return False
 
-    if cfg["build"]["quant"]["debug_level"] not in [-1, 0, 1, 2, 3]:
-        logger.error("debug_level({}) must be in [-1, 0, 1, 2, 3]".format(cfg["build"]["quant"]["debug_level"]))
+    debug_level = cfg["build"]["quant"]["debug_level"]
+    debug_level_lists = [-1, 0, 1, 2, 3]
+    if debug_level not in debug_level_lists:
+        logger.error("debug_level({}) must be in {}".format(debug_level, debug_level_lists))
         return False
 
     if "calib_method" not in cfg["build"]["quant"]:
@@ -83,26 +97,31 @@ def check_config(cfg, phase="build"):
         return False
 
     calib_method = cfg["build"]["quant"]["calib_method"]
+    calib_method_lists = ["kld", "min_max", "l2norm"]
     if calib_method.startswith("percentile_"):
         pass
     else:
-        if calib_method not in ["kld", "min_max", "l2norm"]:
-            logger.error("calib_method({}) must be in [kld, min_max, l2norm, percentile_0.99]".format(calib_method))
+        if calib_method not in calib_method_lists:
+            logger.error("calib_method({}) must be in {}".format(calib_method, calib_method_lists))
             return False
 
     if phase == "build":
-        if not os.path.exists(cfg["model"]["weight"]):
-            logger.error("The model weight not exist -> {}".format(cfg["model"]["weight"]))
+        weight = cfg["model"]["weight"]
+        if not os.path.exists(weight):
+            logger.error("The model weight not exist -> {}".format(weight))
             return False
 
     # 多输入必须定义预处理
-    if len(cfg["model"]["inputs"]) > 1 and not cfg["build"]["quant"]["custom_preprocess_cls"]:
+    input_lists = cfg["model"]["inputs"]
+    if len(input_lists) > 1 and not cfg["build"]["quant"]["custom_preprocess_cls"]:
         logger.error("Multi-input must be setting custom_preprocess")
         return False
 
-    for _input in cfg["model"]["inputs"]:
-        if _input["layout"] not in ["NCHW", "NHWC"]:
-            logger.error("layout must be in [NCHW, NHWC]")
+    for _input in input_lists:
+        layout = _input["layout"]
+        layout_lists = ["NCHW", "NHWC"]
+        if layout not in layout_lists:
+            logger.error("layout({}) must be in {}".format(layout, layout_lists))
             return False
 
         if "shape" not in _input:
@@ -138,8 +157,9 @@ def check_config(cfg, phase="build"):
             return False
 
         resize_type = _input["resize_type"]
-        if resize_type not in [0, 1]:
-            logger.error("resize_type must be in [0, 1]")
+        resize_type_lists = [0, 1]
+        if resize_type not in resize_type_lists:
+            logger.error("resize_type({}) must be in {}".format(resize_type, resize_type_lists))
             return False
 
         shape = _input["shape"]
@@ -154,7 +174,7 @@ def check_config(cfg, phase="build"):
         mean = _input["mean"]
         std = _input["std"]
         if mean is None:
-            mean = [0 for _ in range(c)]
+            mean = [0.0 for _ in range(c)]
         if std is None:
             std = [1.0 for _ in range(c)]
 
@@ -162,16 +182,20 @@ def check_config(cfg, phase="build"):
             logger.error("input channel must be equal len(mean/std)")
             return False
 
-        if _input["pixel_format"] not in ["None", "RGB", "BGR", "GRAY"]:
-            logger.error("pixel_format must be in [None, RGB, BGR, GRAY]")
+        pixel_format = _input["pixel_format"]
+        pixel_format_lists = ["None", "RGB", "BGR", "GRAY"]
+        if pixel_format not in pixel_format_lists:
+            logger.error("pixel_format({}) must be in {}".format(pixel_format, pixel_format_lists))
             return False
 
         if _input["pixel_format"] == "None" and not cfg["build"]["quant"]["custom_preprocess_cls"]:
             logger.error("Pixel format == None, must be setting custom_preprocess")
             return False
 
-        if _input["padding_mode"] not in [0, 1]:
-            logger.error("padding_mode must be in [0, 1]")
+        padding_mode = _input["padding_mode"]
+        padding_mode_lists = [0, 1]
+        if padding_mode not in padding_mode_lists:
+            logger.error("padding_mode({}) must be in {}".format(padding_mode, padding_mode_lists))
             return False
 
         if _input["data_path"]:
