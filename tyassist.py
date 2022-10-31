@@ -293,7 +293,7 @@ def demo(cfg, dtype):
     logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
 
 
-def run(config_filepath, phase, dtype):
+def run(config_filepath, phase, dtype, target):
     # 补充自定义预处理文件所在目录，必须与配置文件同目录
     config_abspath = os.path.abspath(config_filepath)
     config_dir = os.path.dirname(config_abspath)
@@ -302,6 +302,10 @@ def run(config_filepath, phase, dtype):
     config = read_yaml_to_dict(config_abspath)
     if not check_config(config, phase):
         exit(-1)
+    # 更新target，优先使用命令行
+    if target is not None:
+        config["build"]["target"] = target
+
     res = dict()
     if phase == "build":
         build(config)
@@ -317,7 +321,7 @@ def run(config_filepath, phase, dtype):
     return res
 
 
-def benchmark(mapping_file, dtype):
+def benchmark(mapping_file, dtype, target):
     import csv
     from prettytable import PrettyTable
 
@@ -343,7 +347,7 @@ def benchmark(mapping_file, dtype):
             continue
 
         os.chdir(config_dir)  # 切换至模型目录
-        res = run(config_abspath, "test", dtype)
+        res = run(config_abspath, "test", dtype, target)
         # logger.info("{}".format(res))
         os.chdir(root)  # 切换根目录
 
@@ -366,6 +370,8 @@ if __name__ == "__main__":
                         help="Please choose one of them")
     parser.add_argument("--config", "-c", type=str, required=True,
                         help="Please specify a configuration file")
+    parser.add_argument("--target", type=str, required=False, choices=("nnp300", "nnp400"),
+                        help="Please choose one of them")
     parser.add_argument("--dtype", "-t", type=str, default="int8",
                         help="Please specify a type(int8, tvm-fp32, tvm-int8)")
     parser.add_argument("--log_dir", type=str, default="./logs",
@@ -386,6 +392,6 @@ if __name__ == "__main__":
         logger.info("{} with TyAssist version: {}".format(args.type, VERSION))
 
     if args.type == "benchmark":
-        benchmark(args.config, args.dtype)
+        benchmark(args.config, args.dtype, args.target)
     else:
-        _ = run(args.config, args.type, args.dtype)
+        _ = run(args.config, args.type, args.dtype, args.target)
