@@ -611,10 +611,12 @@ class DpExec(object):
         return nnp4xx_inference(edgex_module, in_datas)
 
     def _nnp4xx_tvm_fixed(self, in_datas):
-        return nnp4xx_inference(nnp4xx_build_lib(self._relay_quant, self._params_quant), in_datas)
+        save_path = os.path.join(self._result_dir, "model_tvm_fixed.so")
+        return nnp4xx_inference(nnp4xx_build_lib(self._relay_quant, self._params_quant, save_path), in_datas)
 
     def _nnp4xx_tvm_float(self, in_datas):
-        return nnp4xx_inference(nnp4xx_build_lib(self._relay, self._params), in_datas)
+        save_path = os.path.join(self._result_dir, "model_tvm_float.so")
+        return nnp4xx_inference(nnp4xx_build_lib(self._relay, self._params, save_path), in_datas)
 
     def _nnp4xx_make_netbin(self, in_datas):
         from tvm.contrib.edgex import compile_nnp_model

@@ -59,13 +59,15 @@ def nnp3xx_build_lib(relay_func, params):
         exit(-1)
 
 
-def nnp4xx_build_lib(relay, params):
+def nnp4xx_build_lib(relay, params, save_path=None):
     try:
         from tvm.contrib import graph_executor
         from tvm.relay import build
         cpu_target = tvm.target.Target("llvm")
         with tvm.transform.PassContext(opt_level=3):
             cpu_lib = build(relay, target=cpu_target, params=params)
+            if save_path:
+                cpu_lib.export_library(save_path)
         module = graph_executor.GraphModule(cpu_lib["default"](tvm.cpu()))
         return module
     except Exception as e:
