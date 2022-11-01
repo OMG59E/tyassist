@@ -52,7 +52,7 @@ def build(cfg):
 
     tvm_float_output = dpexec.tvm_float_output(in_datas)
 
-    in_datas = dpexec.get_datas(use_norm=False, force_cr=True)  # tvm iss not support CR
+    in_datas = dpexec.get_datas(use_norm=False, force_cr=True, to_file=False)  # tvm iss not support CR
 
     if cfg["build"]["enable_quant"]:
         dpexec.relay_quantization(in_datas)
@@ -99,7 +99,7 @@ def compare(cfg):
     infer.load(dpexec.model_dir, enable_aipp=True)
     infer.set_pixel_format([dpexec.pixel_formats(idx) for idx in range(len(dpexec.input_names))])
 
-    in_datas = dpexec.get_datas(use_norm=False, force_cr=False)
+    in_datas = dpexec.get_datas(use_norm=False, force_cr=False, to_file=False)
 
     in_datas = [in_datas[key] for key in in_datas]
     outputs = infer.run(in_datas, dpexec.input_enable_aipps, to_file=True)
