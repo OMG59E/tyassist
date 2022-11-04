@@ -20,7 +20,7 @@ from utils.compare import compare_dump_out, compare_dump_out2
 
 class Infer(object):
     def __init__(self, net_cfg_file="/DEngine/tyhcp/net.cfg", sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-                 enable_dump=False, max_batch=1):
+                 enable_dump=0, max_batch=1):
         """
         :param net_cfg_file:
         :param sdk_cfg_file:
@@ -30,12 +30,8 @@ class Infer(object):
         self._port = 9090
         self._net_cfg_file = net_cfg_file
         self._sdk_cfg_file = sdk_cfg_file
-        self._enable_dump = False
-        if enable_dump:
-            if self._ip == "127.0.0.1":   # TODO 非127.0.0.1的地址也可能是ISS服务
-                logger.warning("ISS mode not support dump server")
-            else:
-                self._enable_dump = True
+        self._enable_dump = enable_dump
+        self._prefix = "chip"
         self._engine = None
         self._sdk = None
         self._max_batch = max_batch
@@ -62,6 +58,12 @@ class Infer(object):
         with open(self._net_cfg_file, "r") as f:
             net_cfg = f.read().strip()
             self._ip = net_cfg.split(":")[0]
+
+        if self._enable_dump:
+            if self._ip == "127.0.0.1":   # TODO 非127.0.0.1的地址也可能是ISS服务
+                self._prefix = "iss"
+                logger.warning("ISS mode not support dump server")
+
         try:
             import tvm
             import tvm.rpc
@@ -75,7 +77,7 @@ class Infer(object):
             self._sdk = dcl.DeSDKModule(remote)
             logger.info("tyhcp version: {}".format(self._sdk.version))
 
-            if self._enable_dump:
+            if self._enable_dump == 1:
                 self._sdk.select_dump_profile(DumpProfileSel.Dump)
                 dump_server_ip = os.getenv("DUMP_SERVER_IP")
                 dump_server_port = os.getenv("DUMP_SERVER_PORT")
@@ -120,6 +122,10 @@ class Infer(object):
 
     def set_pixel_format(self, pixel_formats):
         self._pixel_formats = pixel_formats
+
+    @property
+    def prefix(self):
+        return self._prefix
 
     @property
     def ave_latency_ms(self):
@@ -170,18 +176,20 @@ class Infer(object):
         chip_cost = self._engine.get_profile_result()["last_model_exec_time"] * 0.001
         self._ave_latency_ms += chip_cost
 
-        if self._enable_dump:
+        if self._enable_dump == 1:
             self._compare_dump_out()
 
         # dump输出
         if to_file:
-            logger.info("[runonchip] predict result: outputs size -> {}".format(self._engine.get_num_outputs()))
+            logger.info("[{}] predict result: outputs size -> {}".format(self._prefix, self._engine.get_num_outputs()))
             for idx, output in enumerate(outputs):
                 logger.info("outputs[{}], shape={}, dtype={}".format(idx, output.shape, output.dtype))
-                filepath_txt = os.path.join(self._result_dir, "chip_fixed_out_{}.txt".format(idx))
-                filepath_bin = os.path.join(self._result_dir, "chip_fixed_out_{}.bin".format(idx))
+                filepath_txt = os.path.join(self._result_dir, "{}_fixed_out_{}.txt".format(self._prefix, idx))
+                filepath_bin = os.path.join(self._result_dir, "{}_fixed_out_{}.bin".format(self._prefix, idx))
                 output.tofile(filepath_txt, sep="\n")
                 output.tofile(filepath_bin)
+                logger.info("save {}_fixed_output[{}] to {}".format(self._prefix, idx, filepath_txt))
+                logger.info("save {}_fixed_output[{}] to {}".format(self._prefix, idx, filepath_bin))
         return outputs
 
     def _compare_dump_out(self):
@@ -203,7 +211,7 @@ class Infer(object):
         logger.info("cp {} -> {}".format(src, chip_dump_out))
         shutil.copytree(src, chip_dump_out)
 
-        iss_fixed_dump_out = os.path.join(self._result_dir, "host_iss_fused_out.pickle")
+        iss_fixed_dump_out = os.path.join(self._result_dir, "iss_fused_out.pickle")
         if not os.path.join(iss_fixed_dump_out):
             logger.error("Not found iss_fixed_dump_out -> {}".format(iss_fixed_dump_out))
             exit(-1)

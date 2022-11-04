@@ -34,6 +34,7 @@ class DpExec(object):
         self._quant_cfg = cfg["build"]["quant"]
         self._target = cfg["build"]["target"]
         self._enable_quant = cfg["build"]["enable_quant"]
+        self._enable_build = cfg["build"]["enable_build"]
         self._enable_dump = cfg["build"]["enable_dump"]
         self._framework = cfg["model"]["framework"]
         self._custom_preprocess_module = self._quant_cfg["custom_preprocess_module"]
@@ -69,10 +70,6 @@ class DpExec(object):
                     _input["enable_aipp"] = True
             else:
                 _input["enable_aipp"] = False
-
-            # if self._enable_dump:
-            #     logger.info("enable_dump: true")
-            #     _input["enable_aipp"] = False
 
             self._input_enable_aipps.append(_input["enable_aipp"])
 
@@ -141,8 +138,20 @@ class DpExec(object):
         return self._enable_dump
 
     @property
+    def enable_build(self):
+        return self._enable_build
+
+    @property
+    def enable_quant(self):
+        return self._enable_quant
+
+    @property
     def model_dir(self):
         return self._model_dir
+
+    @property
+    def result_dir(self):
+        return self._result_dir
 
     @property
     def input_names(self):
@@ -155,10 +164,6 @@ class DpExec(object):
     @property
     def input_enable_aipps(self):
         return self._input_enable_aipps
-
-    # @property
-    # def enable_aipp(self):
-    #     return not self._enable_dump
 
     def mean(self, idx):
         return self._means[idx]
@@ -509,8 +514,8 @@ class DpExec(object):
             outputs = self._nnp4xx_tvm_fixed(in_datas)
         if to_file and len(outputs) > 0:
             for idx, output in enumerate(outputs):
-                output.tofile(os.path.join(self._result_dir, "host_tvm_fixed_out_{}.bin".format(idx)))
-                output.tofile(os.path.join(self._result_dir, "host_tvm_fixed_out_{}.txt".format(idx)), sep="\n")
+                output.tofile(os.path.join(self._result_dir, "tvm_fixed_out_{}.bin".format(idx)))
+                output.tofile(os.path.join(self._result_dir, "tvm_fixed_out_{}.txt".format(idx)), sep="\n")
         return outputs
 
     def tvm_float_output(self, in_datas, to_file=True):
@@ -526,49 +531,49 @@ class DpExec(object):
             outputs = self._nnp4xx_tvm_float(in_datas)
         if to_file and len(outputs) > 0:
             for idx, output in enumerate(outputs):
-                output.tofile(os.path.join(self._result_dir, "host_tvm_float_out_{}.bin".format(idx)))
-                output.tofile(os.path.join(self._result_dir, "host_tvm_float_out_{}.txt".format(idx)), sep="\n")
+                output.tofile(os.path.join(self._result_dir, "tvm_float_out_{}.bin".format(idx)))
+                output.tofile(os.path.join(self._result_dir, "tvm_float_out_{}.txt".format(idx)), sep="\n")
         return outputs
 
-    def _nnp3xx_make_netbin(self, in_datas):
+    def _nnp3xx_make_netbin(self, in_datas, enable_build=True):
         """nnp3xx编译relay_func, 并生产netbin模型
-        :param in_datas:
-        :return:
         """
-        logger.info("################### build start ####################")
-        import deepeye
-        from deepeye.relay_pass import dump_func_output
-        input_info = dict()
-        for idx, _input in enumerate(self._inputs):
-            # 模型输入信息其key包含"layout", "resize_type", "padding_size", "padding_value"，都为可选参数，
-            # 但如果配置了任意参数，则"layout"参数就必须设置为"RGB", "BGR"，"GRAY"三者之一
-            # 开启dump功能，会禁止CR模块，需要将layout强设成NCHW来关闭CR功能
-            if not _input["enable_aipp"]:
-                logger.warning("Input({}) will disable_aipp".format(_input["name"]))
-                input_info[_input["name"]] = {"layout": "NCHW"}
-            else:
-                input_info[_input["name"]] = {
-                    "layout": _input["pixel_format"],
-                    "resize_type": _input["resize_type"],
-                    "padding_size": None if PaddingMode.CENTER == self.padding_mode(idx) else _input["padding_size"],
-                    "padding_value": _input["padding_value"],
-                }
-                logger.info("Input({}): will enable_aipp".format(_input["name"]))
-            logger.info("Input({}) info -> {}".format(input_info[_input["name"]], input_info[_input["name"]]))
+        if enable_build:
+            logger.info("################### build start ####################")
+            import deepeye
+            input_info = dict()
+            for idx, _input in enumerate(self._inputs):
+                # 模型输入信息其key包含"layout", "resize_type", "padding_size", "padding_value"，都为可选参数，
+                # 但如果配置了任意参数，则"layout"参数就必须设置为"RGB", "BGR"，"GRAY"三者之一
+                # 开启dump功能，会禁止CR模块，需要将layout强设成NCHW来关闭CR功能
+                if not _input["enable_aipp"]:
+                    logger.warning("Input({}) will disable_aipp".format(_input["name"]))
+                    input_info[_input["name"]] = {"layout": "NCHW"}
+                else:
+                    input_info[_input["name"]] = {
+                        "layout": _input["pixel_format"],
+                        "resize_type": _input["resize_type"],
+                        "padding_size": None if PaddingMode.CENTER == self.padding_mode(idx) else _input["padding_size"],
+                        "padding_value": _input["padding_value"],
+                    }
+                    logger.info("Input({}): will enable_aipp".format(_input["name"]))
+                logger.info("Input({}) info -> {}".format(input_info[_input["name"]], input_info[_input["name"]]))
 
-        deepeye.make_netbin(
-            self._relay_quant,  # 提供输入数据类型信息
-            self._target,
-            self._model_dir,
-            input_info,
-            params=None,
-            model_name="opt_ir",
-            return_buffer=False,
-            debug_level=1 if self._enable_dump else 0,
-            opt_cfg=None,
-            extra_info=""
-        )
-        logger.info("################### build end ####################")
+            deepeye.make_netbin(
+                self._relay_quant,  # 提供输入数据类型信息
+                self._target,
+                self._model_dir,
+                input_info,
+                params=None,
+                model_name="opt_ir",
+                return_buffer=False,
+                debug_level=1 if self._enable_dump else 0,
+                opt_cfg=None,
+                extra_info=""
+            )
+            logger.info("################### build end ####################")
+        else:
+            logger.warning("disable build")
 
         iss_fixed_outputs = None
         if self._target.startswith("nnp3") and self._enable_dump:
@@ -578,20 +583,20 @@ class DpExec(object):
                 logger.error("Not found netbin_file -> {}".format(netbin_file))
                 exit(-1)
 
-            # in_datas = self.get_datas(use_norm=False, force_cr=True)
             in_datas_list = [in_datas[key] for key in in_datas]
             iss_fixed_outputs = run_net_bin(netbin_file, in_datas_list)
             for idx, output in enumerate(iss_fixed_outputs):
-                output.tofile(os.path.join(self._result_dir, "host_iss_fixed_out_{}.bin".format(idx)))
-                output.tofile(os.path.join(self._result_dir, "host_iss_fixed_out_{}.txt".format(idx)), sep="\n")
+                output.tofile(os.path.join(self._result_dir, "iss_fixed_out_{}.bin".format(idx)))
+                output.tofile(os.path.join(self._result_dir, "iss_fixed_out_{}.txt".format(idx)), sep="\n")
 
-        if self._enable_dump:
+        if self._enable_dump == 1:
             # iss芯片软仿，生成每个融合算子在iss上的输出数据，用于和芯片硬仿做对比。
             # 目前debug_level=1启动dump功能，无法使用CR模块，需要将layout强设成NCHW来关闭CR功能
+            from deepeye.relay_pass import dump_func_output
             dump_dict, weight = dump_func_output(self._model_dir, in_datas, self._target)
-            with open(os.path.join(self._result_dir, "host_iss_fused_out.pickle"), "wb") as fp:
+            with open(os.path.join(self._result_dir, "iss_fused_out.pickle"), "wb") as fp:
                 pickle.dump(dump_dict, fp)
-            with open(os.path.join(self._result_dir, "host_iss_fused_weight.pickle"), "wb") as fp:
+            with open(os.path.join(self._result_dir, "iss_fused_weight.pickle"), "wb") as fp:
                 pickle.dump(weight, fp)
 
         return iss_fixed_outputs
@@ -612,26 +617,44 @@ class DpExec(object):
 
     def _nnp4xx_tvm_fixed(self, in_datas):
         save_path = os.path.join(self._result_dir, "model_tvm_fixed.so")
-        return nnp4xx_inference(nnp4xx_build_lib(self._relay_quant, self._params_quant, save_path), in_datas)
+        tvm_fixed_outputs = nnp4xx_inference(nnp4xx_build_lib(self._relay_quant, self._params_quant, save_path), in_datas)
+        for idx, output in enumerate(tvm_fixed_outputs):
+            output.tofile(os.path.join(self._result_dir, "tvm_fixed_out_{}.bin".format(idx)))
+            output.tofile(os.path.join(self._result_dir, "tvm_fixed_out_{}.txt".format(idx)), sep="\n")
+        return tvm_fixed_outputs
 
     def _nnp4xx_tvm_float(self, in_datas):
         save_path = os.path.join(self._result_dir, "model_tvm_float.so")
-        return nnp4xx_inference(nnp4xx_build_lib(self._relay, self._params, save_path), in_datas)
+        tvm_float_outputs = nnp4xx_inference(nnp4xx_build_lib(self._relay, self._params, save_path), in_datas)
+        for idx, output in enumerate(tvm_float_outputs):
+            output.tofile(os.path.join(self._result_dir, "tvm_float_out_{}.bin".format(idx)))
+            output.tofile(os.path.join(self._result_dir, "tvm_float_out_{}.txt".format(idx)), sep="\n")
+        return tvm_float_outputs
 
-    def _nnp4xx_make_netbin(self, in_datas):
-        from tvm.contrib.edgex import compile_nnp_model
-        # compile edgex lib
-        edgex_lib = compile_nnp_model(
-            self._relay_quant,
-            self._params_quant,
-            output_path="{}/net_combine.bin".format(self._model_dir),
-            opt_level=2,
-        )
-        logger.info("Executing model on edgex...")
+    def _nnp4xx_make_netbin(self, in_datas, enable_build=True):
+        edgex_lib = None
+        if enable_build:
+            from tvm.contrib.edgex import compile_nnp_model
+            # compile edgex lib
+            edgex_lib = compile_nnp_model(
+                self._relay_quant,
+                self._params_quant,
+                output_path="{}/net_combine.so".format(self._model_dir),
+                opt_level=2,
+            )
+            logger.info("Executing model on edgex...")
+        else:
+            logger.warning("nnp4xx disable build")
+            model_path = "{}/net_combine.so".format(self._model_dir)
+            if not os.path.exists(model_path):
+                logger.error("Not found model path -> {}".format(model_path))
+                exit(-1)
+            edgex_lib = tvm.runtime.load_module(model_path)
+
         iss_fixed_outputs = self.nnp4xx_iss_fixed(edgex_lib, in_datas)
         for idx, output in enumerate(iss_fixed_outputs):
-            output.tofile(os.path.join(self._result_dir, "host_iss_fixed_out_{}.bin".format(idx)))
-            output.tofile(os.path.join(self._result_dir, "host_iss_fixed_out_{}.txt".format(idx)), sep="\n")
+            output.tofile(os.path.join(self._result_dir, "iss_fixed_out_{}.bin".format(idx)))
+            output.tofile(os.path.join(self._result_dir, "iss_fixed_out_{}.txt".format(idx)), sep="\n")
         return iss_fixed_outputs
 
     @staticmethod
@@ -643,8 +666,8 @@ class DpExec(object):
         os.environ["EDGEX_DEBUG_ISS"] = "on"
         os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
-    def make_netbin(self, in_datas):
+    def make_netbin(self, in_datas, enable_build=True):
         if self._target.startswith("nnp3"):
-            return self._nnp3xx_make_netbin(in_datas)
+            return self._nnp3xx_make_netbin(in_datas, enable_build)
         elif self._target.startswith("nnp4"):
-            return self._nnp4xx_make_netbin(in_datas)
+            return self._nnp4xx_make_netbin(in_datas, enable_build)

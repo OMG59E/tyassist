@@ -52,8 +52,18 @@ def check_config(cfg, phase="build"):
         logger.error("The key(enable_quant) must be in cfg[build]")
         return False
 
+    if "enable_build" not in cfg["build"]:
+        logger.error("The key(enable_build) must be in cfg[build]")
+        return False
+
     if "enable_dump" not in cfg["build"]:
         logger.error("The key(enable_dump) must be in cfg[build]")
+        return False
+
+    enable_dump = cfg["build"]["enable_dump"]
+    enable_dump_lists = [0, 1, 2]
+    if enable_dump not in enable_dump_lists:
+        logger.error("The enable_dump({}) must be in {}".format(enable_dump, enable_dump_lists))
         return False
 
     if "target" not in cfg["build"]:
