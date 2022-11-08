@@ -372,7 +372,8 @@ if __name__ == "__main__":
                         help="Please specify a operator")
     parser.add_argument("--config", "-c", type=str, required=True,
                         help="Please specify a configuration file")
-    parser.add_argument("--target", type=str, required=False, choices=("nnp300", "nnp400"),
+    parser.add_argument("--target", type=str, required=False,
+                        choices=("nnp300", "nnp3020", "nnp310", "nnp320", "nnp400"),
                         help="Please specify a chip target")
     parser.add_argument("--dtype", "-t", type=str, default="int8", choices=("int8", "tvm-fp32", "tvm-int8"),
                         help="Please specify one of them")
