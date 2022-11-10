@@ -59,9 +59,9 @@ def build(cfg):
     else:
         dpexec.load_relay_quant_from_json()
 
-    iss_fixed_output = dpexec.make_netbin(in_datas, dpexec.enable_build)
-
     tvm_fixed_output = dpexec.tvm_fixed_output(in_datas)
+
+    iss_fixed_output = dpexec.make_netbin(in_datas, dpexec.enable_build)
 
     # 计算相似度
     for idx in range(len(tvm_float_output)):
