@@ -2,7 +2,7 @@
 
 model: {
   framework: "pytorch",
-  save_dir: "./dp2000",
+  save_dir: "./outputs",
   weight: "../../models/pytorch/pytorch_squeezenet_v1.1/squeezenet_1.1.pt",
   graph: "",
   inputs: [

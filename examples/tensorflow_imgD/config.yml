@@ -2,7 +2,7 @@
 
 model: {
   framework: "tensorflow",
-  save_dir: "./dp2000",
+  save_dir: "./outputs",
   weight: "/DEngine/tyexamples/models/tensorflow/tensorflow_imgD/imgD.pb",
   graph: ,
   inputs: [

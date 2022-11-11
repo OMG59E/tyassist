@@ -2,7 +2,7 @@
 
 model: {
   framework: "caffe",
-  save_dir: "./dp2000",
+  save_dir: "./outputs",
   weight: "../../models/caffe/caffe_centernet_dla34/invasion_dla34.caffemodel",
   graph: "../../models/caffe/caffe_centernet_dla34/caffe_centernet_dla34_part2.prototxt",
   inputs: [

@@ -2,7 +2,7 @@
 
 model: {
   framework: "onnx",
-  save_dir: "./dp2000",
+  save_dir: "./outputs",
   weight: "../../models/onnx/onnx_squeezenet_v1.1/squeezenet1.1-7.onnx",
   graph: "",
   inputs: [
@@ -27,7 +27,7 @@ model: {
 }
 
 build: {
-  target: "nnp300",
+  target: "nnp320",
   enable_quant: true,
   enable_build: true,
   enable_dump: 1,

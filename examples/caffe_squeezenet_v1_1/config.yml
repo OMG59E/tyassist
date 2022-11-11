@@ -2,7 +2,7 @@
 
 model: {
   framework: "caffe",
-  save_dir: "./dp2000",
+  save_dir: "./outputs",
   weight: "../../models/caffe/caffe_squeezenet_v1.1/squeezenet_v1.1.caffemodel",
   graph: "../../models/caffe/caffe_squeezenet_v1.1/deploy.prototxt",
   inputs: [

@@ -2,7 +2,7 @@
 
 model: {
   framework: "mxnet",
-  save_dir: "./dp2000",
+  save_dir: "./outputs",
   weight: "../../models/mxnet/mxnet_squeezenet_v1.1/squeezenet_v1.1-0000.params",
   graph: "../../models/mxnet/mxnet_squeezenet_v1.1/squeezenet_v1.1-symbol.json",
   inputs: [

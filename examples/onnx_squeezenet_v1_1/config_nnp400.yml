@@ -2,7 +2,7 @@
 
 model: {
   framework: "onnx",
-  save_dir: "./edge10",
+  save_dir: "./outputs",
   weight: "../../models/onnx/onnx_squeezenet_v1.1/squeezenet1.1-7.onnx",
   graph: "",
   inputs: [
@@ -28,8 +28,8 @@ model: {
 
 build: {
   target: "nnp400",
-  enable_quant: true,
-  enable_build: true,
+  enable_quant: false,
+  enable_build: false,
   quant: {
     data_dir: "/DEngine/tyassist/data/datasets/ILSVRC2012/ILSVRC2012_img_val",
     prof_img_num: 50,

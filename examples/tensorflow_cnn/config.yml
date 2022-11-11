@@ -2,7 +2,7 @@
 
 model: {
   framework: "tensorflow",
-  save_dir: "./dp2000",
+  save_dir: "./outputs",
   weight: "../../models/tensorflow/tensorflow_cnn/cnn.pb",
   graph: "",
   inputs: [
