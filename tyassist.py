@@ -103,25 +103,26 @@ def compare(cfg):
     for idx, fixed_output in enumerate(fixed_outputs):
         tvm_float_out_path = os.path.join(dpexec.model_dir, "result", "tvm_float_out_{}.bin".format(idx))
         tvm_fixed_out_path = os.path.join(dpexec.model_dir, "result", "tvm_fixed_out_{}.bin".format(idx))
-        iss_fixed_out_path = os.path.join(dpexec.model_dir, "result", "iss_fixed_out_{}.bin".format(idx))
         if not os.path.exists(tvm_fixed_out_path):
             logger.error("Not found tvm_fixed_out_path -> {}".format(tvm_fixed_out_path))
             exit(-1)
         if not os.path.exists(tvm_float_out_path):
             logger.error("Not found tvm_float_out_path -> {}".format(tvm_float_out_path))
             exit(-1)
-        if not os.path.exists(iss_fixed_out_path):
-            logger.error("Not found iss_fixed_out_path -> {}".format(iss_fixed_out_path))
-            exit(-1)
         tvm_fixed_out = np.fromfile(tvm_fixed_out_path, dtype=fixed_output.dtype)
         tvm_float_out = np.fromfile(tvm_float_out_path, dtype=fixed_output.dtype)
-        iss_fixed_out = np.fromfile(iss_fixed_out_path, dtype=fixed_output.dtype)
         dist0 = cosine_distance(fixed_output, tvm_fixed_out)
         dist1 = cosine_distance(fixed_output, tvm_float_out)
-        dist2 = cosine_distance(fixed_output, iss_fixed_out)
         logger.info("[Compare] fixed({}) vs fixed(tvm) output tensor[{}] similarity={:.6f}".format(infer.prefix, idx, dist0))
         logger.info("[Compare] fixed({}) vs float(tvm) output tensor[{}] similarity={:.6f}".format(infer.prefix, idx, dist1))
-        logger.info("[Compare] fixed({}) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(infer.prefix, idx, dist2))
+        if dpexec.enable_dump:
+            iss_fixed_out_path = os.path.join(dpexec.model_dir, "result", "iss_fixed_out_{}.bin".format(idx))
+            if not os.path.exists(iss_fixed_out_path):
+                logger.error("Not found iss_fixed_out_path -> {}".format(iss_fixed_out_path))
+                exit(-1)
+            iss_fixed_out = np.fromfile(iss_fixed_out_path, dtype=fixed_output.dtype)
+            dist2 = cosine_distance(fixed_output, iss_fixed_out)
+            logger.info("[Compare] fixed({}) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(infer.prefix, idx, dist2))
 
 
 def test(cfg, dtype):
@@ -176,7 +177,7 @@ def test(cfg, dtype):
             dpexec.model_dir,
             net_cfg_file="/DEngine/tyhcp/net.cfg",
             sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-            enable_aipp=False,  # dpexec.enable_aipp,  测试和demo默认关闭aipp
+            enable_aipp=False,  # dpexec.enable_aipp,  测试默认关闭aipp
             enable_dump=False,
             max_batch=1  # 目前仅支持最大batch 1
         )
@@ -258,7 +259,7 @@ def demo(cfg, dtype):
             dpexec.model_dir,
             net_cfg_file="/DEngine/tyhcp/net.cfg",
             sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-            enable_aipp=True,  # dpexec.enable_aipp,  测试和demo默认关闭aipp
+            enable_aipp=True,
             enable_dump=False,
             max_batch=1  # 目前仅支持最大batch 1
         )

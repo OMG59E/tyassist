@@ -117,7 +117,7 @@ class DpExec(object):
                 exit(-1)
             self._pixel_formats.append(pixel_format)
 
-        self._model_dir = cfg["model"]["save_dir"]
+        self._model_dir = os.path.join(cfg["model"]["save_dir"], self._target)
         self._result_dir = os.path.join(self._model_dir, "result")
         if not os.path.exists(self._result_dir):
             os.makedirs(self._result_dir)
