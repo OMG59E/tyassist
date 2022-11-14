@@ -16,6 +16,7 @@ from utils import logger
 from utils.utils import get_host_ip
 from utils.enum_type import PixelFormat
 from utils.compare import compare_dump_out, compare_dump_out2
+from utils.utils import get_md5
 
 
 class Infer(object):
@@ -162,6 +163,7 @@ class Infer(object):
                     logger.error("Not support image shape -> {}".format(shape))
                     exit(-1)
                 self._engine.set_aipp(batch_idx=0, input_idx=idx, image_format=image_format, image_size=[w, h])
+            # logger.info("md5: {}".format(get_md5(in_data.copy().tostring())))
             self._engine.set_input(0, idx, in_data.copy())
 
         # logger.info("model is running...")

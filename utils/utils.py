@@ -8,6 +8,7 @@
 @Software: PyCharm
 """
 import socket
+import hashlib
 
 
 def get_host_ip():
@@ -19,3 +20,9 @@ def get_host_ip():
         s.close()
 
     return ip
+
+
+def get_md5(data):
+    md5 = hashlib.md5()
+    md5.update(data)
+    return md5.hexdigest()

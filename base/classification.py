@@ -19,6 +19,7 @@ from .model_base import ModelBase
 from utils import logger
 from utils.preprocess import default_preprocess
 from utils.enum_type import PaddingMode, DataType
+from utils.utils import get_md5
 
 
 class Classifier(ModelBase, ABC):
@@ -122,6 +123,7 @@ class Classifier(ModelBase, ABC):
     def inference(self, cv_image):
         t_start = time.time()
         data = self._preprocess(cv_image)
+        # logger.info("md5: {}".format(get_md5(data.tostring())))
         outputs = self._infer.run([data], self._input_enable_aipps)
         output = self._postprocess(outputs, cv_image)
         end2end_cost = time.time() - t_start
@@ -177,6 +179,7 @@ class Classifier(ModelBase, ABC):
             exit(-1)
 
         chip_output = self.inference(cv_image)
+        # logger.info("md5: {}".format(get_md5(chip_output.tostring())))
         max_idx = np.argmax(chip_output, axis=1).flatten()[0]
         max_prob = chip_output[:, max_idx].flatten()[0]
         logger.info("predict cls = {}, prob = {:.6f}".format(max_idx, max_prob))
