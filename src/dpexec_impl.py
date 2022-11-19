@@ -247,7 +247,7 @@ class DpExec(object):
                 params,
                 shape_dict,
                 convert_input_as_nchw=True if self.data_layout(0) == DataLayout.NHWC else False,
-                convert_output_as_nchw=False,
+                convert_output_as_nchw=True,
             )
         elif self._framework == "onnx":
             if self._target.startswith("nnp3"):
@@ -360,11 +360,17 @@ class DpExec(object):
                         in_datas[_input["name"]] = im.transpose((0, 3, 1, 2))  # hwc -> chw, BGR888
             else:
                 logger.warning("Not set data_path, will use random data")
-                # 采用随机数据
-                if use_norm:
-                    in_datas[_input["name"]] = np.random.randn(n, c, h, w).astype(dtype=np.float32)
+                if self.has_custom_preprocess:
+                    in_datas[_input["name"]] = self._custom_preprocess_cls.get_single_data("", idx)
                 else:
-                    in_datas[_input["name"]] = np.random.randint(0, 255, (n, c, h, w)).astype(dtype=np.uint8)
+                    # random data
+                    if use_norm:
+                        in_datas[_input["name"]] = np.random.randn(n, c, h, w).astype(dtype=np.float32)
+                    else:
+                        in_datas[_input["name"]] = np.random.randint(0, 255, (n, c, h, w)).astype(dtype=np.uint8)
+
+                _input["padding_size"] = None  #
+
             if to_file:
                 # save data
                 in_datas[_input["name"]].tofile(os.path.join(self._result_dir, "data_{}_CRN.bin".format(idx)))
@@ -435,6 +441,10 @@ class DpExec(object):
             data_type = "uint8"
             if in_datas[_input["name"]].dtype == np.uint8:
                 pass
+            elif in_datas[_input["name"]].dtype == np.int16:
+                data_type = "int16"
+            elif in_datas[_input["name"]].dtype == np.float16:
+                data_type = "float16"
             elif in_datas[_input["name"]].dtype == np.float32:
                 data_type = "float32"
             else:
