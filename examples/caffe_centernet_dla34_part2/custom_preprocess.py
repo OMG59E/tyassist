@@ -21,7 +21,10 @@ class CustomCenterNetDLA34Part2(BaseCustomPreprocess):
         :param idx:  不支持输入的索引
         :return:
         """
-        pass
+        n, c, h, w = self._inputs[idx]["shape"]
+        if self._inputs[idx]["layout"] == "NHWC":
+            n, h, w, c = self._inputs[idx]["shape"]
+        return np.random.randn(n, c, h, w).astype(dtype=np.float32)
 
     def get_data(self):
         """工具链内部调用预处理来校准的函数
@@ -29,9 +32,6 @@ class CustomCenterNetDLA34Part2(BaseCustomPreprocess):
         """
         for i in range(self._calib_num):
             datas = dict()
-            for _input in self._inputs:
-                n, c, h, w = _input["shape"]
-                if _input["layout"] == "NHWC":
-                    n, h, w, c = _input["shape"]
-                datas[_input["name"]] = np.random.randn(n, c, h, w).astype(dtype=np.float32)
+            for idx, _input in enumerate(self._inputs):
+                datas[_input["name"]] = self.get_single_data("", idx)
             yield datas
