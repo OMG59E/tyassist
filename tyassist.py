@@ -61,6 +61,8 @@ def build(cfg):
 
     tvm_fixed_output = dpexec.tvm_fixed_output(in_datas)
 
+    dpexec.compress_analysis()
+
     iss_fixed_output = dpexec.make_netbin(in_datas, dpexec.enable_build)
 
     # 计算相似度
@@ -98,6 +100,9 @@ def compare(cfg):
     in_datas = dpexec.get_datas(use_norm=False, force_cr=False, to_file=False)
     in_datas = [in_datas[key] for key in in_datas]
     fixed_outputs = infer.run(in_datas, dpexec.input_enable_aipps, to_file=True)
+
+    infer.save_profile()
+    logger.info("average cost {:.6f}ms".format(infer.ave_latency_ms))
 
     # compare
     for idx, fixed_output in enumerate(fixed_outputs):

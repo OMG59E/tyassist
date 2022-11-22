@@ -85,11 +85,12 @@ class Infer(object):
                 self._sdk.set_dump_server_ip(dump_server_ip, int(dump_server_port))
             else:
                 self._sdk.select_dump_profile(DumpProfileSel.Profile)
+                # self._sdk.set_profile_remote_main_dir("/tmp")
 
             self._sdk.sdk_init(self._sdk_cfg_file)
             logger.info("tyhcp init succeed.")
         except Exception as e:
-            logger.error("Import failed -> {}, please run in TyHCP".format(e))
+            logger.error("Import failed -> {}".format(e))
             exit(-1)
 
     def load(self, model_dir, enable_aipp=False):
@@ -123,6 +124,11 @@ class Infer(object):
 
     def set_pixel_format(self, pixel_formats):
         self._pixel_formats = pixel_formats
+
+    def save_profile(self):
+        filepath = os.path.join(self._result_dir, "profile_result.tar.gz")
+        logger.info("save profile to {}".format(filepath))
+        self._sdk.copy_profile_file_to(filepath)
 
     @property
     def prefix(self):

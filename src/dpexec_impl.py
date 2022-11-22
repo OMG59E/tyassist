@@ -313,13 +313,12 @@ class DpExec(object):
                     self._custom_preprocess_module, self._custom_preprocess_cls))
                 exit(-1)
 
-    def get_datas(self, use_norm=False, force_cr=False, to_file=True):
+    def get_datas(self, filepath="", use_norm=False, force_cr=False, to_file=True):
         """获取量化/编译阶段处理数据
-        :return:
         """
         in_datas = collections.OrderedDict()  # 保证输入顺序一致
         for idx, _input in enumerate(self._inputs):
-            data_path = _input["data_path"]
+            data_path = _input["data_path"] if not filepath else filepath
             n, c, h, w = self.shape(idx)
             if data_path:
                 if not os.path.exists(data_path):
@@ -359,11 +358,11 @@ class DpExec(object):
                             im = np.expand_dims(im, axis=0)
                         in_datas[_input["name"]] = im.transpose((0, 3, 1, 2))  # hwc -> chw, BGR888
             else:
+                # random data
                 logger.warning("Not set data_path, will use random data")
                 if self.has_custom_preprocess:
                     in_datas[_input["name"]] = self._custom_preprocess_cls.get_single_data("", idx)
                 else:
-                    # random data
                     if use_norm:
                         in_datas[_input["name"]] = np.random.randn(n, c, h, w).astype(dtype=np.float32)
                     else:
@@ -545,6 +544,79 @@ class DpExec(object):
                 output.tofile(os.path.join(self._result_dir, "tvm_float_out_{}.txt".format(idx)), sep="\n")
         return outputs
 
+    @property
+    def target_ops(self):
+        return ["nn.conv2d", "nn.dense", "nn.batch_matmul"]
+
+    def compress_analysis(self):
+        from tvm import relay
+        from tvm.contrib import graph_runtime
+        from tvm.relay import expr as _expr
+        from tvm.relay import ir_pass as _ir_pass
+        quan_json_path = os.path.join(self._result_dir, "quantized.json")
+        relay_func = tvm.relay.quantization.get_ir_from_json(quan_json_path)
+
+        feature_map_nodes = []
+        weights = []
+
+        def visit_func(expr):
+            """visit_func"""
+            if isinstance(expr, _expr.Call) and expr.op.name in self.target_ops:
+                data, weight = expr.args
+                if isinstance(weight, _expr.Constant):
+                    weights.append(weight.data.asnumpy())
+                feature_map_nodes.append(data)
+
+        _ir_pass.post_order_visit(relay_func, visit_func)
+        graph = relay.Function(relay_func.params, tvm.relay.Tuple(feature_map_nodes))
+
+        weight_size = 0
+        weight_count = 0
+        for idx, w in enumerate(weights):
+            weight_count += len(np.where(w.flatten() == 0)[0])
+            weight_size += len(w.flatten())
+
+        ctx = tvm.cpu(0)
+        with tvm.relay.build_config(opt_level=3):
+            graph, lib, params = tvm.relay.build(graph, "llvm", params=None)
+
+        module = graph_runtime.create(graph, lib, ctx)
+        module.set_input(**params)
+
+        # if self._custom_preprocess_cls:
+        #     logger.error("Not support custom preprocess")
+        #     exit(-1)
+        data_dir = self._quant_cfg["data_dir"]
+        prof_img_num = self._quant_cfg["prof_img_num"]
+        data_lists = os.listdir(data_dir)
+        if prof_img_num < len(data_lists):
+            data_lists = data_lists[0:prof_img_num]
+        else:
+            prof_img_num = len(data_lists)
+
+        ret = []
+        feature_map_size = 0
+        feature_map_count = 0
+        for filename in data_lists:
+            _, ext = os.path.splitext(filename)
+            if ext not in [".JPEG", ".jpg", ".bmp", ".png", ".PNG"]:
+                continue
+            filepath = os.path.join(data_dir, filename)
+            in_datas = self.get_datas(filepath=filepath, use_norm=False, force_cr=True, to_file=False)
+            module.set_input(**in_datas)
+            module.run()
+
+            outputs = list()
+            for idx in range(module.get_num_outputs()):
+                output = module.get_output(idx).asnumpy()
+                feature_map_count += len(np.where(output.flatten() == 0)[0])
+                feature_map_size += len(output.flatten())
+            ret.append(outputs)
+        logger.info("feature_map: {}/{}={:.6f}".format(
+                feature_map_count, feature_map_size, float(feature_map_count) / feature_map_size))
+        logger.info("weight: {}/{}={:.6f}".format(weight_count, weight_size, float(weight_count) / weight_size))
+        return ret, weights
+
     def _nnp3xx_make_netbin(self, in_datas, enable_build=True):
         """nnp3xx编译relay_func, 并生产netbin模型
         """
@@ -594,7 +666,7 @@ class DpExec(object):
                 exit(-1)
 
             in_datas_list = [in_datas[key] for key in in_datas]
-            iss_fixed_outputs = run_net_bin(netbin_file, in_datas_list)
+            iss_fixed_outputs = run_net_bin(netbin_file, in_datas_list, work_path=self._model_dir, target=self._target)
             for idx, output in enumerate(iss_fixed_outputs):
                 output.tofile(os.path.join(self._result_dir, "iss_fixed_out_{}.bin".format(idx)))
                 output.tofile(os.path.join(self._result_dir, "iss_fixed_out_{}.txt".format(idx)), sep="\n")
