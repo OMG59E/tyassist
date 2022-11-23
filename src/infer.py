@@ -77,7 +77,6 @@ class Infer(object):
 
             self._sdk = dcl.DeSDKModule(remote)
             logger.info("tyhcp version: {}".format(self._sdk.version))
-
             if self._enable_dump == 1:
                 self._sdk.select_dump_profile(DumpProfileSel.Dump)
                 dump_server_ip = os.getenv("DUMP_SERVER_IP")
@@ -85,8 +84,8 @@ class Infer(object):
                 self._sdk.set_dump_server_ip(dump_server_ip, int(dump_server_port))
             else:
                 self._sdk.select_dump_profile(DumpProfileSel.Profile)
-                # self._sdk.set_profile_remote_main_dir("/tmp")
 
+            logger.info("sdk config path: {}".format(sdk_cfg_file))
             self._sdk.sdk_init(self._sdk_cfg_file)
             logger.info("tyhcp init succeed.")
         except Exception as e:
@@ -109,6 +108,7 @@ class Infer(object):
         if self._enable_dump:
             self._dump_root_path = self._sdk.set_dump_work_path(self._result_dir)
             logger.info("dump root path: {}".format(self._dump_root_path))
+        logger.info("sdk config: {}".format(self._sdk.get_sdk_config()))
 
         netbin_file = os.path.join(self._model_dir, "net_combine.bin")
         if not os.path.isfile(netbin_file):
@@ -121,14 +121,17 @@ class Infer(object):
             self._sdk.disable_aipp()
         self._engine = self._sdk.create_model(self._max_batch)
         self._engine.load_model(netbin_file)
+        logger.info(self._engine.get_model_info())
 
     def set_pixel_format(self, pixel_formats):
         self._pixel_formats = pixel_formats
 
     def save_profile(self):
         filepath = os.path.join(self._result_dir, "profile_result.tar.gz")
-        logger.info("save profile to {}".format(filepath))
         self._sdk.copy_profile_file_to(filepath)
+        logger.info("save profile to {}".format(filepath))
+        if os.path.exists(filepath):
+            os.system("tar -xvf {} -C {}".format(filepath, self._result_dir))
 
     @property
     def prefix(self):
