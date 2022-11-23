@@ -12,6 +12,7 @@ import pickle
 import json
 import numpy as np
 from utils.dist_metrics import cosine_distance
+from utils import logger
 
 
 def compare_dump_out(chip_dump_path, iss_fixed_dump_path):
@@ -59,7 +60,7 @@ def compare_dump_out(chip_dump_path, iss_fixed_dump_path):
         table.add_row(result)
         f_csv.writerow(result)
     f.close()
-    print(table, flush=True)
+    logger.info("\n{}".format(table))
 
 
 def compare_dump_out2(tvm_fixed_dump_path, tvm_fp32_dump_path):
@@ -85,5 +86,5 @@ def compare_dump_out2(tvm_fixed_dump_path, tvm_fp32_dump_path):
         tvm_fixed_vs_tvm_fp32_dist = "{:.6f}".format(cosine_distance(tvm_fp32_out, tvm_fixed_out))
         result = [idx, op_name, tvm_fixed_vs_tvm_fp32_dist]
         table.add_row(result)
-    print(table, flush=True)
+    logger.info("\n{}".format(table))
 

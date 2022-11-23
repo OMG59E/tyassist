@@ -52,74 +52,98 @@ def build(cfg):
 
     tvm_float_output = dpexec.tvm_float_output(in_datas)
 
-    in_datas = dpexec.get_datas(use_norm=False, force_cr=True)  # tvm iss not support CR
+    in_datas = dpexec.get_datas(use_norm=False, force_cr=True, to_file=False)  # tvm iss not support CR
 
-    if cfg["build"]["enable_quant"]:
+    if dpexec.enable_quant:
         dpexec.relay_quantization(in_datas)
     else:
         dpexec.load_relay_quant_from_json()
 
-    iss_fixed_output = dpexec.make_netbin(in_datas)
-
     tvm_fixed_output = dpexec.tvm_fixed_output(in_datas)
+
+    dpexec.compress_analysis()
+
+    iss_fixed_output = dpexec.make_netbin(in_datas, dpexec.enable_build)
 
     # 计算相似度
     for idx in range(len(tvm_float_output)):
         dist = cosine_distance(tvm_float_output[idx], tvm_fixed_output[idx])
-        logger.info("[runoncpu] float(tvm) output tensor [{}] shape:{} dtype:{}".format(
+        logger.info("[Build] float(tvm) output tensor[{}] shape:{} dtype:{}".format(
             idx, tvm_float_output[idx].shape, tvm_float_output[idx].dtype))
-        logger.info("[runoncpu] fixed(tvm) output tensor [{}] shape:{} dtype:{}".format(
+        logger.info("[Build] fixed(tvm) output tensor[{}] shape:{} dtype:{}".format(
             idx, tvm_fixed_output[idx].shape, tvm_fixed_output[idx].dtype))
         if iss_fixed_output:
-            logger.info("[runoncpu] fixed(iss) output tensor [{}] shape:{} dtype:{}".format(
+            logger.info("[Build] fixed(iss) output tensor[{}] shape:{} dtype:{}".format(
                 idx, iss_fixed_output[idx].shape, iss_fixed_output[idx].dtype))
-        logger.info("[runoncpu] float(tvm) vs fixed(tvm) output tensor [{}] similarity={:.6f}".format(idx, dist))
+        logger.info("[Build] float(tvm) vs fixed(tvm) output tensor[{}] similarity={:.6f}".format(idx, dist))
         if iss_fixed_output:
             dist = cosine_distance(tvm_float_output[idx], iss_fixed_output[idx])
-            logger.info("[runoncpu] float(tvm) vs fixed(iss) output tensor [{}] similarity={:.6f}".format(idx, dist))
+            logger.info("[Build] float(tvm) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(idx, dist))
 
     for idx in range(len(tvm_fixed_output)):
         if iss_fixed_output:
             dist = cosine_distance(tvm_fixed_output[idx], iss_fixed_output[idx])
-            logger.info("[runoncpu] fixed(tvm) vs fixed(iss) output tensor [{}] similarity={:.6f}".format(idx, dist))
+            logger.info("[Build] fixed(tvm) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(idx, dist))
 
 
 def compare(cfg):
     from src.infer import Infer
-
     dpexec = DpExec(cfg)
-
     infer = Infer(
         net_cfg_file="/DEngine/tyhcp/net.cfg",
         sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
         enable_dump=dpexec.enable_dump,
         max_batch=1  # only batch 1
     )
-
     infer.load(dpexec.model_dir, enable_aipp=True)
     infer.set_pixel_format([dpexec.pixel_formats(idx) for idx in range(len(dpexec.input_names))])
-
-    in_datas = dpexec.get_datas(use_norm=False, force_cr=False)
-
+    in_datas = dpexec.get_datas(use_norm=False, force_cr=False, to_file=False)
     in_datas = [in_datas[key] for key in in_datas]
-    outputs = infer.run(in_datas, dpexec.input_enable_aipps, to_file=True)
+    fixed_outputs = infer.run(in_datas, dpexec.input_enable_aipps, to_file=True)
+
+    logger.info("average cost {:.6f}ms".format(infer.ave_latency_ms))
 
     # compare
-    for idx, chip_fixed_output in enumerate(outputs):
-        tvm_float_out_path = os.path.join(dpexec.model_dir, "result", "host_tvm_float_out_{}.bin".format(idx))
-        tvm_fixed_out_path = os.path.join(dpexec.model_dir, "result", "host_tvm_fixed_out_{}.bin".format(idx))
+    for idx, fixed_output in enumerate(fixed_outputs):
+        tvm_float_out_path = os.path.join(dpexec.model_dir, "result", "tvm_float_out_{}.bin".format(idx))
+        tvm_fixed_out_path = os.path.join(dpexec.model_dir, "result", "tvm_fixed_out_{}.bin".format(idx))
         if not os.path.exists(tvm_fixed_out_path):
             logger.error("Not found tvm_fixed_out_path -> {}".format(tvm_fixed_out_path))
             exit(-1)
         if not os.path.exists(tvm_float_out_path):
             logger.error("Not found tvm_float_out_path -> {}".format(tvm_float_out_path))
             exit(-1)
-        tvm_fixed_out = np.fromfile(tvm_fixed_out_path, dtype=chip_fixed_output.dtype)
-        tvm_float_out = np.fromfile(tvm_float_out_path, dtype=chip_fixed_output.dtype)
-        dist0 = cosine_distance(chip_fixed_output, tvm_fixed_out)
-        dist1 = cosine_distance(chip_fixed_output, tvm_float_out)
-        logger.info("[runonchip] fixed(chip) vs fixed(tvm) output tensor: [{}] similarity={:.6f}".format(idx, dist0))
-        logger.info("[runonchip] fixed(chip) vs float(tvm) output tensor: [{}] similarity={:.6f}".format(idx, dist1))
+        tvm_fixed_out = np.fromfile(tvm_fixed_out_path, dtype=fixed_output.dtype)
+        tvm_float_out = np.fromfile(tvm_float_out_path, dtype=fixed_output.dtype)
+        dist0 = cosine_distance(fixed_output, tvm_fixed_out)
+        dist1 = cosine_distance(fixed_output, tvm_float_out)
+        logger.info("[Compare] fixed({}) vs fixed(tvm) output tensor[{}] similarity={:.6f}".format(infer.prefix, idx, dist0))
+        logger.info("[Compare] fixed({}) vs float(tvm) output tensor[{}] similarity={:.6f}".format(infer.prefix, idx, dist1))
+        if dpexec.enable_dump:
+            iss_fixed_out_path = os.path.join(dpexec.model_dir, "result", "iss_fixed_out_{}.bin".format(idx))
+            if not os.path.exists(iss_fixed_out_path):
+                logger.error("Not found iss_fixed_out_path -> {}".format(iss_fixed_out_path))
+                exit(-1)
+            iss_fixed_out = np.fromfile(iss_fixed_out_path, dtype=fixed_output.dtype)
+            dist2 = cosine_distance(fixed_output, iss_fixed_out)
+            logger.info("[Compare] fixed({}) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(infer.prefix, idx, dist2))
+
+
+def profile(cfg):
+    from src.profiler import SdkProfiler
+    dpexec = DpExec(cfg)
+    profiler = SdkProfiler(
+        net_cfg_file="/DEngine/tyhcp/net.cfg",
+        sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
+        max_batch=1  # only batch 1
+    )
+    in_datas = dpexec.get_datas(use_norm=False, force_cr=False, to_file=False)
+    in_datas = [in_datas[key] for key in in_datas]
+    profiler.load(dpexec.model_dir)
+    profiler.run(in_datas)
+    profiler.unload()
+    profiler.save_profile()
+    profiler.parse()
 
 
 def test(cfg, dtype):
@@ -174,7 +198,7 @@ def test(cfg, dtype):
             dpexec.model_dir,
             net_cfg_file="/DEngine/tyhcp/net.cfg",
             sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-            enable_aipp=False,  # dpexec.enable_aipp,  测试和demo默认关闭aipp
+            enable_aipp=False,  # dpexec.enable_aipp,  测试默认关闭aipp
             enable_dump=False,
             max_batch=1  # 目前仅支持最大batch 1
         )
@@ -256,7 +280,7 @@ def demo(cfg, dtype):
             dpexec.model_dir,
             net_cfg_file="/DEngine/tyhcp/net.cfg",
             sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-            enable_aipp=True,  # dpexec.enable_aipp,  测试和demo默认关闭aipp
+            enable_aipp=True,
             enable_dump=False,
             max_batch=1  # 目前仅支持最大batch 1
         )
@@ -293,7 +317,7 @@ def demo(cfg, dtype):
     logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
 
 
-def run(config_filepath, phase, dtype):
+def run(config_filepath, phase, dtype, target):
     # 补充自定义预处理文件所在目录，必须与配置文件同目录
     config_abspath = os.path.abspath(config_filepath)
     config_dir = os.path.dirname(config_abspath)
@@ -302,22 +326,28 @@ def run(config_filepath, phase, dtype):
     config = read_yaml_to_dict(config_abspath)
     if not check_config(config, phase):
         exit(-1)
+    # 更新target，优先使用命令行
+    if target is not None:
+        config["build"]["target"] = target
+
     res = dict()
     if phase == "build":
         build(config)
-    elif phase == "infer":
+    elif phase == "compare":
         compare(config)
     elif phase == "test":
         res = test(config, dtype)
     elif phase == "demo":
         demo(config, dtype)
+    elif phase == "profile":
+        profile(config)
 
     sys.path.remove(config_dir)
     logger.info("success")
     return res
 
 
-def benchmark(mapping_file, dtype):
+def benchmark(mapping_file, dtype, target):
     import csv
     from prettytable import PrettyTable
 
@@ -343,7 +373,7 @@ def benchmark(mapping_file, dtype):
             continue
 
         os.chdir(config_dir)  # 切换至模型目录
-        res = run(config_abspath, "test", dtype)
+        res = run(config_abspath, "test", dtype, target)
         # logger.info("{}".format(res))
         os.chdir(root)  # 切换根目录
 
@@ -357,17 +387,20 @@ def benchmark(mapping_file, dtype):
         table.add_row(row)
         f_csv.writerow(row)
     f.close()
-    print(table, flush=True)
+    logger.info("\n{}".format(table))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TyAssist Tool")
-    parser.add_argument("type", type=str, choices=("demo", "test", "infer", "benchmark", "build"),
-                        help="Please choose one of them")
+    parser.add_argument("type", type=str, choices=("demo", "test", "compare", "benchmark", "build", "profile"),
+                        help="Please specify a operator")
     parser.add_argument("--config", "-c", type=str, required=True,
                         help="Please specify a configuration file")
-    parser.add_argument("--dtype", "-t", type=str, default="int8",
-                        help="Please specify a type(int8, tvm-fp32, tvm-int8)")
+    parser.add_argument("--target", type=str, required=False,
+                        choices=("nnp300", "nnp3020", "nnp310", "nnp320", "nnp400"),
+                        help="Please specify a chip target")
+    parser.add_argument("--dtype", "-t", type=str, default="int8", choices=("int8", "tvm-fp32", "tvm-int8"),
+                        help="Please specify one of them")
     parser.add_argument("--log_dir", type=str, default="./logs",
                         help="Please specify a log dir, default ./logs")
 
@@ -386,6 +419,6 @@ if __name__ == "__main__":
         logger.info("{} with TyAssist version: {}".format(args.type, VERSION))
 
     if args.type == "benchmark":
-        benchmark(args.config, args.dtype)
+        benchmark(args.config, args.dtype, args.target)
     else:
-        _ = run(args.config, args.type, args.dtype)
+        _ = run(args.config, args.type, args.dtype, args.target)

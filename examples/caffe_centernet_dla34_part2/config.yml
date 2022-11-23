@@ -1,111 +1,55 @@
-# 模型量化编译配置文件
+# config
 
 model: {
-  # 模型框架，必须设置
   framework: "caffe",
-
-  # 量化文件以及各种过程文件保存路径
-  save_dir: "./dp2000",
-
-  # 模型权重路径，必须设置
+  save_dir: "./outputs",
   weight: "../../models/caffe/caffe_centernet_dla34/invasion_dla34.caffemodel",
-
-  # 模型图结构定义路径，非caffe/mxnet框架模型可以不设置
   graph: "../../models/caffe/caffe_centernet_dla34/caffe_centernet_dla34_part2.prototxt",
-
-  # 模型输入配置，存在多个输入，注意顺序
-  # 目前不能分别设置多个输入的NHWC->NCHW的转换, 必须相同
   inputs: [
     {
-      name: "cat_blob11_input",  # 输入名称
-      shape: [ 1, 128, 128, 128 ], # 原模型的实际输入形状
-      layout: "NCHW",  # 输入数据布局，支持 NCHW，NHWC
-      pixel_format: "None",  # 像素格式，支持 None(未知), RGB，BGR，GRAY，设置为None时必须配置自定义处理模块
-      mean: ,   # 输入均值，不配置，默认为0，存在自定义预处理情况下，无须在自定义模块内进行norm
-      std: ,   # 输入方差，不配置，默认为1，存在自定义预处理情况下，无须在自定义模块内进行norm
-      resize_type: 0,   # resize类型，0-长宽分别resize，1-长边等比例resize
-      padding_value: 128,  # resize图像不足部分将自动padding，仅等比例resize生效
-      padding_mode: 0,  # 目前仅支持 0: 左上角(LEFT_TOP), 1: 中心点(CENTER)，仅等比例resize生效
-      # 用于比较各阶段输出的相似度，空表示采用随机数
+      name: "cat_blob11_input",
+      shape: [ 1, 128, 128, 128 ],
+      layout: "NCHW",
+      pixel_format: "None",
+      mean: ,
+      std: ,
+      resize_type: 0,
+      padding_value: 128,
+      padding_mode: 0,
       data_path: ,
     },
     {
-      name: "relu_blob47_input",  # 输入名称
-      shape: [ 1, 64, 64, 64 ], # 原模型的实际输入形状
-      layout: "NCHW",  # 输入数据布局，支持 NCHW，NHWC
-      pixel_format: "None",  # 像素格式，支持 None(未知), RGB，BGR，GRAY，设置为None时必须配置自定义处理模块
-      mean: ,   # 输入均值，不配置，默认为0，存在自定义预处理情况下，无须在自定义模块内进行norm
-      std: ,   # 输入方差，不配置，默认为1，存在自定义预处理情况下，无须在自定义模块内进行norm
-      resize_type: 0,   # resize类型，0-长宽分别resize，1-长边等比例resize
-      padding_value: 128,  # resize图像不足部分将自动padding，仅等比例resize生效
-      padding_mode: 0,  # 目前仅支持 0: 左上角(LEFT_TOP), 1: 中心点(CENTER)，仅等比例resize生效
-      # 用于比较各阶段输出的相似度，空表示采用随机数
+      name: "relu_blob47_input",
+      shape: [ 1, 64, 64, 64 ],
+      layout: "NCHW",
+      pixel_format: "None",
+      mean: ,
+      std: ,
+      resize_type: 0,
+      padding_value: 128,
+      padding_mode: 0,
       data_path: ,
     }
   ],
 
-  # 存在多个输出，注意顺序，一般用于TensorFlow，其余可不配置
-  outputs: [
-    {
-      name: "",  # TensorFlow必须设置
-    },
-    {
-      name: "",  # TensorFlow必须设置
-    },
-    {
-      name: "",  # TensorFlow必须设置
-    }
-  ],
+  outputs: [],
 }
 
 build: {
-  # 目标平台，必须设置
   target: "nnp300",
-
-  # 是否跳过量化编译过程，仅做CPU端的浮点和定点仿真
-  # 注意disable之前必须已经生成量化模型
   enable_quant: true,
-
-  # 量化配置参数，仅在enable_quant为true生效
+  enable_build: true,
   quant: {
-    # 量化输入数据路径(必须设置)，
     data_dir: "",
-
-    # 量化使用的数据数量，0表示使用所有数据
     prof_img_num: 50,
-
-    # 进行check_similarity的图片的张数
-    # 如果大于1，最终会输出所有图片的平均相似度
-    # 如果等于0，则会处理similarity_dataset中所有图片
     similarity_img_num: 1,
-
-    # 进行相似度比对的输入数据，配置为空，则默认取前述data_dir接口表示的输入。
-    # 具体配置参照dataset，可定义为图片集路径，或用户自定义的预处理。
     similarity_dataset: ,
-
-    # 用户自定义量化函数，若不配置此项，则使用默认前处理，多输入或非1,3通道数据必须配置
-    # 自定义预处理模块必须与yml配置文件同级目录
     custom_preprocess_module: "custom_preprocess",
     custom_preprocess_cls: "CustomCenterNetDLA34Part2",
-
-    # 量化调试等级
-    # 0 - 输出整体余弦相似度,
-    # 1 - 输出整体余弦相似度、输出逐层余弦相似度、逐层保存浮点模型和定点模型的数据、逐层保存浮点定点的对比PNG图
-    # 2 - 输出整体余弦相似度、输出逐层余弦相似度、逐层保存浮点定点的对比PNG图
-    # 3 - 输出整体余弦相似度、输出逐层余弦相似度
-    #-1 - 不输出debug信息
     debug_level: 0,
-
-    # 校准方法 "kld", "min_max", "percentile_0.99..", "l2norm"
     calib_method: "kld",
-
-    # 可配置为op的索引，可单个配置也可组成list
     skip_layer_idxes: [ ],
-
-    # 可配置为op的类型，可单个配置也可组成list
-    skip_layer_types: [ ],   # 例子 ["nn.conv2d", "nn.conv2d"]
+    skip_layer_types: [ ],
   },
-
-  # 是否使能进行逐层dump结果，注意：为0时模型不支持软仿/iss
   enable_dump: 1
 }
