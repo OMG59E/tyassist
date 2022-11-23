@@ -101,7 +101,6 @@ def compare(cfg):
     in_datas = [in_datas[key] for key in in_datas]
     fixed_outputs = infer.run(in_datas, dpexec.input_enable_aipps, to_file=True)
 
-    infer.save_profile()
     logger.info("average cost {:.6f}ms".format(infer.ave_latency_ms))
 
     # compare
@@ -128,6 +127,23 @@ def compare(cfg):
             iss_fixed_out = np.fromfile(iss_fixed_out_path, dtype=fixed_output.dtype)
             dist2 = cosine_distance(fixed_output, iss_fixed_out)
             logger.info("[Compare] fixed({}) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(infer.prefix, idx, dist2))
+
+
+def profile(cfg):
+    from src.profiler import SdkProfiler
+    dpexec = DpExec(cfg)
+    profiler = SdkProfiler(
+        net_cfg_file="/DEngine/tyhcp/net.cfg",
+        sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
+        max_batch=1  # only batch 1
+    )
+    in_datas = dpexec.get_datas(use_norm=False, force_cr=False, to_file=False)
+    in_datas = [in_datas[key] for key in in_datas]
+    profiler.load(dpexec.model_dir)
+    profiler.run(in_datas)
+    profiler.unload()
+    profiler.save_profile()
+    profiler.parse()
 
 
 def test(cfg, dtype):
@@ -323,6 +339,8 @@ def run(config_filepath, phase, dtype, target):
         res = test(config, dtype)
     elif phase == "demo":
         demo(config, dtype)
+    elif phase == "profile":
+        profile(config)
 
     sys.path.remove(config_dir)
     logger.info("success")
@@ -369,12 +387,12 @@ def benchmark(mapping_file, dtype, target):
         table.add_row(row)
         f_csv.writerow(row)
     f.close()
-    print(table, flush=True)
+    logger.info("\n{}".format(table))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TyAssist Tool")
-    parser.add_argument("type", type=str, choices=("demo", "test", "compare", "benchmark", "build"),
+    parser.add_argument("type", type=str, choices=("demo", "test", "compare", "benchmark", "build", "profile"),
                         help="Please specify a operator")
     parser.add_argument("--config", "-c", type=str, required=True,
                         help="Please specify a configuration file")
