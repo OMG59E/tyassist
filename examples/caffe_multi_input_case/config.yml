@@ -3,8 +3,8 @@
 model: {
   framework: "caffe",
   save_dir: "./outputs",
-  weight: "../../models/caffe/caffe_multi_input_model/caffe_multi_input_case.caffemodel",
-  graph: "../../models/caffe/caffe_multi_input_model/caffe_multi_input_case_deploy.prototxt",
+  weight: "../../models/caffe/caffe_multi_input_model/multi_input_case.caffemodel",
+  graph: "../../models/caffe/caffe_multi_input_model/multi_input_case_deploy.prototxt",
   inputs: [
     {
       name: "input0",
@@ -53,5 +53,5 @@ build: {
     skip_layer_idxes: [ ],
     skip_layer_types: [ ],
   },
-  enable_dump: 0
+  enable_dump: 1
 }

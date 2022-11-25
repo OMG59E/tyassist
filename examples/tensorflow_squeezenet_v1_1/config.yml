@@ -3,7 +3,7 @@
 model: {
   framework: "tensorflow",
   save_dir: "./outputs",
-  weight: "/DEngine/tyexamples/models/tensorflow/tensorflow_squeezenet_v1.1/squeezenet.pb",
+  weight: "../../models/tensorflow/tensorflow_squeezenet_v1.1/squeezenet.pb",
   graph: "",
   inputs: [
     {
