@@ -13,6 +13,21 @@ import json
 from . import logger
 
 
+def nnp3xx_get_device_type(work_dir, node_name=None):
+    import deepeye
+    return deepeye.util.get_device_type(work_dir, node_name)
+
+
+def nnp3xx_count_mac(relay_quant):
+    from deepeye.util import count_mac
+    return count_mac(relay_quant)
+
+
+def nnp3xx_eval_relay(relay_func, params, in_datas):
+    import deepeye
+    return deepeye.eval_relay(relay_func, params, in_datas)
+
+
 def nnp3xx_load_from_json(filepath):
     try:
         with open(filepath, "rb") as f:
@@ -24,6 +39,16 @@ def nnp3xx_load_from_json(filepath):
     except Exception as e:
         logger.error("Failed to load model from json -> {}".format(e))
         exit(-1)
+
+
+def nnp4xx_estimate_flops(relay_quant):
+    from tvm.contrib.edgex import estimate_FLOPs
+    return estimate_FLOPs(relay_quant)
+
+
+def nnp4xx_estimate_cycles(relay_quant):
+    from tvm.contrib.edgex import estimate_cycles
+    return estimate_cycles(relay_quant)
 
 
 def nnp4xx_load_from_json(filepath):
@@ -73,6 +98,13 @@ def nnp4xx_build_lib(relay, params, save_path=None):
     except Exception as e:
         logger.error("Failed to load model -> {}".format(e))
         exit(-1)
+
+
+def nnp4xx_iss_fixed(lib, in_datas):
+    from tvm.contrib import graph_executor
+    logger.info("Executing model on edgex...")
+    edgex_module = graph_executor.GraphModule(lib["default"](tvm.edgex(), tvm.cpu()))
+    return nnp4xx_inference(edgex_module, in_datas)
 
 
 def nnp4xx_inference(module, in_datas):

@@ -59,11 +59,15 @@ def build(cfg):
     else:
         dpexec.load_relay_quant_from_json()
 
+    dpexec.get_mac()  # print mac/flops/cycles info
+
     tvm_fixed_output = dpexec.tvm_fixed_output(in_datas)
 
     dpexec.compress_analysis()
 
     iss_fixed_output = dpexec.make_netbin(in_datas, dpexec.enable_build)
+
+    dpexec.get_device_type()  # print op backend info
 
     # 计算相似度
     for idx in range(len(tvm_float_output)):
