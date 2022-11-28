@@ -36,6 +36,7 @@ import tvm
 
 class DpExec(object):
     def __init__(self, cfg: dict):
+        self._model_dir = None
         self._cfg = cfg
         self._quant_cfg = cfg["build"]["quant"]
         self._target = cfg["build"]["target"]
@@ -56,8 +57,24 @@ class DpExec(object):
         self._relay = None
         self._params = None
 
+        if "name" not in cfg["model"]:
+            self._model_name = "net_combine"
+        else:
+            if not cfg["model"]["name"]:
+                self._model_name = "net_combine"
+            else:
+                self._model_name = cfg["model"]["name"]
+
+        self._model_dir = os.path.join(cfg["model"]["save_dir"], self._target)
+        self._result_dir = os.path.join(self._model_dir, "result")
+        if not os.path.exists(self._result_dir):
+            os.makedirs(self._result_dir)
+
         if self._target.startswith("nnp4"):
-            self.set_nnp4xx_env()
+            EDGEX_DEBUG_WORKING_DIR = os.path.join(self._model_dir, "debug")
+            if not os.path.exists(EDGEX_DEBUG_WORKING_DIR):
+                os.makedirs(EDGEX_DEBUG_WORKING_DIR)
+            self.set_nnp4xx_env(EDGEX_DEBUG_WORKING_DIR)
 
         self._input_enable_aipps = list()
         self._data_layouts = list()
@@ -122,11 +139,6 @@ class DpExec(object):
                 logger.error("Not support pixel_format -> {}".format(_input["pixel_format"]))
                 exit(-1)
             self._pixel_formats.append(pixel_format)
-
-        self._model_dir = os.path.join(cfg["model"]["save_dir"], self._target)
-        self._result_dir = os.path.join(self._model_dir, "result")
-        if not os.path.exists(self._result_dir):
-            os.makedirs(self._result_dir)
 
         # 设置自定义预处理
         self.set_custom_preprocess()
@@ -675,10 +687,19 @@ class DpExec(object):
         else:
             logger.warning("disable build")
 
+        # NOTE 临时重命名输出模型
+        import shutil
+        src = os.path.join(self._model_dir, "{}.bin".format(self._model_name))
+        if not os.path.exists(src):
+            logger.error("Not found netbin_file -> {}".format(src))
+            exit(-1)
+        dst = os.path.join(self._model_dir, "{}.ty".format(self._model_name))
+        shutil.move(src, dst)
+
         iss_fixed_outputs = None
         if self._target.startswith("nnp3") and self._enable_dump:
             from deepeye.run_net_bin.run_net_bin import run_net_bin
-            netbin_file = os.path.join(self._model_dir, "net_combine.bin")
+            netbin_file = os.path.join(self._model_dir, "{}.ty".format(self._model_name))
             if not os.path.exists(netbin_file):
                 logger.error("Not found netbin_file -> {}".format(netbin_file))
                 exit(-1)
@@ -718,7 +739,7 @@ class DpExec(object):
             logger.warning("Not support get device type for nnp4xx")
 
     def _nnp4xx_tvm_fixed(self, in_datas):
-        save_path = os.path.join(self._result_dir, "model_tvm_fixed.so")
+        save_path = os.path.join(self._result_dir, "model_tvm_fixed.ty")
         tvm_fixed_outputs = nnp4xx_inference(nnp4xx_build_lib(self._relay_quant, self._params_quant, save_path), in_datas)
         for idx, output in enumerate(tvm_fixed_outputs):
             output.tofile(os.path.join(self._result_dir, "tvm_fixed_out_{}.bin".format(idx)))
@@ -726,7 +747,7 @@ class DpExec(object):
         return tvm_fixed_outputs
 
     def _nnp4xx_tvm_float(self, in_datas):
-        save_path = os.path.join(self._result_dir, "model_tvm_float.so")
+        save_path = os.path.join(self._result_dir, "model_tvm_float.ty")
         tvm_float_outputs = nnp4xx_inference(nnp4xx_build_lib(self._relay, self._params, save_path), in_datas)
         for idx, output in enumerate(tvm_float_outputs):
             output.tofile(os.path.join(self._result_dir, "tvm_float_out_{}.bin".format(idx)))
@@ -742,13 +763,13 @@ class DpExec(object):
                 self._relay_quant,
                 self._params_quant,
                 working_dir=self._model_dir,
-                export_lib_path="{}/net_combine.so".format(self._model_dir),
+                export_lib_path="{}/{}.ty".format(self._model_dir, self._model_name),
                 opt_level=2,
             )
             logger.info("Executing model on edgex...")
         else:
             logger.warning("nnp4xx disable build")
-            model_path = "{}/net_combine.so".format(self._model_dir)
+            model_path = "{}/{}.ty".format(self._model_dir, self._model_name)
             if not os.path.exists(model_path):
                 logger.error("Not found model path -> {}".format(model_path))
                 exit(-1)
@@ -761,13 +782,14 @@ class DpExec(object):
         return iss_fixed_outputs
 
     @staticmethod
-    def set_nnp4xx_env():
+    def set_nnp4xx_env(working_dir="/tmp"):
         dep_path = "{}/de-dcl/client/lib".format(tvm.__path__[0])
         ld_path = os.getenv("LD_LIBRARY_PATH")
         ld_path = dep_path if ld_path is None else dep_path + ":" + ld_path
         os.environ["LD_LIBRARY_PATH"] = ld_path
         os.environ["EDGEX_DEBUG_ISS"] = "on"
         os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
+        os.environ["EDGEX_DEBUG_WORKING_DIR"] = working_dir
 
     def make_netbin(self, in_datas, enable_build=True):
         if self._target.startswith("nnp3"):

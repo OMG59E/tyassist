@@ -4,6 +4,9 @@ model: {
   # 模型框架，必须设置, 支持caffe/onnx/pytorch/tensorflow/mxnet，400系列目前仅支持onnx
   framework: "",
 
+  # 编译后模型名，缺省或不配置情况为net_combine
+  name: ,
+
   # 量化文件以及各种过程文件保存路径
   save_dir: "",
 
