@@ -71,10 +71,7 @@ class DpExec(object):
             os.makedirs(self._result_dir)
 
         if self._target.startswith("nnp4"):
-            EDGEX_DEBUG_WORKING_DIR = os.path.join(self._model_dir, "debug")
-            if not os.path.exists(EDGEX_DEBUG_WORKING_DIR):
-                os.makedirs(EDGEX_DEBUG_WORKING_DIR)
-            self.set_nnp4xx_env(EDGEX_DEBUG_WORKING_DIR)
+            self.set_nnp4xx_env()
 
         self._input_enable_aipps = list()
         self._data_layouts = list()
@@ -782,14 +779,13 @@ class DpExec(object):
         return iss_fixed_outputs
 
     @staticmethod
-    def set_nnp4xx_env(working_dir="/tmp"):
+    def set_nnp4xx_env():
         dep_path = "{}/de-dcl/client/lib".format(tvm.__path__[0])
         ld_path = os.getenv("LD_LIBRARY_PATH")
         ld_path = dep_path if ld_path is None else dep_path + ":" + ld_path
         os.environ["LD_LIBRARY_PATH"] = ld_path
         os.environ["EDGEX_DEBUG_ISS"] = "on"
         os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
-        os.environ["EDGEX_DEBUG_WORKING_DIR"] = working_dir
 
     def make_netbin(self, in_datas, enable_build=True):
         if self._target.startswith("nnp3"):
