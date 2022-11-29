@@ -3,7 +3,7 @@
 model: {
   framework: "tensorflow",
   save_dir: "./outputs",
-  weight: "/DEngine/tyexamples/models/tensorflow/tensorflow_imgD/imgD.pb",
+  weight: "../../models/tensorflow/tensorflow_imgD/imgD.pb",
   graph: ,
   inputs: [
     {
@@ -16,7 +16,7 @@ model: {
       resize_type: 0,
       padding_value: 128,
       padding_mode: 0,
-      data_path: "/DEngine/tyexamples/data/pic/rgbd/rgb/banana.png",
+      data_path: "../../data/pic/rgbd/rgb/banana.png",
     }
   ],
 
@@ -32,7 +32,7 @@ build: {
   enable_quant: true,
   enable_build: true,
   quant: {
-    data_dir: "/DEngine/tyexamples/data/pic/rgbd",
+    data_dir: "../../data/pic/rgbd",
     prof_img_num: 50,
     similarity_img_num: 1,
     similarity_dataset: ,

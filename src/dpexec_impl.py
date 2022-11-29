@@ -22,7 +22,13 @@ from utils.nnp_func import (
     nnp4xx_load_from_json,
     nnp3xx_build_lib,
     nnp4xx_build_lib,
-    nnp4xx_inference
+    nnp4xx_inference,
+    nnp3xx_count_mac,
+    nnp3xx_eval_relay,
+    nnp3xx_get_device_type,
+    nnp4xx_estimate_flops,
+    nnp4xx_estimate_cycles,
+    nnp4xx_iss_fixed
 )
 
 import tvm
@@ -30,6 +36,7 @@ import tvm
 
 class DpExec(object):
     def __init__(self, cfg: dict):
+        self._model_dir = None
         self._cfg = cfg
         self._quant_cfg = cfg["build"]["quant"]
         self._target = cfg["build"]["target"]
@@ -49,6 +56,19 @@ class DpExec(object):
         self._params_quant = None
         self._relay = None
         self._params = None
+
+        if "name" not in cfg["model"]:
+            self._model_name = "net_combine"
+        else:
+            if not cfg["model"]["name"]:
+                self._model_name = "net_combine"
+            else:
+                self._model_name = cfg["model"]["name"]
+
+        self._model_dir = os.path.join(cfg["model"]["save_dir"], self._target)
+        self._result_dir = os.path.join(self._model_dir, "result")
+        if not os.path.exists(self._result_dir):
+            os.makedirs(self._result_dir)
 
         if self._target.startswith("nnp4"):
             self.set_nnp4xx_env()
@@ -116,11 +136,6 @@ class DpExec(object):
                 logger.error("Not support pixel_format -> {}".format(_input["pixel_format"]))
                 exit(-1)
             self._pixel_formats.append(pixel_format)
-
-        self._model_dir = os.path.join(cfg["model"]["save_dir"], self._target)
-        self._result_dir = os.path.join(self._model_dir, "result")
-        if not os.path.exists(self._result_dir):
-            os.makedirs(self._result_dir)
 
         # 设置自定义预处理
         self.set_custom_preprocess()
@@ -316,6 +331,7 @@ class DpExec(object):
     def get_datas(self, filepath="", use_norm=False, force_cr=False, to_file=True):
         """获取量化/编译阶段处理数据
         """
+        # NOTE: 不支持的输入数据类型由原始模型实际要求决定
         in_datas = collections.OrderedDict()  # 保证输入顺序一致
         for idx, _input in enumerate(self._inputs):
             data_path = _input["data_path"] if not filepath else filepath
@@ -360,7 +376,7 @@ class DpExec(object):
             else:
                 # random data
                 logger.warning("Not set data_path, will use random data")
-                if self.has_custom_preprocess:
+                if not _input["support"]:
                     in_datas[_input["name"]] = self._custom_preprocess_cls.get_single_data("", idx)
                 else:
                     if use_norm:
@@ -499,16 +515,15 @@ class DpExec(object):
         elif self._target.startswith("nnp4"):
             self._relay_quant, self._params_quant = nnp4xx_load_from_json(quan_json_path)
 
-    @staticmethod
-    def _nnp3xx_eval_relay(relay_func, params, in_datas):
-        """
-        :param relay_func:
-        :param params:
-        :param in_datas:
-        :return:
-        """
-        import deepeye
-        return deepeye.eval_relay(relay_func, params, in_datas)
+    def get_mac(self):
+        if self._target.startswith("nnp3"):
+            logger.info("MAC: {}".format(nnp3xx_count_mac(self._relay_quant)))
+        elif self._target.startswith("nnp4"):
+            logger.warning("Not support to get mac for nnp4xx")
+            # logger.info("FLOPS: {} Cycles: {}".format(
+            #     nnp4xx_estimate_flops(self._relay_quant),
+            #     nnp4xx_estimate_cycles(self._relay_quant),
+            # ))
 
     def tvm_fixed_output(self, in_datas, to_file=True):
         """量化后模型在CPU端仿真推理
@@ -518,7 +533,8 @@ class DpExec(object):
         """
         outputs = list()
         if self._target.startswith("nnp3"):
-            outputs = self._nnp3xx_eval_relay(self._relay_quant, {}, in_datas)
+            outputs = nnp3xx_eval_relay(self._relay_quant, {}, in_datas)
+            outputs = [outputs[name] for name in outputs]
         elif self._target.startswith("nnp4"):
             outputs = self._nnp4xx_tvm_fixed(in_datas)
         if to_file and len(outputs) > 0:
@@ -535,7 +551,8 @@ class DpExec(object):
         """
         outputs = list()
         if self._target.startswith("nnp3"):
-            outputs = self._nnp3xx_eval_relay(self._relay, self._params, in_datas)
+            outputs = nnp3xx_eval_relay(self._relay, self._params, in_datas)
+            outputs = [outputs[name] for name in outputs]
         elif self._target.startswith("nnp4"):
             outputs = self._nnp4xx_tvm_float(in_datas)
         if to_file and len(outputs) > 0:
@@ -548,12 +565,13 @@ class DpExec(object):
     def target_ops(self):
         return ["nn.conv2d", "nn.dense", "nn.batch_matmul"]
 
-    def compress_analysis(self):
+    def _nnp3xx_compress_analysis(self):
+        quan_json_path = os.path.join(self._result_dir, "quantized.json")
+
         from tvm import relay
         from tvm.contrib import graph_runtime
         from tvm.relay import expr as _expr
         from tvm.relay import ir_pass as _ir_pass
-        quan_json_path = os.path.join(self._result_dir, "quantized.json")
         relay_func = tvm.relay.quantization.get_ir_from_json(quan_json_path)
 
         feature_map_nodes = []
@@ -583,25 +601,28 @@ class DpExec(object):
         module = graph_runtime.create(graph, lib, ctx)
         module.set_input(**params)
 
-        # if self._custom_preprocess_cls:
-        #     logger.error("Not support custom preprocess")
-        #     exit(-1)
         data_dir = self._quant_cfg["data_dir"]
         prof_img_num = self._quant_cfg["prof_img_num"]
-        data_lists = os.listdir(data_dir)
-        if prof_img_num < len(data_lists):
-            data_lists = data_lists[0:prof_img_num]
+        data_lists = ["" for _ in range(prof_img_num)]
+        if os.path.exists(data_dir):
+            data_lists = os.listdir(data_dir)
+            if prof_img_num < len(data_lists):
+                data_lists = data_lists[0:prof_img_num]
+            else:
+                prof_img_num = len(data_lists)
         else:
-            prof_img_num = len(data_lists)
+            logger.warning("Not set data_dir, will use random data")
 
         ret = []
         feature_map_size = 0
         feature_map_count = 0
         for filename in data_lists:
-            _, ext = os.path.splitext(filename)
-            if ext not in [".JPEG", ".jpg", ".bmp", ".png", ".PNG"]:
-                continue
-            filepath = os.path.join(data_dir, filename)
+            filepath = ""
+            if filename:
+                _, ext = os.path.splitext(filename)
+                if ext not in [".JPEG", ".jpg", ".bmp", ".png", ".PNG"]:
+                    continue
+                filepath = os.path.join(data_dir, filename)
             in_datas = self.get_datas(filepath=filepath, use_norm=False, force_cr=True, to_file=False)
             module.set_input(**in_datas)
             module.run()
@@ -613,9 +634,15 @@ class DpExec(object):
                 feature_map_size += len(output.flatten())
             ret.append(outputs)
         logger.info("feature_map: {}/{}={:.6f}".format(
-                feature_map_count, feature_map_size, float(feature_map_count) / feature_map_size))
+            feature_map_count, feature_map_size, float(feature_map_count) / (feature_map_size + np.finfo(float).eps)))
         logger.info("weight: {}/{}={:.6f}".format(weight_count, weight_size, float(weight_count) / weight_size))
         return ret, weights
+
+    def compress_analysis(self):
+        if self._target.startswith("nnp3"):
+            return self._nnp3xx_compress_analysis()
+        elif self._target.startswith("nnp4"):
+            logger.warning("Not support compress analysis for nnp4xx")
 
     def _nnp3xx_make_netbin(self, in_datas, enable_build=True):
         """nnp3xx编译relay_func, 并生产netbin模型
@@ -623,7 +650,7 @@ class DpExec(object):
         if enable_build:
             logger.info("################### build start ####################")
             import deepeye
-            input_info = dict()
+            input_info = collections.OrderedDict()
             for idx, _input in enumerate(self._inputs):
                 # 模型输入信息其key包含"layout", "resize_type", "padding_size", "padding_value"，都为可选参数，
                 # 但如果配置了任意参数，则"layout"参数就必须设置为"RGB", "BGR"，"GRAY"三者之一
@@ -657,19 +684,29 @@ class DpExec(object):
         else:
             logger.warning("disable build")
 
+        # NOTE 临时重命名输出模型
+        import shutil
+        src = os.path.join(self._model_dir, "{}.bin".format(self._model_name))
+        if not os.path.exists(src):
+            logger.error("Not found netbin_file -> {}".format(src))
+            exit(-1)
+        dst = os.path.join(self._model_dir, "{}.ty".format(self._model_name))
+        shutil.move(src, dst)
+
         iss_fixed_outputs = None
         if self._target.startswith("nnp3") and self._enable_dump:
             from deepeye.run_net_bin.run_net_bin import run_net_bin
-            netbin_file = os.path.join(self._model_dir, "net_combine.bin")
+            netbin_file = os.path.join(self._model_dir, "{}.ty".format(self._model_name))
             if not os.path.exists(netbin_file):
                 logger.error("Not found netbin_file -> {}".format(netbin_file))
                 exit(-1)
 
-            in_datas_list = [in_datas[key] for key in in_datas]
-            iss_fixed_outputs = run_net_bin(netbin_file, in_datas_list, work_path=self._model_dir, target=self._target)
-            for idx, output in enumerate(iss_fixed_outputs):
-                output.tofile(os.path.join(self._result_dir, "iss_fixed_out_{}.bin".format(idx)))
-                output.tofile(os.path.join(self._result_dir, "iss_fixed_out_{}.txt".format(idx)), sep="\n")
+            iss_fixed_outputs = run_net_bin(netbin_file, in_datas, work_path=self._model_dir, target=self._target)
+            iss_fixed_outputs = [iss_fixed_outputs[name] for name in iss_fixed_outputs]
+            for idx, iss_fixed_output in enumerate(iss_fixed_outputs):
+                # logger.info("save output_tensor[{}] to {}".format(output_name, self._result_dir))
+                iss_fixed_output.tofile(os.path.join(self._result_dir, "iss_fixed_out_{}.bin".format(idx)))
+                iss_fixed_output.tofile(os.path.join(self._result_dir, "iss_fixed_out_{}.txt".format(idx)), sep="\n")
 
         if self._enable_dump == 1:
             # iss芯片软仿，生成每个融合算子在iss上的输出数据，用于和芯片硬仿做对比。
@@ -683,22 +720,23 @@ class DpExec(object):
 
         return iss_fixed_outputs
 
-    def print_nnp4xx_estimate_flops(self):
-        from tvm.contrib.edgex import estimate_FLOPs
-        estimate_FLOPs(self._relay_quant)
-
-    def print_nnp4xx_estimate_cycles(self):
-        from tvm.contrib.edgex import estimate_cycles
-        estimate_cycles(self._relay_quant)
-
-    def nnp4xx_iss_fixed(self, lib, in_datas):
-        from tvm.contrib import graph_executor
-        logger.info("Executing model on edgex...")
-        edgex_module = graph_executor.GraphModule(lib["default"](tvm.edgex(), tvm.cpu()))
-        return nnp4xx_inference(edgex_module, in_datas)
+    def get_device_type(self):
+        if self._target.startswith("nnp3"):
+            if self._enable_dump == 0:
+                logger.warning("No set enable_dump, cant get device type")
+                return
+            ops_dict = nnp3xx_get_device_type(self._model_dir)
+            from prettytable import PrettyTable
+            header = ["Id", "OpName", "DeviceType"]
+            table = PrettyTable(header)
+            for idx, op_name in enumerate(ops_dict):
+                table.add_row([idx, op_name, ops_dict[op_name]])
+            logger.info("Op device type:\n{}".format(table))
+        elif self._target.startswith("nnp4"):
+            logger.warning("Not support get device type for nnp4xx")
 
     def _nnp4xx_tvm_fixed(self, in_datas):
-        save_path = os.path.join(self._result_dir, "model_tvm_fixed.so")
+        save_path = os.path.join(self._result_dir, "model_tvm_fixed.ty")
         tvm_fixed_outputs = nnp4xx_inference(nnp4xx_build_lib(self._relay_quant, self._params_quant, save_path), in_datas)
         for idx, output in enumerate(tvm_fixed_outputs):
             output.tofile(os.path.join(self._result_dir, "tvm_fixed_out_{}.bin".format(idx)))
@@ -706,7 +744,7 @@ class DpExec(object):
         return tvm_fixed_outputs
 
     def _nnp4xx_tvm_float(self, in_datas):
-        save_path = os.path.join(self._result_dir, "model_tvm_float.so")
+        save_path = os.path.join(self._result_dir, "model_tvm_float.ty")
         tvm_float_outputs = nnp4xx_inference(nnp4xx_build_lib(self._relay, self._params, save_path), in_datas)
         for idx, output in enumerate(tvm_float_outputs):
             output.tofile(os.path.join(self._result_dir, "tvm_float_out_{}.bin".format(idx)))
@@ -721,19 +759,20 @@ class DpExec(object):
             edgex_lib = compile_nnp_model(
                 self._relay_quant,
                 self._params_quant,
-                output_path="{}/net_combine.so".format(self._model_dir),
+                working_dir=self._model_dir,
+                export_lib_path="{}/{}.ty".format(self._model_dir, self._model_name),
                 opt_level=2,
             )
             logger.info("Executing model on edgex...")
         else:
             logger.warning("nnp4xx disable build")
-            model_path = "{}/net_combine.so".format(self._model_dir)
+            model_path = "{}/{}.ty".format(self._model_dir, self._model_name)
             if not os.path.exists(model_path):
                 logger.error("Not found model path -> {}".format(model_path))
                 exit(-1)
             edgex_lib = tvm.runtime.load_module(model_path)
 
-        iss_fixed_outputs = self.nnp4xx_iss_fixed(edgex_lib, in_datas)
+        iss_fixed_outputs = nnp4xx_iss_fixed(edgex_lib, in_datas)
         for idx, output in enumerate(iss_fixed_outputs):
             output.tofile(os.path.join(self._result_dir, "iss_fixed_out_{}.bin".format(idx)))
             output.tofile(os.path.join(self._result_dir, "iss_fixed_out_{}.txt".format(idx)), sep="\n")
