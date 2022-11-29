@@ -1,6 +1,6 @@
 set -e
 
-cd $(dirname $0)
+WORK_DIR=$(dirname $0)/..
 
 # get datasets
 wget ftp://192.168.33.100//date/ftp-intellif/DEngine/data/datasets --ftp-user=lijiao --ftp-password=lj --directory-prefix=$WORK_DIR -nH --cut-dirs=4 -r
