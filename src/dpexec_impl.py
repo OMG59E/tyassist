@@ -31,8 +31,6 @@ from utils.nnp_func import (
     nnp4xx_iss_fixed
 )
 
-import tvm
-
 
 class DpExec(object):
     def __init__(self, cfg: dict):
@@ -69,9 +67,6 @@ class DpExec(object):
         self._result_dir = os.path.join(self._model_dir, "result")
         if not os.path.exists(self._result_dir):
             os.makedirs(self._result_dir)
-
-        if self._target.startswith("nnp4"):
-            self.set_nnp4xx_env()
 
         self._input_enable_aipps = list()
         self._data_layouts = list()
@@ -163,6 +158,10 @@ class DpExec(object):
     @property
     def model_dir(self):
         return self._model_dir
+
+    @property
+    def model_name(self):
+        return self._model_name
 
     @property
     def result_dir(self):
@@ -345,7 +344,7 @@ class DpExec(object):
                     in_datas[_input["name"]] = self._custom_preprocess_cls.get_single_data(data_path, idx)
                 else:
                     # default preprocess，only image channel 1 or 3
-                    im = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE if self._pixel_formats[idx] == PixelFormat.GRAY else cv2.IMREAD_COLOR)
+                    im = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE if self._pixel_formats[                                                                         idx] == PixelFormat.GRAY else cv2.IMREAD_COLOR)
                     if (not _input["enable_aipp"]) or force_cr:
                         _input["padding_size"], _ = calc_padding_size(im, (w, h), self.padding_mode(idx))
                         in_datas[_input["name"]] = default_preprocess(
@@ -402,11 +401,13 @@ class DpExec(object):
             model_name="opt_ir",
             # 用户使用云天自带的预处理时，配置为输入量化profile(统计模型的层分布用来 calibrate 生成 scale)
             # 的图片集路径，支持图片格式为 jpg，jpeg，png，bmp。也可配置为用户自定义的预处理。类型str/generator
-            dataset=self._quant_cfg["data_dir"] if not self._custom_preprocess_cls else self._custom_preprocess_cls.get_data,
+            dataset=self._quant_cfg[
+                "data_dir"] if not self._custom_preprocess_cls else self._custom_preprocess_cls.get_data,
             # 使用校准数据数量
             prof_img_num=self._quant_cfg["prof_img_num"],
             # 此配置仅在 dataset 配置为图片集路径（即使用云天自带的预处理），且输入为3通道时有效，对生成芯片模型无效
-            rgb_en=1 if (self.num_inputs == 1 and self._pixel_formats[0] == PixelFormat.RGB and (not self.has_custom_preprocess)) else 0,
+            rgb_en=1 if (self.num_inputs == 1 and self._pixel_formats[0] == PixelFormat.RGB and (
+                not self.has_custom_preprocess)) else 0,
             # 均值方差，对生成芯片模型生效
             norm=norm,
             # 量化配置
@@ -430,13 +431,16 @@ class DpExec(object):
         )
 
     def _nnp4xx_quantization(self, quantize_config, norm):
+        import tvm
         quantized_mod, quantized_params = tvm.relay.quantization.quantize(
             self._relay,
             self._params,
             model_name="opt_ir",
-            dataset=self._quant_cfg["data_dir"] if not self._custom_preprocess_cls else self._custom_preprocess_cls.get_data,
+            dataset=self._quant_cfg[
+                "data_dir"] if not self._custom_preprocess_cls else self._custom_preprocess_cls.get_data,
             prof_img_num=self._quant_cfg["prof_img_num"],
-            rgb_en=1 if (self.num_inputs == 1 and self._pixel_formats[0] == PixelFormat.RGB and (not self.has_custom_preprocess)) else 0,
+            rgb_en=1 if (self.num_inputs == 1 and self._pixel_formats[0] == PixelFormat.RGB and (
+                not self.has_custom_preprocess)) else 0,
             norm=norm,
             quantize_config=quantize_config,
             debug_level=self._quant_cfg["debug_level"],
@@ -471,6 +475,7 @@ class DpExec(object):
             logger.info("Input({}) dtype -> {}".format(_input["name"], in_dtypes[_input["name"]]))
             logger.info("Input({}) mean/std -> {}".format(_input["name"], norm[_input["name"]]))
 
+        import tvm
         quantize_config = tvm.relay.quantization.get_quantize_config(self._target, in_dtypes)
         quantize_config["calib_method"] = self._quant_cfg["calib_method"]
 
@@ -567,7 +572,7 @@ class DpExec(object):
 
     def _nnp3xx_compress_analysis(self):
         quan_json_path = os.path.join(self._result_dir, "quantized.json")
-
+        import tvm
         from tvm import relay
         from tvm.contrib import graph_runtime
         from tvm.relay import expr as _expr
@@ -662,7 +667,8 @@ class DpExec(object):
                     input_info[_input["name"]] = {
                         "layout": _input["pixel_format"],
                         "resize_type": _input["resize_type"],
-                        "padding_size": None if PaddingMode.CENTER == self.padding_mode(idx) else _input["padding_size"],
+                        "padding_size": None if PaddingMode.CENTER == self.padding_mode(idx) else _input[
+                            "padding_size"],
                         "padding_value": _input["padding_value"],
                     }
                     logger.info("Input({}): will enable_aipp".format(_input["name"]))
@@ -737,7 +743,8 @@ class DpExec(object):
 
     def _nnp4xx_tvm_fixed(self, in_datas):
         save_path = os.path.join(self._result_dir, "model_tvm_fixed.ty")
-        tvm_fixed_outputs = nnp4xx_inference(nnp4xx_build_lib(self._relay_quant, self._params_quant, save_path), in_datas)
+        tvm_fixed_outputs = nnp4xx_inference(nnp4xx_build_lib(self._relay_quant, self._params_quant, save_path),
+                                             in_datas)
         for idx, output in enumerate(tvm_fixed_outputs):
             output.tofile(os.path.join(self._result_dir, "tvm_fixed_out_{}.bin".format(idx)))
             output.tofile(os.path.join(self._result_dir, "tvm_fixed_out_{}.txt".format(idx)), sep="\n")
@@ -752,6 +759,7 @@ class DpExec(object):
         return tvm_float_outputs
 
     def _nnp4xx_make_netbin(self, in_datas, enable_build=True):
+        import tvm
         edgex_lib = None
         if enable_build:
             from tvm.contrib.edgex import compile_nnp_model
@@ -780,6 +788,7 @@ class DpExec(object):
 
     @staticmethod
     def set_nnp4xx_env():
+        import tvm
         dep_path = "{}/de-dcl/client/lib".format(tvm.__path__[0])
         ld_path = os.getenv("LD_LIBRARY_PATH")
         ld_path = dep_path if ld_path is None else dep_path + ":" + ld_path
