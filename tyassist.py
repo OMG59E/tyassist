@@ -141,7 +141,7 @@ def profile(cfg):
         sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
         max_batch=1  # only batch 1
     )
-    in_datas = dpexec.get_datas(use_norm=False, force_cr=False, to_file=False)
+    in_datas = dpexec.get_datas(use_norm=False, force_cr=True, to_file=False)
     in_datas = [in_datas[key] for key in in_datas]
     profiler.load(dpexec.model_dir)
     profiler.run(in_datas)

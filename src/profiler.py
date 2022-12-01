@@ -120,35 +120,40 @@ class SdkProfiler(object):
         if os.path.exists(filepath):
             os.system("tar -xvf {} -C {}".format(filepath, self._result_dir))
 
-    def parse(self):
-        model_drv_block = os.path.join(self._result_dir, "MODEL_DRV.block.slice.0")
-        ge_model_desc = os.path.join(self._result_dir, "GE.model_desc.slice.0")
-        dcl_model_slice = os.path.join(self._result_dir, "DCL.dcl_model.slice.0")
-        if not os.path.exists(model_drv_block):
-            logger.error("Not found file -> {}".format(model_drv_block))
+    @staticmethod
+    def _merge(filepath: str):
+        if not os.path.exists(filepath):
+            logger.error("Not found file -> {}".format(filepath))
             exit(-1)
-        if not os.path.exists(ge_model_desc):
-            logger.error("Not found file -> {}".format(ge_model_desc))
-            exit(-1)
-        if not os.path.exists(dcl_model_slice):
-            logger.error("Not found file -> {}".format(dcl_model_slice))
-            exit(-1)
-
-        f = open(model_drv_block, "r")
+        idx = int(filepath.split(".")[-1])
+        f = open(filepath, "r")
         lines = f.readlines()
         f.close()
+        idx += 1
+        filepath = filepath[:-1] + str(idx)
+        while os.path.exists(filepath):
+            f = open(filepath, "r")
+            lines.extend(f.readlines())
+            f.close()
+            idx += 1
+            filepath = filepath[:-1] + str(idx)
+        return lines
 
-        with open(ge_model_desc, "rb") as f:
-            model_desc = json.load(f)
+    def parse(self):
+        model_drv_block_lines = self._merge(os.path.join(self._result_dir, "MODEL_DRV.block.slice.0"))
+        ge_model_desc_lines = self._merge(os.path.join(self._result_dir, "GE.model_desc.slice.0"))
+        dcl_model_slice_lines = self._merge(os.path.join(self._result_dir, "DCL.dcl_model.slice.0"))
+
+        model_desc = json.loads("".join(ge_model_desc_lines))
         op_desc_lists = model_desc["blockDescOutLoop"][0]["blockDescInLoop"][0]["layerDesc"][0]["opList"]
 
         # TODO multi-iter
         from prettytable import PrettyTable
         header = ["Id", "OpName", "Cycles", "Span/ms"]
         table = PrettyTable(header)
-        for n in range(0, len(lines), 2):
-            first = lines[n].strip().split()
-            second = lines[n+1].strip().split()
+        for n in range(0, len(model_drv_block_lines), 2):
+            first = model_drv_block_lines[n].strip().split()
+            second = model_drv_block_lines[n+1].strip().split()
             assert int(first[3]) == int(second[3])
             iter_id = int(first[3])
             hw_cycles = int(first[-3])
