@@ -7,6 +7,7 @@ else
 fi
 
 mkdir -p logs
-LOG_FILE="logs/tyassist_compare_$1_$(date "+%Y%m%d_%H%M%S").log"
+LOG_FILE="logs/tyassist-compare-$1-$(date "+%Y-%m-%d-%H-%M-%S").log"
+
 echo "python3 $DENGINE_ROOT/tyassist/tyassist.py compare $TARGET -c config.yml 2>&1 | tee $LOG_FILE"
 python3 $DENGINE_ROOT/tyassist/tyassist.py compare $TARGET -c config.yml 2>&1 | tee $LOG_FILE
