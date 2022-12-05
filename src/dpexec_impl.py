@@ -344,7 +344,7 @@ class DpExec(object):
                     in_datas[_input["name"]] = self._custom_preprocess_cls.get_single_data(data_path, idx)
                 else:
                     # default preprocess，only image channel 1 or 3
-                    im = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE if self._pixel_formats[                                                                         idx] == PixelFormat.GRAY else cv2.IMREAD_COLOR)
+                    im = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE if self._pixel_formats[idx] == PixelFormat.GRAY else cv2.IMREAD_COLOR)
                     if (not _input["enable_aipp"]) or force_cr:
                         _input["padding_size"], _ = calc_padding_size(im, (w, h), self.padding_mode(idx))
                         in_datas[_input["name"]] = default_preprocess(
@@ -522,7 +522,8 @@ class DpExec(object):
 
     def get_mac(self):
         if self._target.startswith("nnp3"):
-            logger.info("MAC: {}".format(nnp3xx_count_mac(self._relay_quant)))
+            logger.info("Original MAC: {}".format(nnp3xx_count_mac(self._relay)))
+            logger.info("Quant MAC: {}".format(nnp3xx_count_mac(self._relay_quant)))
         elif self._target.startswith("nnp4"):
             logger.warning("Not support to get mac for nnp4xx")
             # logger.info("FLOPS: {} Cycles: {}".format(
@@ -674,6 +675,8 @@ class DpExec(object):
                     logger.info("Input({}): will enable_aipp".format(_input["name"]))
                 logger.info("Input({}) info -> {}".format(input_info[_input["name"]], input_info[_input["name"]]))
 
+            opt_cfg = dict()
+            opt_cfg["SUPPRESS_LONG_FUNC"] = 1
             deepeye.make_netbin(
                 self._relay_quant,  # 提供输入数据类型信息
                 self._target,
