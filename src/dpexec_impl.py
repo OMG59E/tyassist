@@ -689,18 +689,18 @@ class DpExec(object):
                 opt_cfg=None,
                 extra_info=""
             )
+
+            # NOTE 临时重命名输出模型
+            import shutil
+            src = os.path.join(self._model_dir, "{}.bin".format(self._model_name))
+            if not os.path.exists(src):
+                logger.error("Not found netbin_file -> {}".format(src))
+                exit(-1)
+            dst = os.path.join(self._model_dir, "{}.ty".format(self._model_name))
+            shutil.move(src, dst)
             logger.info("################### build end ####################")
         else:
             logger.warning("disable build")
-
-        # NOTE 临时重命名输出模型
-        import shutil
-        src = os.path.join(self._model_dir, "{}.bin".format(self._model_name))
-        if not os.path.exists(src):
-            logger.error("Not found netbin_file -> {}".format(src))
-            exit(-1)
-        dst = os.path.join(self._model_dir, "{}.ty".format(self._model_name))
-        shutil.move(src, dst)
 
         iss_fixed_outputs = None
         if self._target.startswith("nnp3") and self._enable_dump:
