@@ -8,7 +8,6 @@
 @site: www.intellif.com
 @software: PyCharm 
 """
-import tvm
 import json
 from . import logger
 
@@ -31,6 +30,7 @@ def nnp3xx_eval_relay(relay_func, params, in_datas):
 def nnp3xx_load_from_json(filepath):
     try:
         with open(filepath, "rb") as f:
+            import tvm
             from tvm import relay
             relay_func = tvm.load_json(json.load(f))
             relay_func = relay.ir_pass.infer_type(relay_func)
@@ -53,6 +53,7 @@ def nnp4xx_estimate_cycles(relay_quant):
 
 def nnp4xx_load_from_json(filepath):
     try:
+        import tvm
         with open(filepath) as file_obj:
             json_str = json.load(file_obj)
             if "ir" not in tvm.__dict__:
@@ -67,6 +68,7 @@ def nnp4xx_load_from_json(filepath):
 
 def nnp3xx_build_lib(relay_func, params):
     try:
+        import tvm
         from tvm import relay
         from tvm.contrib import graph_runtime
         from deepeye.relay_pass import rewrite_for_cpu
@@ -86,6 +88,7 @@ def nnp3xx_build_lib(relay_func, params):
 
 def nnp4xx_build_lib(relay, params, save_path=None):
     try:
+        import tvm
         from tvm.contrib import graph_executor
         from tvm.relay import build
         cpu_target = tvm.target.Target("llvm")
@@ -101,6 +104,7 @@ def nnp4xx_build_lib(relay, params, save_path=None):
 
 
 def nnp4xx_iss_fixed(lib, in_datas):
+    import tvm
     from tvm.contrib import graph_executor
     logger.info("Executing model on edgex...")
     edgex_module = graph_executor.GraphModule(lib["default"](tvm.edgex(), tvm.cpu()))
@@ -108,6 +112,7 @@ def nnp4xx_iss_fixed(lib, in_datas):
 
 
 def nnp4xx_inference(module, in_datas):
+    import tvm
     for input_name in in_datas:
         module.set_input(input_name, tvm.nd.array(in_datas[input_name]))
     module.run()

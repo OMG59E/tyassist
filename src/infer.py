@@ -92,11 +92,8 @@ class Infer(object):
             logger.error("Import failed -> {}".format(e))
             exit(-1)
 
-    def load(self, model_dir, enable_aipp=False):
+    def load(self, model_dir, model_name, enable_aipp=False):
         """加载芯片模型
-        :param model_dir:
-        :param enable_aipp: 是否使能aipp
-        :return:
         """
         self._enable_aipp = enable_aipp
         self._model_dir = model_dir
@@ -110,7 +107,7 @@ class Infer(object):
             logger.info("dump root path: {}".format(self._dump_root_path))
         logger.info("sdk config: {}".format(self._sdk.get_sdk_config()))
 
-        netbin_file = os.path.join(self._model_dir, "net_combine.bin")
+        netbin_file = os.path.join(self._model_dir, "{}.ty".format(model_name))
         if not os.path.isfile(netbin_file):
             logger.error("netbin_file not file -> {}".format(netbin_file))
             exit(-1)
