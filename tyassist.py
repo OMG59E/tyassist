@@ -44,6 +44,9 @@ def build(cfg):
 
     dpexec = DpExec(cfg)
 
+    if dpexec.target.startswith("nnp4"):
+        dpexec.set_nnp4xx_env()
+
     dpexec.print_tvm_version()
 
     in_datas = dpexec.get_datas(use_norm=True, force_cr=True)
@@ -91,21 +94,38 @@ def build(cfg):
 
 
 def compare(cfg):
-    from src.infer import Infer
     dpexec = DpExec(cfg)
-    infer = Infer(
-        net_cfg_file="/DEngine/tyhcp/net.cfg",
-        sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-        enable_dump=dpexec.enable_dump,
-        max_batch=1  # only batch 1
-    )
-    infer.load(dpexec.model_dir, enable_aipp=True)
-    infer.set_pixel_format([dpexec.pixel_formats(idx) for idx in range(len(dpexec.input_names))])
-    in_datas = dpexec.get_datas(use_norm=False, force_cr=False, to_file=False)
-    in_datas = [in_datas[key] for key in in_datas]
-    fixed_outputs = infer.run(in_datas, dpexec.input_enable_aipps, to_file=True)
-
-    logger.info("average cost {:.6f}ms".format(infer.ave_latency_ms))
+    fixed_outputs = None
+    infer = None
+    if dpexec.target.startswith("nnp3"):
+        from src.infer import Infer
+        infer = Infer(
+            net_cfg_file="/DEngine/tyhcp/net.cfg",
+            sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
+            enable_dump=dpexec.enable_dump,
+            max_batch=1  # only batch 1
+        )
+        infer.load(dpexec.model_dir, dpexec.model_name, enable_aipp=True)
+        infer.set_pixel_format([dpexec.pixel_formats(idx) for idx in range(len(dpexec.input_names))])
+        in_datas = dpexec.get_datas(use_norm=False, force_cr=False, to_file=False)
+        in_datas = [in_datas[key] for key in in_datas]
+        fixed_outputs = infer.run(in_datas, dpexec.input_enable_aipps, to_file=True)
+        logger.info("[{}] average cost {:.6f}ms".format(dpexec.target, infer.ave_latency_ms))
+    elif dpexec.target.startswith("nnp4"):
+        from src.nnp4xx_infer import Infer
+        infer = Infer(
+            net_cfg_file="/DEngine/tyhcp/net.cfg",
+            sdk_cfg_file="/DEngine/tyhcp/simu/config/sdk.cfg",
+            enable_dump=dpexec.enable_dump,
+            max_batch=1  # only batch 1
+        )
+        infer.load(dpexec.model_dir, dpexec.model_name, enable_aipp=True)
+        in_datas = dpexec.get_datas(use_norm=False, force_cr=True, to_file=False)
+        in_datas = [in_datas[key] for key in in_datas]
+        fixed_outputs = infer.run(in_datas)
+    else:
+        logger.error("Not support target[{}]".format(dpexec.target))
+        exit(-1)
 
     # compare
     for idx, fixed_output in enumerate(fixed_outputs):
