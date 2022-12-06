@@ -44,7 +44,7 @@ class Classifier(ModelBase, ABC):
         self._input_enable_aipps = None
         self._input_pixel_format = None
 
-    def load(self, model_dir: str, net_cfg_file="/DEngine/tyhcp/net.cfg",
+    def load(self, model_dir: str, model_name: str, net_cfg_file="/DEngine/tyhcp/net.cfg",
              sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg", enable_aipp=False, enable_dump=False, max_batch=1):
         from src.infer import Infer
         self._infer = Infer(
@@ -54,7 +54,7 @@ class Classifier(ModelBase, ABC):
             max_batch=max_batch
         )
         self._enable_aipp = enable_aipp if DataType.INT8 == self._dtype else False   # 除芯片定点外强制关闭aipp
-        self._infer.load(model_dir, self._enable_aipp)
+        self._infer.load(model_dir, model_name, self._enable_aipp)
 
     def set_dtype(self, dtype=DataType.INT8):
         self._dtype = dtype

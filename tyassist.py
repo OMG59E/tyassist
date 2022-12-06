@@ -220,6 +220,7 @@ def test(cfg, dtype):
     if dtype == "int8":
         model.load(
             dpexec.model_dir,
+            dpexec.model_name,
             net_cfg_file="/DEngine/tyhcp/net.cfg",
             sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
             enable_aipp=False,  # dpexec.enable_aipp,  测试默认关闭aipp
@@ -302,6 +303,7 @@ def demo(cfg, dtype):
     if dtype == "int8":
         model.load(
             dpexec.model_dir,
+            dpexec.model_name,
             net_cfg_file="/DEngine/tyhcp/net.cfg",
             sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
             enable_aipp=True,
