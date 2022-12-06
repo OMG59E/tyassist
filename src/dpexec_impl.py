@@ -626,7 +626,7 @@ class DpExec(object):
             filepath = ""
             if filename:
                 _, ext = os.path.splitext(filename)
-                if ext not in [".JPEG", ".jpg", ".bmp", ".png", ".PNG"]:
+                if ext not in [".JPEG", ".jpg", ".bmp", ".png", ".PNG", ".npy"]:
                     continue
                 filepath = os.path.join(data_dir, filename)
             in_datas = self.get_datas(filepath=filepath, use_norm=False, force_cr=True, to_file=False)
