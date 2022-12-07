@@ -1,12 +1,16 @@
 #!/bin/bash
 
+log_highlight() {
+  echo -e "\e[30;31m"$1"$(tput sgr0)"
+}
+
 if [ "$1" ]; then
   TARGET="--target $1"
   NNP=$1
 elif [ "$NNP" ]; then
   TARGET="--target $NNP"
 else
-  echo "[warn] you didn't specify target in command, that will use the target specified in config file."
+  log_highlight "[warn] you didn't specify target in command, that will use the target specified in config file."
 fi
 
 mkdir -p logs
