@@ -701,12 +701,13 @@ class DpExec(object):
         else:
             logger.warning("disable build")
 
-        from deepeye.net_bin import net_bin_analysis
-        net_bin_analysis(
-            self._model_dir,
-            file_name="{}.ty".format(self._model_name),
-            nnp_dev="{} -mnnp=nnp3xx".format(self._target)
-        )
+        if self._target == "nnp300":
+            from deepeye.net_bin import net_bin_analysis
+            net_bin_analysis(
+                self._model_dir,
+                file_name="{}.ty".format(self._model_name),
+                nnp_dev="300 -mnnp=nnp3xx"
+            )
 
         iss_fixed_outputs = None
         if self._target.startswith("nnp3") and self._enable_dump:
