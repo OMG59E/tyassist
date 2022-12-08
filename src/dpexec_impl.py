@@ -361,7 +361,7 @@ class DpExec(object):
                         )
                     else:
                         if self._pixel_formats[idx] == PixelFormat.RGB:
-                            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)  # BGR -> RGB, aipp need
+                            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)  # AIPP不支持BGR->RGB，需提前转换
 
                         if len(im.shape) not in [2, 3]:
                             logger.error("Not support image shape -> {}".format(im.shape))
@@ -626,7 +626,7 @@ class DpExec(object):
             filepath = ""
             if filename:
                 _, ext = os.path.splitext(filename)
-                if ext not in [".JPEG", ".jpg", ".bmp", ".png", ".PNG"]:
+                if ext not in [".JPEG", ".jpg", ".bmp", ".png", ".PNG", ".npy"]:
                     continue
                 filepath = os.path.join(data_dir, filename)
             in_datas = self.get_datas(filepath=filepath, use_norm=False, force_cr=True, to_file=False)
@@ -668,12 +668,11 @@ class DpExec(object):
                     input_info[_input["name"]] = {
                         "layout": _input["pixel_format"],
                         "resize_type": _input["resize_type"],
-                        "padding_size": None if PaddingMode.CENTER == self.padding_mode(idx) else _input[
-                            "padding_size"],
+                        "padding_size": None if PaddingMode.CENTER == self.padding_mode(idx) else _input["padding_size"],
                         "padding_value": _input["padding_value"],
                     }
                     logger.info("Input({}): will enable_aipp".format(_input["name"]))
-                logger.info("Input({}) info -> {}".format(input_info[_input["name"]], input_info[_input["name"]]))
+                logger.info("Input({}) info -> {}".format(_input["name"], input_info[_input["name"]]))
 
             opt_cfg = dict()
             opt_cfg["SUPPRESS_LONG_FUNC"] = 1
@@ -689,18 +688,25 @@ class DpExec(object):
                 opt_cfg=None,
                 extra_info=""
             )
+
+            # NOTE 临时重命名输出模型
+            import shutil
+            src = os.path.join(self._model_dir, "{}.bin".format(self._model_name))
+            if not os.path.exists(src):
+                logger.error("Not found netbin_file -> {}".format(src))
+                exit(-1)
+            dst = os.path.join(self._model_dir, "{}.ty".format(self._model_name))
+            shutil.move(src, dst)
             logger.info("################### build end ####################")
         else:
             logger.warning("disable build")
 
-        # NOTE 临时重命名输出模型
-        import shutil
-        src = os.path.join(self._model_dir, "{}.bin".format(self._model_name))
-        if not os.path.exists(src):
-            logger.error("Not found netbin_file -> {}".format(src))
-            exit(-1)
-        dst = os.path.join(self._model_dir, "{}.ty".format(self._model_name))
-        shutil.move(src, dst)
+        # from deepeye.nnp3_net_bin import net_bin_analysis
+        # net_bin_analysis(
+        #     self._model_dir,
+        #     file_name="{}.ty".format(self._model_name),
+        #     nnp_dev="320"
+        # )
 
         iss_fixed_outputs = None
         if self._target.startswith("nnp3") and self._enable_dump:
@@ -719,7 +725,6 @@ class DpExec(object):
 
         if self._enable_dump == 1:
             # iss芯片软仿，生成每个融合算子在iss上的输出数据，用于和芯片硬仿做对比。
-            # 目前debug_level=1启动dump功能，无法使用CR模块，需要将layout强设成NCHW来关闭CR功能
             from deepeye.relay_pass import dump_func_output
             dump_dict, weight = dump_func_output(self._model_dir, in_datas, self._target)
             with open(os.path.join(self._result_dir, "iss_fused_out.pickle"), "wb") as fp:

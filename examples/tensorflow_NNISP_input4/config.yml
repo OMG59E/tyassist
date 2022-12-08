@@ -1,0 +1,90 @@
+# config
+
+model: {
+  framework: "tensorflow",
+  save_dir: "./outputs",
+  weight: "NNISP_imx485_noiseEstimator_little_111120.pb",
+  graph: "",
+  inputs: [
+    {
+      name: "ADgain_placeholder",
+      shape: [ 1, 1, 1, 4 ],
+      layout: "NHWC",
+      pixel_format: "None",
+      mean:,
+      std:,
+      resize_type: 0,
+      padding_value: 128,
+      padding_mode: 0,
+      enable: False,
+      data_path: "",
+    },
+    {
+      name: "pre_fuse_frame_placeholder",
+      shape: [ 1, 256, 256, 1 ],
+      layout: "NHWC",
+      pixel_format: "None",
+      mean:,
+      std:,
+      resize_type: 0,
+      padding_value: 128,
+      padding_mode: 0,
+      enable: False,
+      data_path: "",
+    },
+    {
+      name: "coef2_placeholder",
+      shape: [ 1, 64, 64, 1 ],
+      layout: "NHWC",
+      pixel_format: "None",
+      mean:,
+      std:,
+      resize_type: 0,
+      padding_value: 128,
+      padding_mode: 0,
+      enable: False,
+      data_path: "",
+    },
+    {
+      name: "fuse_coef_placeholder",
+      shape: [ 1, 64, 64, 1 ],
+      layout: "NHWC",
+      pixel_format: "None",
+      mean:,
+      std:,
+      resize_type: 0,
+      padding_value: 128,
+      padding_mode: 0,
+      enable: False,
+      data_path: "",
+    }
+  ],
+
+  outputs: [
+    {
+      name: "noise_estimator_NPU/mean_blur_for_raw/mul",  # TensorFlow必须设置
+    },
+    {
+      name: "add",  # TensorFlow必须设置
+    }
+  ],
+}
+
+build: {
+  target: "nnp300",
+  enable_quant: true,
+  enable_build: true,
+  quant: {
+    data_dir: "",
+    prof_img_num: 50,
+    similarity_img_num: 1,
+    similarity_dataset: ,
+    custom_preprocess_module: "custom_preprocess",
+    custom_preprocess_cls: "CustomTensorFlowInput4",
+    debug_level: 0,
+    calib_method: "kld",
+    skip_layer_idxes: [ ],
+    skip_layer_types: [ ],
+  },
+  enable_dump: 1,
+}

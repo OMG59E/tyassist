@@ -62,8 +62,9 @@ class Infer(object):
 
         if self._enable_dump:
             if self._ip == "127.0.0.1":   # TODO 非127.0.0.1的地址也可能是ISS服务
-                self._prefix = "iss"
-                logger.warning("ISS mode not support dump server")
+                self._prefix = "sdk_iss"
+                logger.warning("ISS mode not support dump server, will be disable")
+                self._enable_dump = 0
 
         try:
             import tvm

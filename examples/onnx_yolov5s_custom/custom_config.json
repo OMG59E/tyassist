@@ -1,0 +1,17 @@
+[
+    {
+        "op_from": "onnx",
+        "op_type": "DetectionOut",
+        "op_target": "arm",
+        "input_num": 1,
+        "output_num": 1,
+        "version": 0.2,
+        "custom_param": {
+            "conf_threshold": "float",
+            "iou_threshold": "float",
+            "top_k": "int",
+            "keep_top_k": "int",
+            "num_classes": "int"
+        }
+    }
+]
