@@ -72,7 +72,7 @@ class SdkProfiler(object):
             logger.error("Import failed -> {}".format(e))
             exit(-1)
 
-    def load(self, model_dir):
+    def load(self, model_dir, model_name):
         self._model_dir = model_dir
         self._result_dir = os.path.join(self._model_dir, "result")
         if not os.path.exists(self._result_dir):
@@ -81,7 +81,7 @@ class SdkProfiler(object):
         self._result_dir = os.path.abspath(self._result_dir)
         logger.info("sdk config: {}".format(self._sdk.get_sdk_config()))
 
-        netbin_file = os.path.join(self._model_dir, "net_combine.bin")
+        netbin_file = os.path.join(self._model_dir, "{}.ty".format(model_name))
         if not os.path.isfile(netbin_file):
             logger.error("netbin_file not file -> {}".format(netbin_file))
             exit(-1)

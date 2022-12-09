@@ -163,7 +163,7 @@ def profile(cfg):
     )
     in_datas = dpexec.get_datas(use_norm=False, force_cr=True, to_file=False)
     in_datas = [in_datas[key] for key in in_datas]
-    profiler.load(dpexec.model_dir)
+    profiler.load(dpexec.model_dir, dpexec.model_name)
     profiler.run(in_datas)
     profiler.unload()
     profiler.save_profile()
