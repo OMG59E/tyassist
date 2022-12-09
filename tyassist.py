@@ -159,11 +159,12 @@ def profile(cfg):
     profiler = SdkProfiler(
         net_cfg_file="/DEngine/tyhcp/net.cfg",
         sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
+        target=dpexec.target,
         max_batch=1  # only batch 1
     )
     in_datas = dpexec.get_datas(use_norm=False, force_cr=True, to_file=False)
     in_datas = [in_datas[key] for key in in_datas]
-    profiler.load(dpexec.model_dir)
+    profiler.load(dpexec.model_dir, dpexec.model_name)
     profiler.run(in_datas)
     profiler.unload()
     profiler.save_profile()

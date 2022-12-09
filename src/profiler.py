@@ -13,9 +13,12 @@ import json
 from utils import logger
 
 
+TARGETS = {"nnp320": 768, "nnp300": 792, "nnp200": 750}
+
+
 class SdkProfiler(object):
     def __init__(self, net_cfg_file="/DEngine/tyhcp/net.cfg",
-                 sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg", max_batch=1):
+                 sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg", target="nnp300", max_batch=1):
         self._ip = "127.0.0.1"
         self._port = 9090
         self._net_cfg_file = net_cfg_file
@@ -25,6 +28,7 @@ class SdkProfiler(object):
         self._max_batch = max_batch
         self._model_dir = ""
         self._result_dir = ""
+        self._target = target
         self._ave_latency_ms = 0
         self._total = 0
 
@@ -72,7 +76,7 @@ class SdkProfiler(object):
             logger.error("Import failed -> {}".format(e))
             exit(-1)
 
-    def load(self, model_dir):
+    def load(self, model_dir, model_name):
         self._model_dir = model_dir
         self._result_dir = os.path.join(self._model_dir, "result")
         if not os.path.exists(self._result_dir):
@@ -81,7 +85,7 @@ class SdkProfiler(object):
         self._result_dir = os.path.abspath(self._result_dir)
         logger.info("sdk config: {}".format(self._sdk.get_sdk_config()))
 
-        netbin_file = os.path.join(self._model_dir, "net_combine.bin")
+        netbin_file = os.path.join(self._model_dir, "{}.ty".format(model_name))
         if not os.path.isfile(netbin_file):
             logger.error("netbin_file not file -> {}".format(netbin_file))
             exit(-1)
@@ -159,7 +163,7 @@ class SdkProfiler(object):
             hw_cycles = int(first[-3])
             span = int(first[-1])
             logger.info("iter_id[{}] hw_cycles: {}, hw_span: {:.3f}ms, span: {:.3f}ms".format(
-                iter_id, hw_cycles, hw_cycles * 2.0 * 10**-3 / 792, span * 10**-6))
+                iter_id, hw_cycles, hw_cycles * 2.0 * 10**-3 / TARGETS[self._target], span * 10**-6))
             num_ops = int(second[7])
             for idx in range(num_ops):
                 op_name = op_desc_lists[idx]["opName"]
