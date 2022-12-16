@@ -13,11 +13,13 @@ import time
 import tvm
 
 from utils import logger
-from utils.nnp_func import (
-    nnp3xx_load_from_json,
+from nnp4xx_func import (
     nnp4xx_load_from_json,
-    nnp3xx_build_lib,
     nnp4xx_build_lib
+)
+from nnp3xx_func import (
+    nnp3xx_load_from_json,
+    nnp3xx_build_lib,
 )
 
 

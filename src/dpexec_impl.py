@@ -17,18 +17,20 @@ import json
 from utils import logger
 from utils.preprocess import default_preprocess, calc_padding_size
 from utils.enum_type import PaddingMode, PixelFormat, DataLayout
-from utils.nnp_func import (
-    nnp3xx_load_from_json,
+from .nnp4xx_func import (
     nnp4xx_load_from_json,
-    nnp3xx_build_lib,
     nnp4xx_build_lib,
     nnp4xx_inference,
-    nnp3xx_count_mac,
-    nnp3xx_eval_relay,
-    nnp3xx_get_device_type,
     nnp4xx_estimate_flops,
     nnp4xx_estimate_cycles,
     nnp4xx_iss_fixed
+)
+from .nnp3xx_func import (
+    nnp3xx_load_from_json,
+    nnp3xx_count_mac,
+    nnp3xx_build_lib,
+    nnp3xx_eval_relay,
+    nnp3xx_get_device_type
 )
 
 
