@@ -124,13 +124,6 @@ class Infer(object):
     def set_pixel_format(self, pixel_formats):
         self._pixel_formats = pixel_formats
 
-    def save_profile(self):
-        filepath = os.path.join(self._result_dir, "profile_result.tar.gz")
-        self._sdk.copy_profile_file_to(filepath)
-        logger.info("save profile to {}".format(filepath))
-        if os.path.exists(filepath):
-            os.system("tar -xvf {} -C {}".format(filepath, self._result_dir))
-
     @property
     def prefix(self):
         return self._prefix

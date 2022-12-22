@@ -769,26 +769,29 @@ class DpExec(object):
         return tvm_float_outputs
 
     def _nnp4xx_make_netbin(self, in_datas, enable_build=True):
+        model_path = "{}/{}.ty".format(self._model_dir, self._model_name)
+        model_path_aarch64 = "{}/{}_aarch64.ty".format(self._model_dir, self._model_name)
         import tvm
-        edgex_lib = None
         if enable_build:
             from tvm.contrib.edgex import compile_nnp_model
             # compile edgex lib
-            edgex_lib = compile_nnp_model(
+            _ = compile_nnp_model(
                 self._relay_quant,
                 self._params_quant,
                 working_dir=self._model_dir,
-                export_lib_path="{}/{}.ty".format(self._model_dir, self._model_name),
+                export_lib_path=[model_path, model_path_aarch64],
                 opt_level=2,
+                target_host=["llvm -mtriple=x86_64", "llvm -mtriple=aarch64"],
+                target_host_cc=[None, "aarch64-none-linux-gnu-gcc"]
             )
             logger.info("Executing model on edgex...")
         else:
             logger.warning("nnp4xx disable build")
-            model_path = "{}/{}.ty".format(self._model_dir, self._model_name)
-            if not os.path.exists(model_path):
-                logger.error("Not found model path -> {}".format(model_path))
-                exit(-1)
-            edgex_lib = tvm.runtime.load_module(model_path)
+
+        if not os.path.exists(model_path):
+            logger.error("Not found model path -> {}".format(model_path))
+            exit(-1)
+        edgex_lib = tvm.runtime.load_module(model_path)
 
         iss_fixed_outputs = nnp4xx_iss_fixed(edgex_lib, in_datas)
         for idx, output in enumerate(iss_fixed_outputs):
