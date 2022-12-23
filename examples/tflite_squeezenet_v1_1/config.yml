@@ -1,0 +1,47 @@
+# config
+
+model: {
+  framework: "tflite",
+  save_dir: "./outputs",
+  weight: "./squeezenet_1_default_1.tflite",
+  graph: "",
+  inputs: [
+    {
+      name: "Placeholder",
+      shape: [ 1, 224, 224, 3 ],
+      layout: "NHWC",
+      pixel_format: "RGB",
+      mean: [ 104.0, 117.0, 123.0 ],
+      std: [ 1.0, 1.0, 1.0 ],
+      resize_type: 0,
+      padding_value: 128,
+      padding_mode: 0,
+      data_path: "../../data/datasets/ILSVRC2012/ILSVRC2012_img_val/ILSVRC2012_val_00000001.JPEG",
+    }
+  ],
+
+  outputs: [
+    {
+      name: "flatten/Reshape",
+    }
+  ]
+}
+
+build: {
+  target: "nnp300",
+  enable_quant: true,
+  enable_build: true,
+  quant: {
+    data_dir: "../../data/datasets/ILSVRC2012/ILSVRC2012_img_val",
+    prof_img_num: 50,
+    similarity_img_num: 1,
+    similarity_dataset: ,
+    custom_preprocess_module: ,
+    custom_preprocess_cls: ,
+    debug_level: 0,
+    calib_method: "kld",
+    skip_layer_idxes: [ ],
+    skip_layer_types: [ ],
+  },
+  enable_dump: 1,
+}
