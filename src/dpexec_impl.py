@@ -302,6 +302,22 @@ class DpExec(object):
                 arg_params=arg_params,
                 aux_params=aux_params
             )
+        elif self._framework == "tflite":
+            import tflite.Model
+            tflite_model_buf = open(self._weight, "rb").read()
+            model = tflite.Model.GetRootAsModel(tflite_model_buf, 0)
+
+            model_input_names = ["Placeholder"]
+            data_name = model_input_names[0]
+            sym, params = relay.frontend.from_tflite(model, shape_dict, dtype_dict)
+            
+            for idx, _input in enumerate(self._inputs):
+                if self.data_layout(idx) == DataLayout.NHWC:
+                    nhwc_shape = _input["shape"]
+                    nchw_shape = [nhwc_shape[0], nhwc_shape[3], nhwc_shape[1], nhwc_shape[2]]
+                    shape_dict[_input["name"]] = nchw_shape
+
+            self._relay, self._params = relay.relay_pass.tflite_frontend_convert(sym, params, shape_dict)
         else:
             logger.error("Not support {} yet".format(self._framework))
             exit(-1)
