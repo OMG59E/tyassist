@@ -9,10 +9,10 @@
 """
 import os
 from utils import logger
-from base.dataset_base import DatasetBase
+from base.base_dataset import BaseDataset
 
 
-class ILSVRC2012(DatasetBase):
+class ILSVRC2012(BaseDataset):
     """
     ILSVRC2012 val
     """

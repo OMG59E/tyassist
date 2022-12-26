@@ -28,20 +28,9 @@ from utils import logger
 
 
 class Detector(Classifier):
-    def __init__(self, input_size: tuple, mean: tuple, std: tuple, use_rgb=False, use_norm=False, resize_type=0,
-                 padding_value=114, padding_mode=PaddingMode.CENTER, dataset=None, test_num=0):
-        super().__init__(
-            input_size,
-            mean,
-            std,
-            use_rgb=use_rgb,
-            use_norm=use_norm,
-            resize_type=resize_type,
-            padding_value=padding_value,
-            padding_mode=padding_mode,
-            dataset=dataset,
-            test_num=test_num
-        )
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
         self._iou_threshold = 0.45
         self._conf_threshold = 0.25
 
@@ -67,14 +56,14 @@ class Detector(Classifier):
         return outputs.numpy()
 
     def evaluate(self):
-        if not self._dataset:
+        if not self.dataset:
             logger.error("The dataset is null")
             exit(-1)
 
         self._iou_threshold = 0.65
         self._conf_threshold = 0.01
 
-        img_paths = self._dataset.get_datas(num=self._test_num)
+        img_paths = self.dataset.get_datas(num=self.test_num)
 
         save_results = "results"
         if DataType.TVM_FLOAT32 == self.dtype:
@@ -98,10 +87,10 @@ class Detector(Classifier):
             detections2txt(detections, label_path)
         pred_json = "pred.json"
         detection_txt2json(save_results, pred_json)
-        _map, map50 = coco_eval(pred_json, self._dataset.annotations_file, self._dataset.image_ids)
+        _map, map50 = coco_eval(pred_json, self.dataset.annotations_file, self.dataset.image_ids)
         return {
             "input_size": "{}x{}x{}x{}".format(1, 3, self._input_size[1], self._input_size[0]),
-            "dataset": self._dataset.dataset_name,
+            "dataset": self.dataset.dataset_name,
             "num": len(img_paths),
             "map": "{:.6f}".format(_map),
             "map50": "{:.6f}".format(map50),

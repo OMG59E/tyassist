@@ -8,11 +8,11 @@
 @Software: PyCharm
 """
 import os
-from base.dataset_base import DatasetBase
+from base.base_dataset import BaseDataset
 from utils import logger
 
 
-class COCO2017Val(DatasetBase):
+class COCO2017Val(BaseDataset):
     """提供图片path和label
     """
     def __init__(self, root_path, batch_size=1):

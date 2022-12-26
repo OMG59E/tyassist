@@ -87,9 +87,12 @@ class Nnp3xxSdkProfiler(BaseSdkProfiler, abc.ABC):
     def save_profile(self):
         filepath = os.path.join(self.result_dir, "profile_result.tar.gz")
         self.sdk.copy_profile_file_to(filepath)
-        logger.info("save profile to {}".format(filepath))
         if os.path.exists(filepath):
             os.system("tar -xvf {} -C {}".format(filepath, self.result_dir))
+            logger.info("save profile to {}".format(filepath))
+        else:
+            logger.error("Failed to save profile to {}".format(filepath))
+            exit(-1)
 
     def unload(self):
         if self.engine:

@@ -72,18 +72,6 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.model_path = os.path.join(self.model_dir, "{}.ty".format(self.model_name))
         self.model_path_aarch64 = os.path.join(self.model_dir, "{}_aarch64.ty".format(self.model_name))
 
-        # sdk
-        # self.sdk = None
-        # self.sdk_enable_aipp = False
-        # self.sdk_enable_dump = False
-        # self.engine = None
-        # self.prefix = "chip"
-        # self.sdk_dump_root_path = ""
-        # self.total = 0
-        # self.time_span = 0
-        #
-        # self.phase = "build"
-
     def set_model_name(self):
         if "name" in self.cfg["model"]:
             if self.cfg["model"]["name"]:
@@ -145,6 +133,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         @param to_file:  是否保存数据
         @return:
         """
+        # TODO 处理多输入
         in_datas = OrderedDict()  # 保证输入顺序一致
         for idx, _input in enumerate(self.inputs):
             data_path = _input["data_path"] if not filepath else filepath
@@ -268,14 +257,14 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @staticmethod
-    def load_relay_from_json(quant_json_path):
+    def load_relay_from_json(json_path):
         """ load relay from json file
-        @param quant_json_path:
+        @param json_path:
         @return:
         """
         import tvm
         from tvm import relay
-        relay_func = tvm.relay.quantization.get_ir_from_json(quant_json_path)
+        relay_func = tvm.relay.quantization.get_ir_from_json(json_path)
         return relay_func
 
     def iss_dump_output(self, in_datas):
@@ -297,9 +286,6 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def build(self, in_datas):
         """relay build"""
-        raise NotImplementedError
-
-    def profile(self):
         raise NotImplementedError
 
     @property
@@ -353,6 +339,13 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         """tvm cpu fixed"""
         raise NotImplementedError
 
+    def infer(self):
+        """ inference on chip/sdk_iss """
+        raise NotImplementedError
+
+    def profile(self):
+        raise NotImplementedError
+
     @abc.abstractmethod
     def tvm_float_inference(self, in_datas, to_file=False):
         """tvm cpu float"""
@@ -404,32 +397,3 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
 
     def tensorflow2relay(self):
         raise NotImplementedError
-
-    # def load(self, net_cfg_file, sdk_cfg_file, model_path, enable_aipp, enable_dump):
-    #     """sdk load netbin for chip/iss inference
-    #     @param net_cfg_file: ip config
-    #     @param sdk_cfg_file: sdk init config
-    #     @param model_path:  netbin path
-    #     @param enable_aipp:
-    #     @param enable_dump:
-    #     @return:
-    #     """
-    #     raise NotImplementedError
-    #
-    # def infer(self, in_datas, to_file=False):
-    #     """sdk chip/iss inference
-    #     @param in_datas:
-    #     @param to_file:
-    #     @return:
-    #     """
-    #     raise NotImplementedError
-    #
-    # def unload(self):
-    #     """unload netbin"""
-    #     raise NotImplementedError
-    #
-    # def dump_profile(self):
-    #     raise NotImplementedError
-    #
-    # def compare_layer_out(self):
-    #     raise NotImplementedError

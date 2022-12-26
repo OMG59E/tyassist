@@ -10,7 +10,7 @@
 import abc
 
 
-class DatasetBase(object, metaclass=abc.ABCMeta):
+class BaseDataset(object, metaclass=abc.ABCMeta):
     """提供图片path和label
     """
     @abc.abstractmethod

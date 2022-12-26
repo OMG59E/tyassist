@@ -105,41 +105,12 @@ def build(cfg):
 def compare(cfg):
     logger.info("{}".format(cfg))
     tyexec = get_tyexec(cfg)
-    fixed_outputs = None
-    infer = None
-    if tyexec.target.startswith("nnp3"):
-        from src.nnp3xx_infer import Nnp3xxSdkInfer
-        infer = Nnp3xxSdkInfer(
-            net_cfg_file="/DEngine/tyhcp/net.cfg",
-            sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-            enable_aipp=True,
-            enable_dump=tyexec.enable_dump
-        )
-        infer.load(tyexec.model_path)
-        in_datas = tyexec.get_datas(use_norm=False, force_cr=False, to_file=False)
-        in_datas_list = list()
-        for idx, key in enumerate(in_datas):
-            in_datas_list.append({"data": in_datas[key],
-                                  "pixel_format": tyexec.inputs[idx]["pixel_format"],
-                                  "enable_aipp": tyexec.inputs[idx]["enable_aipp"]})
-        fixed_outputs = infer.run(in_datas_list, to_file=True)
-    elif tyexec.target.startswith("nnp4"):
-        from src.nnp4xx_infer import Nnp4xxSdkInfer
-        infer = Nnp4xxSdkInfer(
-            net_cfg_file="/DEngine/tyhcp/net.cfg",
-            sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-            enable_aipp=True,
-            enable_dump=tyexec.enable_dump
-        )
-        infer.load(tyexec.model_path)
-        in_datas = tyexec.get_datas(use_norm=False, force_cr=True, to_file=False)
-        in_datas = [in_datas[key] for key in in_datas]
-        fixed_outputs = infer.run(in_datas, to_file=True)
+    fixed_outputs, backend = tyexec.infer()
 
     # compare
     for idx, fixed_output in enumerate(fixed_outputs):
-        tvm_float_out_path = os.path.join(infer.result_dir, "tvm_float_out_{}.bin".format(idx))
-        tvm_fixed_out_path = os.path.join(infer.result_dir, "tvm_fixed_out_{}.bin".format(idx))
+        tvm_float_out_path = os.path.join(tyexec.result_dir, "tvm_float_out_{}.bin".format(idx))
+        tvm_fixed_out_path = os.path.join(tyexec.result_dir, "tvm_fixed_out_{}.bin".format(idx))
         if not os.path.exists(tvm_fixed_out_path):
             logger.error("Not found tvm_fixed_out_path -> {}".format(tvm_fixed_out_path))
             exit(-1)
@@ -150,8 +121,8 @@ def compare(cfg):
         tvm_float_out = np.fromfile(tvm_float_out_path, dtype=fixed_output.dtype)
         dist0 = cosine_distance(fixed_output, tvm_fixed_out)
         dist1 = cosine_distance(fixed_output, tvm_float_out)
-        logger.info("[Compare] fixed({}) vs fixed(tvm) output tensor[{}] similarity={:.6f}".format(infer.prefix, idx, dist0))
-        logger.info("[Compare] fixed({}) vs float(tvm) output tensor[{}] similarity={:.6f}".format(infer.prefix, idx, dist1))
+        logger.info("[Compare] fixed({}) vs fixed(tvm) output tensor[{}] similarity={:.6f}".format(backend, idx, dist0))
+        logger.info("[Compare] fixed({}) vs float(tvm) output tensor[{}] similarity={:.6f}".format(backend, idx, dist1))
         if tyexec.enable_dump:
             iss_fixed_out_path = os.path.join(tyexec.result_dir, "iss_fixed_out_{}.bin".format(idx))
             if not os.path.exists(iss_fixed_out_path):
@@ -159,28 +130,13 @@ def compare(cfg):
                 exit(-1)
             iss_fixed_out = np.fromfile(iss_fixed_out_path, dtype=fixed_output.dtype)
             dist2 = cosine_distance(fixed_output, iss_fixed_out)
-            logger.info("[Compare] fixed({}) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(infer.prefix, idx, dist2))
+            logger.info("[Compare] fixed({}) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(backend, idx, dist2))
 
 
 def profile(cfg):
+    logger.info("{}".format(cfg))
     tyexec = get_tyexec(cfg)
-
-    if tyexec.target.startswith("nnp3"):
-        from src.nnp3xx_profiler import Nnp3xxSdkProfiler
-        profiler = Nnp3xxSdkProfiler(
-            net_cfg_file="/DEngine/tyhcp/net.cfg",
-            sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-            target=tyexec.target,
-        )
-        in_datas = tyexec.get_datas(use_norm=False, force_cr=True, to_file=False)
-        in_datas = [in_datas[key] for key in in_datas]
-        profiler.load(tyexec.model_path)
-        profiler.run(in_datas)
-        profiler.unload()
-        profiler.save_profile()
-        profiler.parse()
-    elif tyexec.target.startswith("nnp4"):
-        logger.error("nnp4xx not support profile")
+    tyexec.profile()
 
 
 def test(cfg, dtype):
@@ -191,12 +147,14 @@ def test(cfg, dtype):
 
     tyexec = get_tyexec(cfg)
 
+    if tyexec.num_inputs > 1:
+        logger.error("Not support multi-input model")
+        exit(-1)
+
     data_dir = cfg["test"]["data_dir"]
     test_num = cfg["test"]["test_num"]
     dataset_module = cfg["test"]["dataset_module"]
     dataset_cls = cfg["test"]["dataset_cls"]
-
-    _, c, h, w = tyexec.shape(0)
 
     dataset = None
     m = importlib.import_module(dataset_module)
@@ -215,51 +173,23 @@ def test(cfg, dtype):
     if hasattr(m, model_impl_cls):
         # 实例化预处理对象
         model = getattr(m, model_impl_cls)(
-            (h, w),
-            mean=tyexec.inputs[0]["mean"],
-            std=tyexec.inputs[0]["std"],
-            use_norm=False,
-            use_rgb=True if tyexec.inputs[0]["pixel_format"] == "RGB" else False,
-            resize_type=tyexec.inputs[0]["resize_type"],
-            padding_value=tyexec.inputs[0]["padding_value"],
-            padding_mode=tyexec.inputs[0]["padding_mode"],
+            inputs=tyexec.inputs,
             dataset=dataset,
-            test_num=test_num
+            test_num=test_num,
+            enable_aipp=True,
+            target=tyexec.target,
+            dtype=dtype,   # int8/tvm-fp32/tvm-int8
         )
     else:
         logger.error("{}.py has no class named {}".format(model_impl_module, model_impl_cls))
         exit(-1)
 
     if dtype == "int8":
-        model.load(
-            tyexec.model_dir,
-            tyexec.model_name,
-            net_cfg_file="/DEngine/tyhcp/net.cfg",
-            sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-            enable_aipp=False,  # dpexec.enable_aipp,  测试默认关闭aipp
-            enable_dump=False,
-            max_batch=1  # 目前仅支持最大batch 1
-        )
-        model.set_dtype(DataType.INT8)
-        model.set_input_enable_aipps(tyexec.input_enable_aipps)
-        model.set_input_pixel_format([tyexec.pixel_formats(idx) for idx in range(len(dpexec.input_names))])
+        model.load(tyexec.model_path)
     elif dtype == "tvm-fp32":
-        model.load_relay_from_mem(
-            dpexec.input_names,
-            dpexec.x2relay,
-            target=dpexec.target
-        )
-        model.set_dtype(DataType.TVM_FLOAT32)
+        model.load(tyexec.original_json_path)
     elif dtype == "tvm-int8":
-        model.load_relay_from_json(
-            dpexec.input_names,
-            os.path.join(dpexec.model_dir, "result", "quantized.json"),
-            target=dpexec.target
-        )
-        model.set_dtype(DataType.TVM_INT8)
-    else:
-        logger.error("Not support dtype -> {}".format(dtype))
-        exit(-1)
+        model.load(tyexec.quant_json_path)
 
     res = model.evaluate()
     del sys.modules[dataset_module]
@@ -273,11 +203,12 @@ def test(cfg, dtype):
 
 def demo(cfg, dtype):
     logging.getLogger("deepeye").setLevel(logging.WARNING)
+    logger.info(cfg)
 
-    dpexec = DpExec(cfg)
+    tyexec = get_tyexec(cfg)
 
-    if dpexec.num_inputs > 1:
-        logger.error("Not support demo multi-input model")
+    if tyexec.num_inputs > 1:
+        logger.error("Not support multi-input model")
         exit(-1)
 
     if not check_demo_config(cfg):
@@ -291,58 +222,28 @@ def demo(cfg, dtype):
     file_list = os.listdir(data_dir)
     file_list = file_list if num > len(file_list) else file_list[0:num]
 
-    _, c, h, w = dpexec.shape(0)
-
     model = None
-
     m = importlib.import_module(model_impl_module)
     if hasattr(m, model_impl_cls):
         # 实例化预处理对象
         model = getattr(m, model_impl_cls)(
-            (h, w),
-            mean=dpexec.mean(0),
-            std=dpexec.std(0),
-            use_norm=False,
-            use_rgb=True if dpexec.pixel_formats(0) == PixelFormat.RGB else False,
-            resize_type=dpexec.resize_type(0),
-            padding_value=dpexec.padding_value(0),
-            padding_mode=dpexec.padding_mode(0),
-            dataset=None
+            inputs=tyexec.inputs,
+            dataset=None,
+            test_num=0,
+            enable_aipp=True,
+            target=tyexec.target,
+            dtype=dtype,   # int8/tvm-fp32/tvm-int8
         )
     else:
         logger.error("{}.py has no class named {}".format(model_impl_module, model_impl_cls))
         exit(-1)
 
     if dtype == "int8":
-        model.load(
-            dpexec.model_dir,
-            dpexec.model_name,
-            net_cfg_file="/DEngine/tyhcp/net.cfg",
-            sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
-            enable_aipp=True,
-            enable_dump=False,
-            max_batch=1  # 目前仅支持最大batch 1
-        )
-        model.set_dtype(DataType.INT8)
-        model.set_input_enable_aipps(dpexec.input_enable_aipps)
-        model.set_input_pixel_format([dpexec.pixel_formats(idx) for idx in range(len(dpexec.input_names))])
+        model.load(tyexec.model_path)
     elif dtype == "tvm-fp32":
-        model.load_relay_from_mem(
-            dpexec.input_names,
-            dpexec.x2relay,
-            target=dpexec.target
-        )
-        model.set_dtype(DataType.TVM_FLOAT32)
+        model.load(tyexec.original_json_path)
     elif dtype == "tvm-int8":
-        model.load_relay_from_json(
-            dpexec.input_names,
-            os.path.join(dpexec.model_dir, "result", "quantized.json"),
-            target=dpexec.target
-        )
-        model.set_dtype(DataType.TVM_INT8)
-    else:
-        logger.error("Not support dtype -> {}".format(dtype))
-        exit(-1)
+        model.load(tyexec.quant_json_path)
 
     for filename in file_list:
         _, ext = os.path.splitext(filename)
