@@ -23,7 +23,6 @@ from utils.metrics import (
     detection_txt2json,
     detections2txt,
 )
-from utils.enum_type import PaddingMode, DataType
 from utils import logger
 
 
@@ -66,9 +65,9 @@ class Detector(Classifier):
         img_paths = self.dataset.get_datas(num=self.test_num)
 
         save_results = "results"
-        if DataType.TVM_FLOAT32 == self.dtype:
+        if "tvm-fp32" == self.dtype:
             save_results = "results_tvm_fp32"
-        if DataType.TVM_INT8 == self.dtype:
+        if "tvm-int8" == self.dtype:
             save_results = "results_tvm_int8"
         if not os.path.exists(save_results):
             os.makedirs(save_results)
@@ -111,9 +110,9 @@ class Detector(Classifier):
         detections = self.inference(cv_image)
 
         save_results = "vis"
-        if DataType.TVM_FLOAT32 == self.dtype:
+        if "tvm-fp32" == self.dtype:
             save_results = "vis_tvm_fp32"
-        if DataType.TVM_INT8 == self.dtype:
+        if "tvm-int8" == self.dtype:
             save_results = "vis_tvm_int8"
         if not os.path.exists(save_results):
             os.makedirs(save_results)
