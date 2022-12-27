@@ -208,6 +208,8 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         else:
             logger.warning("disable build")
 
+        # self.model_analysis()
+
         iss_fixed_outputs = self.iss_fixed_inference(in_datas)
         self.iss_dump_output(in_datas)
         return iss_fixed_outputs
@@ -316,8 +318,8 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         if self.target != "nnp300":
             logger.warning("model_analysis only support nnp300")
             return
-        from deepeye.nnp3_net_bin import net_bin_analysis
-        net_bin_analysis(
+        import deepeye
+        deepeye.net_bin.net_bin_analysis(
             self.model_dir,
             file_name="{}.ty".format(self.model_name),
             nnp_dev="nnp300 -mnnp=nnp3xx"
