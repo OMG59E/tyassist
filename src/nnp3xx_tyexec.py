@@ -9,7 +9,7 @@
 @software: PyCharm 
 """
 import os
-import shutil
+import json
 import pickle
 import numpy as np
 from abc import ABC
@@ -17,7 +17,6 @@ from prettytable import PrettyTable
 from collections import OrderedDict
 from utils import logger
 from utils.enum_type import PaddingMode
-from utils.compare import compare_dump_out, compare_dump_out2
 from .base_tyexec import BaseTyExec
 
 
@@ -209,6 +208,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             logger.warning("disable build")
 
         # self.model_analysis()
+        self.get_profile_info()
 
         iss_fixed_outputs = self.iss_fixed_inference(in_datas)
         self.iss_dump_output(in_datas)
@@ -229,10 +229,52 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             logger.error("Failed to get tytvm version -> {}".format(e))
             exit(-1)
 
+    @property
+    def targets(self):
+        return {"nnp320": 768, "nnp300": 792, "nnp200": 750}
+
     def get_relay_mac(self):
         from deepeye.util import count_mac
         logger.info("float relay MAC: {}".format(count_mac(self.relay)))
         logger.info("fixed relay MAC: {}".format(count_mac(self.relay_quant)))
+
+    def get_profile_info(self):
+        filepath = os.path.join(self.model_dir, "model_profile.json")
+        if not os.path.exists(filepath):
+            logger.warning("Not found file -> {}".format(filepath))
+            return
+        graph_filepath = os.path.join(self.model_dir, "graph.json")
+        if not os.path.exists(graph_filepath):
+            logger.warning("Not found file -> {}".format(graph_filepath))
+            return
+        with open(filepath, "rb") as f:
+            model_profile = json.load(f)
+        with open(graph_filepath, "rb") as f:
+            graph = json.load(f)
+
+        op_name_map = dict()
+        nodes = graph["nodes"]
+        for node in nodes:
+            if "debug_name" not in node or "name" not in node:
+                continue
+            op_name = node["name"]
+            debug_name = node["debug_name"]
+            op_name_map[op_name] = debug_name
+
+        header = ["Id", "OpName", "DDR/Read", "DDR/Write", "MAC", "Cycles", "Span/ms"]
+        table = PrettyTable(header)
+        func_info = model_profile["func_info"]
+        for idx, op_name in enumerate(func_info):
+            table.add_row([
+                idx,
+                op_name_map[op_name],
+                func_info[op_name]["ddr_read"],
+                func_info[op_name]["ddr_write"],
+                func_info[op_name]["mac"],
+                func_info[op_name]["cost"],
+                "{:.3f}".format(func_info[op_name]["cost"] * 2.0 * 10**-3 / self.targets[self.target])
+            ])
+        logger.info("model profile:\n{}".format(table))
 
     def get_device_type(self):
         if self.enable_dump == 0:
