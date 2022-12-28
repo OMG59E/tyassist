@@ -185,8 +185,13 @@ def check_config(cfg, phase="build"):
         std = _input["std"]
         if mean is None:
             mean = [0.0 for _ in range(c)]
+        else:
+            if len(mean) == 1:
+                mean = [mean[0] for _ in range(c)]
         if std is None:
             std = [1.0 for _ in range(c)]
+            if len(std) == 1:
+                std = [std[0] for _ in range(c)]
 
         if c != len(mean) or c != len(std) or len(mean) != len(std):
             logger.error("input channel must be equal len(mean/std)")
@@ -198,7 +203,7 @@ def check_config(cfg, phase="build"):
             logger.error("pixel_format({}) must be in {}".format(pixel_format, pixel_format_lists))
             return False
 
-        if _input["pixel_format"] == "None" and not cfg["build"]["quant"]["custom_preprocess_cls"]:
+        if _input["pixel_format"] == "None" and _input["data_path"] and not cfg["build"]["quant"]["custom_preprocess_cls"]:
             logger.error("Pixel format == None, must be setting custom_preprocess")
             return False
 
