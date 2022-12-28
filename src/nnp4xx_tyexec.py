@@ -92,8 +92,10 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 self.relay_quant,
                 self.params_quant,
                 working_dir=self.model_dir,
-                export_lib_path="{}/{}.ty".format(self.model_dir, self.model_name),
+                export_lib_path=[self.model_path, self.model_path_aarch64],
                 opt_level=2,
+                target_host=["llvm -mtriple=x86_64", "llvm -mtriple=aarch64"],
+                target_host_cc=[None, "aarch64-none-linux-gnu-gcc"]
             )
             logger.info("Executing model on edgex...")
         else:
