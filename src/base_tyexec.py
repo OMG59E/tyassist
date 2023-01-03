@@ -86,7 +86,6 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             if _input["layout"] == "NHWC":
                 n, h, w, c = shape
 
-            _input["shape"] = (n, c, h, w)
             self.shape_dict[_input["name"]] = (n, c, h, w)
             self.dtype_dict[_input["name"]] = "float32"
 
@@ -100,7 +99,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             if not _input["mean"]:
                 _input["mean"] = [0.0 for _ in range(c)]
             if not _input["std"]:
-                _input["std"] = [0.0 for _ in range(c)]
+                _input["std"] = [1.0 for _ in range(c)]
 
             _input["padding_mode"] = PaddingMode.LEFT_TOP if _input["padding_mode"] == 0 else PaddingMode.CENTER
 
@@ -137,7 +136,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         in_datas = OrderedDict()  # 保证输入顺序一致
         for idx, _input in enumerate(self.inputs):
             data_path = _input["data_path"] if not filepath else filepath
-            n, c, h, w = _input["shape"]
+            n, c, h, w = self.shape_dict[_input["name"]]
             if data_path:
                 if not os.path.exists(data_path):
                     logger.error("Not found data_path -> {}".format(data_path))
@@ -377,6 +376,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             self.tensorflow2relay()
         elif self.framework == "tflite":
             self.tflite2relay()
+        elif self.framework == "tflite-qnn":
+            self.tflite_qnn2relay()
         else:
             logger.error("Not support framework -> {}".format(self.framework))
             exit(-1)
@@ -401,4 +402,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     def tflite2relay(self):
+        raise NotImplementedError
+
+    def tflite_qnn2relay(self):
         raise NotImplementedError

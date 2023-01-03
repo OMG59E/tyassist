@@ -35,7 +35,7 @@ def check_config(cfg, phase="build"):
         return False
 
     framework = cfg["model"]["framework"]
-    framework_lists = ["caffe", "onnx", "pytorch", "mxnet", "tensorflow"]
+    framework_lists = ["caffe", "onnx", "pytorch", "mxnet", "tensorflow", "tflite", "tflite-qnn"]
     if framework not in framework_lists:
         logger.error("framework({}) must be in {}".format(framework, framework_lists))
         return False

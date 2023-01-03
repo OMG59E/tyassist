@@ -458,10 +458,13 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         import tvm.relay.testing.tf as tf_testing
         output_names = [item["name"] for item in self.outputs]
         graph_def = tf_testing.get_graph_def_from_pb(self.weight, output_names)
+        shape_dict = dict()
+        for idx, _input in enumerate(self.inputs):
+            shape_dict[_input["name"]] = _input["shape"]
         sym, params = relay.frontend.from_tensorflow(
             graph=graph_def,
-            layout="NCHW",
-            shape=self.shape_dict,
+            layout="NCHW",  # 可选, 输出的目标布局
+            shape=shape_dict,
             outputs=output_names
         )
         sym = sym["main"]
@@ -469,18 +472,29 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             sym,
             params,
             self.shape_dict,
-            convert_input_as_nchw=True if self.inputs[0]["layout"] == "NHWC" else False,
+            convert_input_as_nchw=True,
             convert_output_as_nchw=True,
         )
 
     def tflite2relay(self):
         import tflite
+        from tvm import relay
+        with open(self.weight, "rb") as f:
+            tflite_model_buf = f.read()
+        model = tflite.Model.GetRootAsModel(tflite_model_buf, 0)
+        shape_dict = dict()
+        for idx, _input in enumerate(self.inputs):
+            shape_dict[_input["name"]] = _input["shape"]
+        sym, params = relay.frontend.from_tflite(model, shape_dict, self.dtype_dict)
+        self.relay, self.params = relay.relay_pass.tflite_frontend_convert(sym, params, self.shape_dict)
+
+    def tflite_qnn2relay(self):
+        import tflite
         import deepeye
         with open(self.weight, "rb") as f:
             tflite_model_buf = f.read()
         model = tflite.Model.GetRootAsModel(tflite_model_buf, 0)
-        input_info = dict()
-        for key in self.shape_dict:
-            input_info[key] = {"shape": self.shape_dict[key], "dtype": self.dtype_dict[key]}
-        self.relay = deepeye.from_qnn(model, input_info, self.target, convert_input_as_nchw=True)
-
+        input_infos = dict()
+        for idx, _input in enumerate(self.inputs):
+            input_infos[_input["name"]] = {"shape": _input["shape"], "dtype": "float32"}
+        self.relay = deepeye.from_qnn(model, input_infos, self.target, convert_input_as_nchw=True)
