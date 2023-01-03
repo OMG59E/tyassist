@@ -375,6 +375,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             self.mxnet2relay()
         elif self.framework == "tensorflow":
             self.tensorflow2relay()
+        elif self.framework == "tflite":
+            self.tflite2relay()
         else:
             logger.error("Not support framework -> {}".format(self.framework))
             exit(-1)
@@ -396,4 +398,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     def tensorflow2relay(self):
+        raise NotImplementedError
+
+    def tflite2relay(self):
         raise NotImplementedError

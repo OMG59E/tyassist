@@ -472,3 +472,15 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             convert_input_as_nchw=True if self.inputs[0]["layout"] == "NHWC" else False,
             convert_output_as_nchw=True,
         )
+
+    def tflite2relay(self):
+        import tflite
+        import deepeye
+        with open(self.weight, "rb") as f:
+            tflite_model_buf = f.read()
+        model = tflite.Model.GetRootAsModel(tflite_model_buf, 0)
+        input_info = dict()
+        for key in self.shape_dict:
+            input_info[key] = {"shape": self.shape_dict[key], "dtype": self.dtype_dict[key]}
+        self.relay = deepeye.from_qnn(model, input_info, self.target, convert_input_as_nchw=True)
+
