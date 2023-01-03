@@ -463,7 +463,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             shape_dict[_input["name"]] = _input["shape"]
         sym, params = relay.frontend.from_tensorflow(
             graph=graph_def,
-            layout="NCHW",  # 可选, 输出的目标布局
+            # layout="NCHW",  # 可选, 输出的目标布局
             shape=shape_dict,
             outputs=output_names
         )
@@ -486,7 +486,13 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         for idx, _input in enumerate(self.inputs):
             shape_dict[_input["name"]] = _input["shape"]
         sym, params = relay.frontend.from_tflite(model, shape_dict, self.dtype_dict)
-        self.relay, self.params = relay.relay_pass.tflite_frontend_convert(sym, params, self.shape_dict)
+        self.relay, self.params = relay.relay_pass.tflite_frontend_convert(
+            sym,
+            params,
+            self.shape_dict,
+            convert_input_as_nchw=True,
+            convert_output_as_nchw=True
+        )
 
     def tflite_qnn2relay(self):
         import tflite
