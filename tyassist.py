@@ -53,200 +53,215 @@ def get_tyexec(cfg):
 
 
 def build(cfg):
-    logger.info("{}".format(cfg))
+    try:
+        logger.info("{}".format(cfg))
+        tyexec = get_tyexec(cfg)
 
-    tyexec = get_tyexec(cfg)
+        tyexec.get_version()
+        tyexec.x2relay()  # model to relay_func
 
-    tyexec.get_version()
-    tyexec.x2relay()  # model to relay_func
+        in_datas = tyexec.get_datas(use_norm=False, force_cr=True, to_file=True)  # 量化后模型输入数据
+        tyexec.quantization(in_datas)
+        tvm_fixed_output = tyexec.tvm_fixed_inference(in_datas, to_file=True)
 
-    in_datas = tyexec.get_datas(use_norm=False, force_cr=True, to_file=True)  # 量化后模型输入数据
-    tyexec.quantization(in_datas)
-    tvm_fixed_output = tyexec.tvm_fixed_inference(in_datas, to_file=True)
+        iss_fixed_output = tyexec.build(in_datas)
 
-    iss_fixed_output = tyexec.build(in_datas)
+        in_datas = tyexec.get_datas(use_norm=True, force_cr=True, to_file=True)  # 原模型输入数据
+        tvm_float_output = tyexec.tvm_float_inference(in_datas, to_file=True)
 
-    in_datas = tyexec.get_datas(use_norm=True, force_cr=True, to_file=True)  # 原模型输入数据
-    tvm_float_output = tyexec.tvm_float_inference(in_datas, to_file=True)
+        tyexec.compress_analysis()
+        tyexec.get_relay_mac()  # print mac/flops/cycles info
+        tyexec.get_device_type()  # print op backend info
 
-    tyexec.compress_analysis()
-    tyexec.get_relay_mac()  # print mac/flops/cycles info
-    tyexec.get_device_type()  # print op backend info
+        # 计算相似度
+        for idx in range(len(tvm_float_output)):
+            dist = cosine_distance(tvm_float_output[idx], tvm_fixed_output[idx])
+            logger.info("[Build] float(tvm) output tensor[{}] shape:{} dtype:{}".format(
+                idx, tvm_float_output[idx].shape, tvm_float_output[idx].dtype))
+            logger.info("[Build] fixed(tvm) output tensor[{}] shape:{} dtype:{}".format(
+                idx, tvm_fixed_output[idx].shape, tvm_fixed_output[idx].dtype))
+            if iss_fixed_output:
+                logger.info("[Build] fixed(iss) output tensor[{}] shape:{} dtype:{}".format(
+                    idx, iss_fixed_output[idx].shape, iss_fixed_output[idx].dtype))
+            logger.info("[Build] float(tvm) vs fixed(tvm) output tensor[{}] similarity={:.6f}".format(idx, dist))
+            if iss_fixed_output:
+                dist = cosine_distance(tvm_float_output[idx], iss_fixed_output[idx])
+                logger.info("[Build] float(tvm) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(idx, dist))
 
-    # 计算相似度
-    for idx in range(len(tvm_float_output)):
-        dist = cosine_distance(tvm_float_output[idx], tvm_fixed_output[idx])
-        logger.info("[Build] float(tvm) output tensor[{}] shape:{} dtype:{}".format(
-            idx, tvm_float_output[idx].shape, tvm_float_output[idx].dtype))
-        logger.info("[Build] fixed(tvm) output tensor[{}] shape:{} dtype:{}".format(
-            idx, tvm_fixed_output[idx].shape, tvm_fixed_output[idx].dtype))
-        if iss_fixed_output:
-            logger.info("[Build] fixed(iss) output tensor[{}] shape:{} dtype:{}".format(
-                idx, iss_fixed_output[idx].shape, iss_fixed_output[idx].dtype))
-        logger.info("[Build] float(tvm) vs fixed(tvm) output tensor[{}] similarity={:.6f}".format(idx, dist))
-        if iss_fixed_output:
-            dist = cosine_distance(tvm_float_output[idx], iss_fixed_output[idx])
-            logger.info("[Build] float(tvm) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(idx, dist))
-
-    for idx in range(len(tvm_fixed_output)):
-        if iss_fixed_output:
-            dist = cosine_distance(tvm_fixed_output[idx], iss_fixed_output[idx])
-            logger.info("[Build] fixed(tvm) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(idx, dist))
+        for idx in range(len(tvm_fixed_output)):
+            if iss_fixed_output:
+                dist = cosine_distance(tvm_fixed_output[idx], iss_fixed_output[idx])
+                logger.info("[Build] fixed(tvm) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(idx, dist))
+    except Exception as e:
+        logger.error("TyAssist failed to build -> {}".format(e))
 
 
 def compare(cfg):
-    logger.info("{}".format(cfg))
-    tyexec = get_tyexec(cfg)
-    fixed_outputs, backend = tyexec.infer()
+    try:
+        logger.info("{}".format(cfg))
+        tyexec = get_tyexec(cfg)
+        fixed_outputs, backend = tyexec.infer()
 
-    # compare
-    for idx, fixed_output in enumerate(fixed_outputs):
-        tvm_float_out_path = os.path.join(tyexec.result_dir, "tvm_float_out_{}.bin".format(idx))
-        tvm_fixed_out_path = os.path.join(tyexec.result_dir, "tvm_fixed_out_{}.bin".format(idx))
-        if not os.path.exists(tvm_fixed_out_path):
-            logger.error("Not found tvm_fixed_out_path -> {}".format(tvm_fixed_out_path))
-            exit(-1)
-        if not os.path.exists(tvm_float_out_path):
-            logger.error("Not found tvm_float_out_path -> {}".format(tvm_float_out_path))
-            exit(-1)
-        tvm_fixed_out = np.fromfile(tvm_fixed_out_path, dtype=fixed_output.dtype)
-        tvm_float_out = np.fromfile(tvm_float_out_path, dtype=fixed_output.dtype)
-        dist0 = cosine_distance(fixed_output, tvm_fixed_out)
-        dist1 = cosine_distance(fixed_output, tvm_float_out)
-        logger.info("[Compare] fixed({}) vs fixed(tvm) output tensor[{}] similarity={:.6f}".format(backend, idx, dist0))
-        logger.info("[Compare] fixed({}) vs float(tvm) output tensor[{}] similarity={:.6f}".format(backend, idx, dist1))
-        if tyexec.enable_dump:
-            iss_fixed_out_path = os.path.join(tyexec.result_dir, "iss_fixed_out_{}.bin".format(idx))
-            if not os.path.exists(iss_fixed_out_path):
-                logger.error("Not found iss_fixed_out_path -> {}".format(iss_fixed_out_path))
+        # compare
+        for idx, fixed_output in enumerate(fixed_outputs):
+            tvm_float_out_path = os.path.join(tyexec.result_dir, "tvm_float_out_{}.bin".format(idx))
+            tvm_fixed_out_path = os.path.join(tyexec.result_dir, "tvm_fixed_out_{}.bin".format(idx))
+            if not os.path.exists(tvm_fixed_out_path):
+                logger.error("Not found tvm_fixed_out_path -> {}".format(tvm_fixed_out_path))
                 exit(-1)
-            iss_fixed_out = np.fromfile(iss_fixed_out_path, dtype=fixed_output.dtype)
-            dist2 = cosine_distance(fixed_output, iss_fixed_out)
-            logger.info("[Compare] fixed({}) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(backend, idx, dist2))
+            if not os.path.exists(tvm_float_out_path):
+                logger.error("Not found tvm_float_out_path -> {}".format(tvm_float_out_path))
+                exit(-1)
+            tvm_fixed_out = np.fromfile(tvm_fixed_out_path, dtype=fixed_output.dtype)
+            tvm_float_out = np.fromfile(tvm_float_out_path, dtype=fixed_output.dtype)
+            dist0 = cosine_distance(fixed_output, tvm_fixed_out)
+            dist1 = cosine_distance(fixed_output, tvm_float_out)
+            logger.info("[Compare] fixed({}) vs fixed(tvm) output tensor[{}] similarity={:.6f}".format(backend, idx, dist0))
+            logger.info("[Compare] fixed({}) vs float(tvm) output tensor[{}] similarity={:.6f}".format(backend, idx, dist1))
+            if tyexec.enable_dump:
+                iss_fixed_out_path = os.path.join(tyexec.result_dir, "iss_fixed_out_{}.bin".format(idx))
+                if not os.path.exists(iss_fixed_out_path):
+                    logger.error("Not found iss_fixed_out_path -> {}".format(iss_fixed_out_path))
+                    exit(-1)
+                iss_fixed_out = np.fromfile(iss_fixed_out_path, dtype=fixed_output.dtype)
+                dist2 = cosine_distance(fixed_output, iss_fixed_out)
+                logger.info("[Compare] fixed({}) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(backend, idx, dist2))
+
+    except Exception as e:
+        logger.error("TyAssist failed to compare -> {}".format(e))
 
 
 def profile(cfg):
-    logger.info("{}".format(cfg))
-    tyexec = get_tyexec(cfg)
-    tyexec.profile()
+    try:
+        logger.info("{}".format(cfg))
+        tyexec = get_tyexec(cfg)
+        tyexec.profile()
+    except Exception as e:
+        logger.error("TyAssist failed to profile -> {}".format(e))
 
 
 def test(cfg, dtype):
-    logging.getLogger("deepeye").setLevel(logging.WARNING)
+    try:
+        logging.getLogger("deepeye").setLevel(logging.WARNING)
 
-    if not check_test_config(cfg):
-        exit(-1)
+        if not check_test_config(cfg):
+            exit(-1)
 
-    tyexec = get_tyexec(cfg)
+        tyexec = get_tyexec(cfg)
 
-    if tyexec.num_inputs > 1:
-        logger.error("Not support multi-input model")
-        exit(-1)
+        if tyexec.num_inputs > 1:
+            logger.error("Not support multi-input model")
+            exit(-1)
 
-    data_dir = cfg["test"]["data_dir"]
-    test_num = cfg["test"]["test_num"]
-    dataset_module = cfg["test"]["dataset_module"]
-    dataset_cls = cfg["test"]["dataset_cls"]
+        data_dir = cfg["test"]["data_dir"]
+        test_num = cfg["test"]["test_num"]
+        dataset_module = cfg["test"]["dataset_module"]
+        dataset_cls = cfg["test"]["dataset_cls"]
 
-    dataset = None
-    m = importlib.import_module(dataset_module)
-    if hasattr(m, dataset_cls):
-        # 实例化预处理对象
-        dataset = getattr(m, dataset_cls)(data_dir)
-    else:
-        logger.error("{}.py has no class named {}".format(dataset_module, dataset_cls))
-        exit(-1)
+        dataset = None
+        m = importlib.import_module(dataset_module)
+        if hasattr(m, dataset_cls):
+            # 实例化预处理对象
+            dataset = getattr(m, dataset_cls)(data_dir)
+        else:
+            logger.error("{}.py has no class named {}".format(dataset_module, dataset_cls))
+            exit(-1)
 
-    model_impl_module = cfg["model"]["model_impl_module"]
-    model_impl_cls = cfg["model"]["model_impl_cls"]
+        model_impl_module = cfg["model"]["model_impl_module"]
+        model_impl_cls = cfg["model"]["model_impl_cls"]
 
-    model = None
-    m = importlib.import_module(model_impl_module)
-    if hasattr(m, model_impl_cls):
-        # 实例化预处理对象
-        model = getattr(m, model_impl_cls)(
-            inputs=tyexec.inputs,
-            dataset=dataset,
-            test_num=test_num,
-            enable_aipp=True,
-            target=tyexec.target,
-            dtype=dtype,   # int8/tvm-fp32/tvm-int8
-        )
-    else:
-        logger.error("{}.py has no class named {}".format(model_impl_module, model_impl_cls))
-        exit(-1)
+        model = None
+        m = importlib.import_module(model_impl_module)
+        if hasattr(m, model_impl_cls):
+            # 实例化预处理对象
+            model = getattr(m, model_impl_cls)(
+                inputs=tyexec.inputs,
+                dataset=dataset,
+                test_num=test_num,
+                enable_aipp=True,
+                target=tyexec.target,
+                dtype=dtype,   # int8/tvm-fp32/tvm-int8
+            )
+        else:
+            logger.error("{}.py has no class named {}".format(model_impl_module, model_impl_cls))
+            exit(-1)
 
-    if dtype == "int8":
-        model.load(tyexec.model_path)
-    elif dtype == "tvm-fp32":
-        model.load(tyexec.original_json_path)
-    elif dtype == "tvm-int8":
-        model.load(tyexec.quant_json_path)
+        if dtype == "int8":
+            model.load(tyexec.model_path)
+        elif dtype == "tvm-fp32":
+            model.load(tyexec.original_json_path)
+        elif dtype == "tvm-int8":
+            model.load(tyexec.quant_json_path)
 
-    res = model.evaluate()
-    del sys.modules[dataset_module]
-    del sys.modules[model_impl_module]
+        res = model.evaluate()
+        del sys.modules[dataset_module]
+        del sys.modules[model_impl_module]
 
-    logger.info("average cost {:.6f}ms".format(model.ave_latency_ms))
-    logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
-    logger.info("{}".format(res))
-    return res
+        logger.info("average cost {:.6f}ms".format(model.ave_latency_ms))
+        logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
+        logger.info("{}".format(res))
+        return res
+    except Exception as e:
+        logger.error("TyAssist failed to test -> {}".format(e))
 
 
 def demo(cfg, dtype):
-    logging.getLogger("deepeye").setLevel(logging.WARNING)
-    logger.info(cfg)
+    try:
+        logging.getLogger("deepeye").setLevel(logging.WARNING)
+        logger.info(cfg)
 
-    tyexec = get_tyexec(cfg)
+        tyexec = get_tyexec(cfg)
 
-    if tyexec.num_inputs > 1:
-        logger.error("Not support multi-input model")
-        exit(-1)
+        if tyexec.num_inputs > 1:
+            logger.error("Not support multi-input model")
+            exit(-1)
 
-    if not check_demo_config(cfg):
-        exit(-1)
+        if not check_demo_config(cfg):
+            exit(-1)
 
-    data_dir = cfg["demo"]["data_dir"]
-    num = cfg["demo"]["num"]
-    model_impl_module = cfg["model"]["model_impl_module"]
-    model_impl_cls = cfg["model"]["model_impl_cls"]
+        data_dir = cfg["demo"]["data_dir"]
+        num = cfg["demo"]["num"]
+        model_impl_module = cfg["model"]["model_impl_module"]
+        model_impl_cls = cfg["model"]["model_impl_cls"]
 
-    file_list = os.listdir(data_dir)
-    file_list = file_list if num > len(file_list) else file_list[0:num]
+        file_list = os.listdir(data_dir)
+        file_list = file_list if num > len(file_list) else file_list[0:num]
 
-    model = None
-    m = importlib.import_module(model_impl_module)
-    if hasattr(m, model_impl_cls):
-        # 实例化预处理对象
-        model = getattr(m, model_impl_cls)(
-            inputs=tyexec.inputs,
-            dataset=None,
-            test_num=0,
-            enable_aipp=True,
-            target=tyexec.target,
-            dtype=dtype,   # int8/tvm-fp32/tvm-int8
-        )
-    else:
-        logger.error("{}.py has no class named {}".format(model_impl_module, model_impl_cls))
-        exit(-1)
+        model = None
+        m = importlib.import_module(model_impl_module)
+        if hasattr(m, model_impl_cls):
+            # 实例化预处理对象
+            model = getattr(m, model_impl_cls)(
+                inputs=tyexec.inputs,
+                dataset=None,
+                test_num=0,
+                enable_aipp=True,
+                target=tyexec.target,
+                dtype=dtype,   # int8/tvm-fp32/tvm-int8
+            )
+        else:
+            logger.error("{}.py has no class named {}".format(model_impl_module, model_impl_cls))
+            exit(-1)
 
-    if dtype == "int8":
-        model.load(tyexec.model_path)
-    elif dtype == "tvm-fp32":
-        model.load(tyexec.original_json_path)
-    elif dtype == "tvm-int8":
-        model.load(tyexec.quant_json_path)
+        if dtype == "int8":
+            model.load(tyexec.model_path)
+        elif dtype == "tvm-fp32":
+            model.load(tyexec.original_json_path)
+        elif dtype == "tvm-int8":
+            model.load(tyexec.quant_json_path)
 
-    for filename in file_list:
-        _, ext = os.path.splitext(filename)
-        if ext not in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]:
-            logger.warning("file ext invalid -> {}".format(filename))
-            continue
+        for filename in file_list:
+            _, ext = os.path.splitext(filename)
+            if ext not in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]:
+                logger.warning("file ext invalid -> {}".format(filename))
+                continue
 
-        filepath = os.path.join(data_dir, filename)
-        model.demo(filepath)
-    logger.info("average cost {:.6f}ms".format(model.ave_latency_ms))
-    logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
+            filepath = os.path.join(data_dir, filename)
+            model.demo(filepath)
+        logger.info("average cost {:.6f}ms".format(model.ave_latency_ms))
+        logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
+    except Exception as e:
+        logger.error("TyAssist failed to demo -> {}".format(e))
 
 
 def run(config_filepath, phase, dtype, target):
