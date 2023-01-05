@@ -40,6 +40,15 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         """
         if self.enable_quant:
             quantize_config, norm = self.set_quantization_cfg(in_datas)
+
+            quant_data_dir = self.quant_cfg["data_dir"]
+            dataset = quant_data_dir
+            if not quant_data_dir:  # 未配置量化路径使用随机数据情况
+                dataset = self.gen_random_data
+            else:
+                if self.has_custom_preprocess:  # 配置量化数据目录情况下存在自定义预处理
+                    dataset = self.custom_preprocess_cls.get_data
+
             logger.info("################   quantization start  ######################")
             import tvm
             from tvm.relay.quantization import quantize
@@ -47,10 +56,9 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 self.relay,
                 self.params,
                 model_name="opt_ir",
-                dataset=self.quant_cfg["data_dir"] if not self.has_custom_preprocess else self.custom_preprocess_cls.get_data,
+                dataset=dataset,
                 prof_img_num=self.quant_cfg["prof_img_num"],
-                rgb_en=1 if (self.num_inputs == 1 and self.inputs[0]["pixel_format"] == "RGB"
-                             and (not self.has_custom_preprocess)) else 0,
+                rgb_en=1 if (self.num_inputs == 1 and self.inputs[0]["pixel_format"] == "RGB") else 0,
                 norm=norm,
                 quantize_config=quantize_config,
                 debug_level=self.quant_cfg["debug_level"],
