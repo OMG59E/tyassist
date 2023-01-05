@@ -79,9 +79,21 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             import tvm
             from tvm.contrib import graph_executor
             from tvm.relay import build
+
+            # 将标量转换成张量
+            def rewrite_scalar(mod):
+                class ScalarRewriter(tvm.relay.ExprMutator):
+                    def visit_constant(self, const):
+                        if len(const.data.shape) == 0:
+                            return tvm.relay.const([const.data.asnumpy()], const.data.dtype)
+                        return super().visit_constant(const)
+
+                mod = tvm.IRModule.from_expr(ScalarRewriter().visit(mod["main"]))
+                return tvm.relay.transform.InferType()(mod)
+
             cpu_target = tvm.target.Target("llvm")
             with tvm.transform.PassContext(opt_level=3):
-                cpu_lib = build(relay_func, target=cpu_target, params=params)
+                cpu_lib = build(rewrite_scalar(relay_func), target=cpu_target, params=params)
                 if save_path:
                     cpu_lib.export_library(save_path)
             module = graph_executor.GraphModule(cpu_lib["default"](tvm.cpu()))
