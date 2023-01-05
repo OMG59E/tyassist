@@ -215,8 +215,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
 
         # self.model_analysis()
         self.get_profile_info()
-
-        iss_fixed_outputs = self.iss_fixed_inference(in_datas)
+        iss_fixed_outputs = self.iss_fixed_inference(in_datas, to_file=True)
         self.iss_dump_output(in_datas)
         return iss_fixed_outputs
 
