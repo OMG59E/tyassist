@@ -351,7 +351,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 if ext not in [".JPEG", ".jpg", ".bmp", ".png", ".PNG", ".npy"]:
                     continue
                 filepath = os.path.join(data_dir, filename)
-            in_datas = self.get_datas(filepath=filepath, use_norm=False, force_cr=True, to_file=False)
+            in_datas = self.get_datas(filepath=filepath, use_norm=False, force_cr=True, use_random=True, to_file=False)
             outputs = self.tvm_inference(module, in_datas)
             for idx, output in enumerate(outputs):
                 feature_map_count += len(np.where(output.flatten() == 0)[0])

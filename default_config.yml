@@ -28,12 +28,11 @@ model: {
       pixel_format: ,
       mean: [ 0.0, 0.0, 0.0 ],   # 输入均值，留空，默认为0，可缺省，支持broadcast，存在自定义预处理情况下，无须在自定义模块内进行norm
       std: [ 1.0, 1.0, 1.0 ],   # 输入方差，留空，默认为1，可缺省，支持broadcast，存在自定义预处理情况下，无须在自定义模块内进行norm
-      dtype: "",   # 原模型输入数据类型，支持数据类型uint8, float32, int16, float16
       resize_type: 0,   # resize类型，0-长宽分别resize，1-长边等比例resize
       padding_value: 128,  # resize图像不足部分将自动padding，仅等比例resize生效
       padding_mode: 0,  # 目前仅支持 0: 左上角(LEFT_TOP), 1: 中心点(CENTER)，仅等比例resize生效
       data_path: ,  # 用于比较各阶段输出的相似度，空表示采用随机数，默认随机数，可缺省
-      # 表示是否使能aipp，内置输入预处理，效率更高
+      # 表示是否使能aipp，内置输入预处理，效率更高, 建议缺省或留空
       # 可缺省或留空，默认为true，true的情况下工具推断能否使能，以下两种情况true无效
       # * 注意自定义的情况下不可使能
       # * pixel_format为None时，强制为false

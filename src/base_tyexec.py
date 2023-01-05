@@ -85,7 +85,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 n, h, w, c = shape
 
             self.shape_dict[_input["name"]] = (n, c, h, w)
-            self.dtype_dict[_input["name"]] = _input["dtype"]
+            self.dtype_dict[_input["name"]] = "float32"   # _input["dtype"]
 
             _input["support"] = False if "None" == _input["pixel_format"] or "None" == _input["layout"] else True
             if _input["support"]:
@@ -142,10 +142,10 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         in_datas = OrderedDict()  # 保证输入顺序一致
         for idx, _input in enumerate(self.inputs):
             data_path = _input["data_path"] if not filepath else filepath
-            in_dtype = "uint8" if (_input["support"] and not use_norm) else _input["dtype"]
-            data_npy_path = os.path.join(self.result_dir, "{}_{}_{}.npy".format(idx, _input["name"], in_dtype))
-            data_bin_path = os.path.join(self.result_dir, "{}_{}_{}.bin".format(idx, _input["name"], in_dtype))
-            data_txt_path = os.path.join(self.result_dir, "{}_{}_{}.txt".format(idx, _input["name"], in_dtype))
+            dtype = "uint8" if (_input["support"] and not use_norm) else "float32"
+            data_npy_path = os.path.join(self.result_dir, "{}_{}_{}.npy".format(idx, _input["name"], dtype))
+            data_bin_path = os.path.join(self.result_dir, "{}_{}_{}.bin".format(idx, _input["name"], dtype))
+            data_txt_path = os.path.join(self.result_dir, "{}_{}_{}.txt".format(idx, _input["name"], dtype))
             n, c, h, w = self.shape_dict[_input["name"]]
             if data_path and not use_random:
                 if not os.path.exists(data_path):
@@ -174,7 +174,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                             resize_type=_input["resize_type"],
                             padding_value=_input["padding_value"],
                             padding_mode=_input["padding_mode"]
-                        ).astype(dtype=in_dtype)
+                        )
                     else:
                         if _input["pixel_format"] == "RGB":
                             im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)  # AIPP不支持BGR->RGB，需提前转换
@@ -200,13 +200,13 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                         in_datas[_input["name"]] = np.random.randint(low=0, high=255, size=(n, c, h, w), dtype=np.uint8)
                         _input["data_path"] = data_npy_path  # 作为tvm float输入
                     else:
-                        if in_dtype == "float32":
+                        if dtype == "float32":
                             in_datas[_input["name"]] = np.random.rand(n, c, h, w).astype(dtype=np.float32)
-                        elif in_dtype == "float16":
+                        elif dtype == "float16":
                             in_datas[_input["name"]] = np.random.rand(n, c, h, w).astype(dtype=np.float16)
-                        elif in_dtype == "int16":
+                        elif dtype == "int16":
                             in_datas[_input["name"]] = np.random.randint(low=-(2**15), high=2**15-1, size=(n, c, h, w), dtype=np.int16)
-                        elif in_dtype == "uint8":
+                        elif dtype == "uint8":
                             in_datas[_input["name"]] = np.random.randint(low=0, high=255, size=(n, c, h, w), dtype=np.uint8)
 
                 _input["padding_size"] = None  #

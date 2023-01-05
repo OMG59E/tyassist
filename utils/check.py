@@ -126,9 +126,6 @@ def check_config(cfg, phase="build"):
 
     # 多输入且不使用随机数据的情况下必须定义预处理
     input_lists = cfg["model"]["inputs"]
-    # if len(input_lists) > 1 and not cfg["build"]["quant"]["custom_preprocess_cls"]:
-    #     logger.error("Multi-input must be setting custom_preprocess")
-    #     return False
 
     use_rand_data = True
     for _input in input_lists:
@@ -170,15 +167,14 @@ def check_config(cfg, phase="build"):
             logger.error("shape must be in cfg[model][inputs]")
             return False
 
-        if "dtype" not in _input:
-            logger.error("dtype must be in cfg[model][inputs]")
-            return False
-
-        dtype = _input["dtype"]
-        dype_lists = ["uint8", "float32", "int16", "float16"]
-        if dtype not in dype_lists:
-            logger.error("dtype({}) must be in {}".format(dtype, dype_lists))
-            return False
+        # if "dtype" not in _input:
+        #     logger.error("dtype must be in cfg[model][inputs]")
+        #     return False
+        # dtype = _input["dtype"]
+        # dype_lists = ["uint8", "float32", "int16", "float16"]
+        # if dtype not in dype_lists:
+        #     logger.error("dtype({}) must be in {}".format(dtype, dype_lists))
+        #     return False
 
         if "mean" not in _input:
             logger.error("mean must be in cfg[model][inputs]")
