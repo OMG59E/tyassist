@@ -64,10 +64,10 @@ def build(cfg):
     tyexec.quantization(in_datas)
     tvm_fixed_output = tyexec.tvm_fixed_inference(in_datas, to_file=True)
 
+    iss_fixed_output = tyexec.build(in_datas)
+
     in_datas = tyexec.get_datas(use_norm=True, force_cr=True, to_file=True)  # 原模型输入数据
     tvm_float_output = tyexec.tvm_float_inference(in_datas, to_file=True)
-
-    iss_fixed_output = tyexec.build(in_datas)
 
     tyexec.compress_analysis()
     tyexec.get_relay_mac()  # print mac/flops/cycles info
