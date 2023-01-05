@@ -33,8 +33,7 @@ class CustomTensorFlowInput4(BaseCustomPreprocess):
         self._data_lists = [input3, input0, input1, input2]
 
     def get_single_data(self, filepath, idx):
-        if not filepath:
-            return self._data_lists[idx]
+        return self._data_lists[idx]
 
     def get_data(self):
         dtypes = [np.int16, np.float32, np.float32, np.uint8]

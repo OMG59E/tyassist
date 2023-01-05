@@ -3,7 +3,7 @@
 model: {
   framework: "tensorflow",
   save_dir: "./outputs",
-  weight: "NNISP_imx485_noiseEstimator_little_111120.pb",
+  weight: "tf_input4.pb",
   graph: "",
   inputs: [
     {
@@ -16,8 +16,7 @@ model: {
       resize_type: 0,
       padding_value: 128,
       padding_mode: 0,
-      enable: False,
-      data_path: "",
+      data_path: "./data/iss_in3_4x1x1",
     },
     {
       name: "pre_fuse_frame_placeholder",
@@ -29,8 +28,7 @@ model: {
       resize_type: 0,
       padding_value: 128,
       padding_mode: 0,
-      enable: False,
-      data_path: "",
+      data_path: "./data/iss_in0_1x256x256",
     },
     {
       name: "coef2_placeholder",
@@ -42,8 +40,7 @@ model: {
       resize_type: 0,
       padding_value: 128,
       padding_mode: 0,
-      enable: False,
-      data_path: "",
+      data_path: "./data/iss_in1_1x64x64",
     },
     {
       name: "fuse_coef_placeholder",
@@ -55,8 +52,7 @@ model: {
       resize_type: 0,
       padding_value: 128,
       padding_mode: 0,
-      enable: False,
-      data_path: "",
+      data_path: "./data/iss_in2_1x64x64",
     }
   ],
 
