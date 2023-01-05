@@ -3,9 +3,7 @@
 """ 
 @file: base_tyexec.py
 @time: 2022/12/14
-@contact: xing.weiguo@intellif.com
-@author: xingwg 
-@site: www.intellif.com
+@Author  : xingwg
 @software: PyCharm 
 """
 import os
@@ -87,11 +85,13 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 n, h, w, c = shape
 
             self.shape_dict[_input["name"]] = (n, c, h, w)
-            self.dtype_dict[_input["name"]] = "float32"
+            self.dtype_dict[_input["name"]] = _input["dtype"]
 
             _input["support"] = False if "None" == _input["pixel_format"] or "None" == _input["layout"] else True
             if _input["support"]:
                 if "enable_aipp" not in _input:
+                    _input["enable_aipp"] = True
+                elif _input["enable_aipp"] is None:
                     _input["enable_aipp"] = True
             else:
                 _input["enable_aipp"] = False
@@ -124,20 +124,30 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                     self.custom_preprocess_module, self.custom_preprocess_cls))
                 exit(-1)
 
-    def get_datas(self, filepath="", use_norm=False, force_cr=False, to_file=True):
+    def gen_random_data(self):
+        for _ in range(self.quant_cfg["prof_img_num"]):
+            yield self.get_datas(use_norm=False, force_cr=False, use_random=True)
+
+    def get_datas(self, filepath="", use_norm=False, force_cr=False, use_random=False, to_file=False):
         """获取tvm float/tvm fixed/iss fixed仿真的数据
         @param filepath: 可指定图片输入
         @param use_norm: 是否归一化，仅tvm float
         @param force_cr: 是否强制进行cvtColor、resize，仅disable_aipp、tvm fixed
+        @param use_random: 表示量化阶段是否使用随机数据
         @param to_file:  是否保存数据
         @return:
         """
+
         # TODO 处理多输入
         in_datas = OrderedDict()  # 保证输入顺序一致
         for idx, _input in enumerate(self.inputs):
             data_path = _input["data_path"] if not filepath else filepath
+            in_dtype = "uint8" if (_input["support"] and not use_norm) else _input["dtype"]
+            data_npy_path = os.path.join(self.result_dir, "{}_{}_{}.npy".format(idx, _input["name"], in_dtype))
+            data_bin_path = os.path.join(self.result_dir, "{}_{}_{}.bin".format(idx, _input["name"], in_dtype))
+            data_txt_path = os.path.join(self.result_dir, "{}_{}_{}.txt".format(idx, _input["name"], in_dtype))
             n, c, h, w = self.shape_dict[_input["name"]]
-            if data_path:
+            if data_path and not use_random:
                 if not os.path.exists(data_path):
                     logger.error("Not found data_path -> {}".format(data_path))
                     return None
@@ -145,8 +155,12 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                     # not support will use custom preprocess
                     in_datas[_input["name"]] = self.custom_preprocess_cls.get_single_data(data_path, idx)
                 else:
-                    # default preprocess，only image channel 1 or 3
-                    im = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE if _input["pixel_format"] == "GRAY" else cv2.IMREAD_COLOR)
+                    _, ext = os.path.splitext(data_path)
+                    if ext == ".npy":   # 随机模式 tvm float 复用
+                        im = np.load(data_path).squeeze(axis=0).transpose(1, 2, 0)
+                    else:
+                        # default preprocess，only image channel 1 or 3
+                        im = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE if _input["pixel_format"] == "GRAY" else cv2.IMREAD_COLOR)
                     if (not _input["enable_aipp"]) or force_cr:
                         _input["padding_size"], _ = calc_padding_size(im, (w, h), _input["padding_mode"])
                         in_datas[_input["name"]] = default_preprocess(
@@ -160,7 +174,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                             resize_type=_input["resize_type"],
                             padding_value=_input["padding_value"],
                             padding_mode=_input["padding_mode"]
-                        )
+                        ).astype(dtype=in_dtype)
                     else:
                         if _input["pixel_format"] == "RGB":
                             im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)  # AIPP不支持BGR->RGB，需提前转换
@@ -173,24 +187,36 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                             im = np.expand_dims(im, axis=0)
                         else:
                             im = np.expand_dims(im, axis=0)
-                        in_datas[_input["name"]] = im.transpose((0, 3, 1, 2))  # hwc -> chw, BGR888
+                        in_datas[_input["name"]] = im.transpose((0, 3, 1, 2))  # hwc -> chw, BGR888  uint8
             else:
                 # random data
                 logger.warning("Not set data_path, will use random data")
-                if not _input["support"]:
-                    in_datas[_input["name"]] = self.custom_preprocess_cls.get_single_data("", idx)
+
+                if not use_random and os.path.exists(data_npy_path):
+                    in_datas[_input["name"]] = np.load(data_npy_path)
+                    logger.info("load data -> {}".format(data_npy_path))
                 else:
-                    if use_norm:
-                        in_datas[_input["name"]] = np.random.randn(n, c, h, w).astype(dtype=np.float32)
+                    if _input["support"] and not use_norm:
+                        in_datas[_input["name"]] = np.random.randint(low=0, high=255, size=(n, c, h, w), dtype=np.uint8)
+                        _input["data_path"] = data_npy_path  # 作为tvm float输入
                     else:
-                        in_datas[_input["name"]] = np.random.randint(0, 255, (n, c, h, w)).astype(dtype=np.uint8)
+                        if in_dtype == "float32":
+                            in_datas[_input["name"]] = np.random.rand(n, c, h, w).astype(dtype=np.float32)
+                        elif in_dtype == "float16":
+                            in_datas[_input["name"]] = np.random.rand(n, c, h, w).astype(dtype=np.float16)
+                        elif in_dtype == "int16":
+                            in_datas[_input["name"]] = np.random.randint(low=-(2**15), high=2**15-1, size=(n, c, h, w), dtype=np.int16)
+                        elif in_dtype == "uint8":
+                            in_datas[_input["name"]] = np.random.randint(low=0, high=255, size=(n, c, h, w), dtype=np.uint8)
 
                 _input["padding_size"] = None  #
 
             if to_file:
                 # save data
-                in_datas[_input["name"]].tofile(os.path.join(self.result_dir, "data_{}_CRN.bin".format(idx)))
-                in_datas[_input["name"]].tofile(os.path.join(self.result_dir, "data_{}_CRN.txt".format(idx)), sep="\n")
+                logger.info("save data -> {}".format(data_npy_path))
+                np.save(data_npy_path, in_datas[_input["name"]])
+                in_datas[_input["name"]].tofile(data_bin_path)
+                in_datas[_input["name"]].tofile(data_txt_path, sep="\n")
 
         return in_datas
 
@@ -215,7 +241,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 logger.error("Not support input dtype -> {}".format(in_datas[name].dtype))
                 exit(-1)
             # 与最终量化后的模型输入数据类型相对应
-            in_dtypes[name] = data_type if self.has_custom_preprocess else "uint8"
+            in_dtypes[name] = data_type if not _input["support"] else "uint8"
             norm[name] = {"mean": _input["mean"], "std": _input["std"], "axis": 1}
             logger.info("Input({}) dtype -> {}".format(name, in_dtypes[name]))
             logger.info("Input({}) mean/std -> {}".format(name, norm[name]))

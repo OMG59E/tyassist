@@ -4,7 +4,6 @@
 @File    : coco.py
 @Time    : 2022/7/25 下午7:35
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import os

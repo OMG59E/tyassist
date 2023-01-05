@@ -3,9 +3,7 @@
 """ 
 @file: base_profiler.py 
 @time: 2022/12/22
-@contact: xing.weiguo@intellif.com
-@author: xingwg 
-@site: www.intellif.com
+@Author  : xingwg
 @software: PyCharm 
 """
 import abc

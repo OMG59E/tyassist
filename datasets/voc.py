@@ -3,9 +3,7 @@
 """ 
 @file: voc.py 
 @time: 2022/08/03
-@contact: xing.weiguo@intellif.com
-@author: xingwg 
-@site: www.intellif.com
+@Author  : xingwg
 @software: PyCharm 
 """
 import os

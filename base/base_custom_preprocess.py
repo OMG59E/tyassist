@@ -4,7 +4,6 @@
 @File    : base_custom_preprocess.py
 @Time    : 2022/7/6 上午11:31
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import abc

@@ -4,7 +4,6 @@
 @File    : check.py
 @Time    : 2022/7/13 上午10:02
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import os

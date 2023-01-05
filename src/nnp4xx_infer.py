@@ -3,9 +3,7 @@
 """ 
 @file: nnp4xx_infer.py 
 @time: 2022/11/30
-@contact: xing.weiguo@intellif.com
-@author: xingwg 
-@site: www.intellif.com
+@Author  : xingwg
 @software: PyCharm 
 """
 import os

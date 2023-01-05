@@ -4,7 +4,6 @@
 @File    : check.py
 @Time    : 2022/7/13 上午10:02
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import os
@@ -84,6 +83,10 @@ def check_config(cfg, phase="build"):
         logger.error("The key(quant) must be in cfg[build]")
         return False
 
+    if "data_dir" not in cfg["build"]["quant"]:
+        logger.error("The key(data_dir) must be in cfg[build][quant]")
+        return False
+
     if "prof_img_num" not in cfg["build"]["quant"]:
         logger.error("The key(prof_img_num) must be in cfg[build][quant]")
         return False
@@ -121,11 +124,40 @@ def check_config(cfg, phase="build"):
             logger.error("The model weight not exist -> {}".format(weight))
             return False
 
-    # 多输入必须定义预处理
+    # 多输入且不使用随机数据的情况下必须定义预处理
     input_lists = cfg["model"]["inputs"]
-    if len(input_lists) > 1 and not cfg["build"]["quant"]["custom_preprocess_cls"]:
-        logger.error("Multi-input must be setting custom_preprocess")
+    # if len(input_lists) > 1 and not cfg["build"]["quant"]["custom_preprocess_cls"]:
+    #     logger.error("Multi-input must be setting custom_preprocess")
+    #     return False
+
+    use_rand_data = True
+    for _input in input_lists:
+        if _input["data_path"]:
+            use_rand_data = False
+        else:
+            logger.warning("input({}) will use random data".format(_input["name"]))
+
+    quant_data_dir = cfg["build"]["quant"]["data_dir"]
+    if quant_data_dir:
+        use_rand_data = False
+    else:
+        logger.warning("quant data will use random data")
+
+    if use_rand_data:
+        logger.warning("Model compilation will use random data")
+
+    if len(input_lists) > 1 and (not use_rand_data) and (not cfg["build"]["quant"]["custom_preprocess_cls"]):
+        logger.error("multi-input must be setting custom_preprocess")
         return False
+    else:
+        if input_lists[0]["pixel_format"] == "None" and (not use_rand_data) and (not cfg["build"]["quant"]["custom_preprocess_cls"]):
+            logger.error("pixel_format == None, must be setting custom_preprocess")
+            return False
+
+    if cfg["build"]["quant"]["custom_preprocess_cls"]:
+        if not cfg["build"]["quant"]["custom_preprocess_module"]:
+            logger.error("custom_preprocess_cls, must be setting custom_preprocess_module")
+            return False
 
     for _input in input_lists:
         layout = _input["layout"]
@@ -136,6 +168,16 @@ def check_config(cfg, phase="build"):
 
         if "shape" not in _input:
             logger.error("shape must be in cfg[model][inputs]")
+            return False
+
+        if "dtype" not in _input:
+            logger.error("dtype must be in cfg[model][inputs]")
+            return False
+
+        dtype = _input["dtype"]
+        dype_lists = ["uint8", "float32", "int16", "float16"]
+        if dtype not in dype_lists:
+            logger.error("dtype({}) must be in {}".format(dtype, dype_lists))
             return False
 
         if "mean" not in _input:
@@ -201,10 +243,6 @@ def check_config(cfg, phase="build"):
         pixel_format_lists = ["None", "RGB", "BGR", "GRAY"]
         if pixel_format not in pixel_format_lists:
             logger.error("pixel_format({}) must be in {}".format(pixel_format, pixel_format_lists))
-            return False
-
-        if _input["pixel_format"] == "None" and _input["data_path"] and not cfg["build"]["quant"]["custom_preprocess_cls"]:
-            logger.error("Pixel format == None, must be setting custom_preprocess")
             return False
 
         padding_mode = _input["padding_mode"]

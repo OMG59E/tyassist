@@ -4,7 +4,6 @@
 @File    : postprocess.py
 @Time    : 2022/7/14 下午1:58
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import time

@@ -4,7 +4,6 @@
 @File    : model_base.py
 @Time    : 2022/7/18 上午10:32
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import abc

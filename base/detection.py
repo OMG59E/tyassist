@@ -4,7 +4,6 @@
 @File    : detection.py
 @Time    : 2022/7/21 上午10:24
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import time

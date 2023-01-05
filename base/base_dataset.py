@@ -4,7 +4,6 @@
 @File    : dataset_base.py
 @Time    : 2022/7/15 下午4:15
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import abc

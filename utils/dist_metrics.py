@@ -4,7 +4,6 @@
 @File    : dist_metrics.py
 @Time    : 2022/7/8 下午3:20
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import numpy as np

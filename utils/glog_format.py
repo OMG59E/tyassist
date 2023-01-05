@@ -4,7 +4,6 @@
 @File    : glog_format.py
 @Time    : 2022/6/29 下午1:59
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import logging

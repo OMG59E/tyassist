@@ -3,9 +3,7 @@
 """ 
 @file: nnp3xx_tyexec.py 
 @time: 2022/12/14
-@contact: xing.weiguo@intellif.com
-@author: xingwg 
-@site: www.intellif.com
+@Author  : xingwg
 @software: PyCharm 
 """
 import os
@@ -30,6 +28,14 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         if self.enable_quant:
             quantize_config, norm = self.set_quantization_cfg(in_datas)
 
+            quant_data_dir = self.quant_cfg["data_dir"]
+            dataset = quant_data_dir
+            if not quant_data_dir:  # 未配置量化路径使用随机数据情况
+                dataset = self.gen_random_data
+            else:
+                if self.has_custom_preprocess:  # 配置量化数据目录情况下存在自定义预处理
+                    dataset = self.custom_preprocess_cls.get_data
+
             from tvm.relay.quantization import quantize
             logger.info("################   quantization start  ######################")
             # 保存路径设置
@@ -39,11 +45,11 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 model_name="opt_ir",
                 # 用户使用云天自带的预处理时，配置为输入量化profile(统计模型的层分布用来 calibrate 生成 scale)
                 # 的图片集路径，支持图片格式为 jpg，jpeg，png，bmp。也可配置为用户自定义的预处理。类型str/generator
-                dataset=self.quant_cfg["data_dir"] if not self.has_custom_preprocess else self.custom_preprocess_cls.get_data,
+                dataset=dataset,
                 # 使用校准数据数量
                 prof_img_num=self.quant_cfg["prof_img_num"],
                 # 此配置仅在 dataset 配置为图片集路径（即使用云天自带的预处理），且输入为3通道时有效，对生成芯片模型无效
-                rgb_en=1 if (self.num_inputs == 1 and self.inputs[0]["pixel_format"] == "RGB" and (not self.has_custom_preprocess)) else 0,
+                rgb_en=1 if (self.num_inputs == 1 and self.inputs[0]["pixel_format"] == "RGB") else 0,
                 # 均值方差，对生成芯片模型生效
                 norm=norm,
                 # 量化配置
@@ -463,7 +469,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             shape_dict[_input["name"]] = _input["shape"]
         sym, params = relay.frontend.from_tensorflow(
             graph=graph_def,
-            # layout="NCHW",  # 可选, 输出的目标布局
+            layout="NCHW",  # 可选, 输出的目标布局
             shape=shape_dict,
             outputs=output_names
         )

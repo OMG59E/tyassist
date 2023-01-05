@@ -4,7 +4,6 @@
 @File    : parser.py
 @Time    : 2022/7/1 下午4:37
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import yaml

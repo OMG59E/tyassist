@@ -4,7 +4,6 @@
 @File    : imagenet.py
 @Time    : 2022/7/15 下午4:32
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import os

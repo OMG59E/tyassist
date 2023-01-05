@@ -4,6 +4,5 @@
 @File    : __init__.py.py
 @Time    : 2022/7/21 上午10:02
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
