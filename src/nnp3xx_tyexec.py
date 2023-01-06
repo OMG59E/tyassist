@@ -377,7 +377,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         from .nnp3xx_infer import Nnp3xxSdkInfer
         in_datas = self.get_datas(use_norm=False, force_cr=False, to_file=False)
         infer = Nnp3xxSdkInfer(enable_dump=self.enable_dump, enable_aipp=True)
-        infer.set_input_enable_aipps([_input["support"] for _input in self.inputs])
+        infer.set_input_enable_aipps([_input["enable_aipp"] for _input in self.inputs])
         infer.set_input_pixel_format([_input["pixel_format"] for _input in self.inputs])
         infer.load(self.model_path)
         outputs = infer.run(in_datas, to_file=True)
@@ -417,13 +417,19 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             text_format.Merge(f.read(), deploy_net)
         with open(self.weight, "rb") as f:
             weight_net.ParseFromString(f.read())
-        self.relay, self.params, _ = relay.frontend.from_caffe(weight_net, deploy_net, self.shape_dict, self.dtype_dict)
+        dtype_dict = dict()
+        for idx, _input in enumerate(self.inputs):
+            dtype_dict[_input["name"]] = "float32"
+        self.relay, self.params, _ = relay.frontend.from_caffe(weight_net, deploy_net, self.shape_dict, dtype_dict)
 
     def onnx2relay(self):
         import onnx
         from tvm import relay
         model = onnx.load(self.weight)
-        self.relay, self.params = relay.frontend.from_onnx(model, self.shape_dict, self.dtype_dict)
+        dtype_dict = dict()
+        for idx, _input in enumerate(self.inputs):
+            dtype_dict[_input["name"]] = "float32"
+        self.relay, self.params = relay.frontend.from_onnx(model, self.shape_dict, dtype_dict)
 
     def pytorch2relay(self):
         import torch
@@ -450,10 +456,13 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             if tp == "aux":
                 aux_params[name] = v
 
+        dtype_dict = dict()
+        for idx, _input in enumerate(self.inputs):
+            dtype_dict[_input["name"]] = "float32"
         self.relay, self.params = relay.frontend.from_mxnet(
             model,
             shape=self.shape_dict,
-            dtype=self.dtype_dict,
+            dtype=dtype_dict,
             arg_params=arg_params,
             aux_params=aux_params
         )
@@ -488,8 +497,10 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             tflite_model_buf = f.read()
         model = tflite.Model.GetRootAsModel(tflite_model_buf, 0)
         shape_dict = dict()
+        dtype_dict = dict()
         for idx, _input in enumerate(self.inputs):
             shape_dict[_input["name"]] = _input["shape"]
+            dtype_dict[_input["name"]] = "float32"
         sym, params = relay.frontend.from_tflite(model, shape_dict, self.dtype_dict)
         self.relay, self.params = relay.relay_pass.tflite_frontend_convert(
             sym,

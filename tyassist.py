@@ -92,6 +92,7 @@ def build(cfg):
             if iss_fixed_output:
                 dist = cosine_distance(tvm_fixed_output[idx], iss_fixed_output[idx])
                 logger.info("[Build] fixed(tvm) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(idx, dist))
+        logger.info("success")
     except Exception as e:
         logger.error("TyAssist failed to build -> {}".format(e))
 
@@ -126,7 +127,7 @@ def compare(cfg):
                 iss_fixed_out = np.fromfile(iss_fixed_out_path, dtype=fixed_output.dtype)
                 dist2 = cosine_distance(fixed_output, iss_fixed_out)
                 logger.info("[Compare] fixed({}) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(backend, idx, dist2))
-
+        logger.info("success")
     except Exception as e:
         logger.error("TyAssist failed to compare -> {}".format(e))
 
@@ -136,6 +137,7 @@ def profile(cfg):
         logger.info("{}".format(cfg))
         tyexec = get_tyexec(cfg)
         tyexec.profile()
+        logger.info("success")
     except Exception as e:
         logger.error("TyAssist failed to profile -> {}".format(e))
 
@@ -200,6 +202,7 @@ def test(cfg, dtype):
         logger.info("average cost {:.6f}ms".format(model.ave_latency_ms))
         logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
         logger.info("{}".format(res))
+        logger.info("success")
         return res
     except Exception as e:
         logger.error("TyAssist failed to test -> {}".format(e))
@@ -260,6 +263,7 @@ def demo(cfg, dtype):
             model.demo(filepath)
         logger.info("average cost {:.6f}ms".format(model.ave_latency_ms))
         logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
+        logger.info("success")
     except Exception as e:
         logger.error("TyAssist failed to demo -> {}".format(e))
 
@@ -290,7 +294,6 @@ def run(config_filepath, phase, dtype, target):
         profile(config)
 
     sys.path.remove(config_dir)
-    logger.info("success")
     return res
 
 
@@ -335,6 +338,7 @@ def benchmark(mapping_file, dtype, target):
         f_csv.writerow(row)
     f.close()
     logger.info("\n{}".format(table))
+    logger.info("success")
 
 
 if __name__ == "__main__":

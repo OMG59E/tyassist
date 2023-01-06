@@ -167,14 +167,12 @@ def check_config(cfg, phase="build"):
             logger.error("shape must be in cfg[model][inputs]")
             return False
 
-        # if "dtype" not in _input:
-        #     logger.error("dtype must be in cfg[model][inputs]")
-        #     return False
-        # dtype = _input["dtype"]
-        # dype_lists = ["uint8", "float32", "int16", "float16"]
-        # if dtype not in dype_lists:
-        #     logger.error("dtype({}) must be in {}".format(dtype, dype_lists))
-        #     return False
+        if "dtype" in _input:
+            dtype = _input["dtype"]
+            dype_lists = ["uint8", "float32", "int16", "float16"]
+            if dtype not in dype_lists:
+                logger.error("dtype({}) must be in {}".format(dtype, dype_lists))
+                return False
 
         if "mean" not in _input:
             logger.error("mean must be in cfg[model][inputs]")

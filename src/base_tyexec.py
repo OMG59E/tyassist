@@ -84,15 +84,26 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             if _input["layout"] == "NHWC":
                 n, h, w, c = shape
 
-            self.shape_dict[_input["name"]] = (n, c, h, w)
-            self.dtype_dict[_input["name"]] = "float32"   # _input["dtype"]
+            if "dtype" not in _input:
+                if _input["pixel_format"] == "None":
+                    _input["dtype"] = "float32"
+                else:
+                    _input["dtype"] = "uint8"
 
-            _input["support"] = False if "None" == _input["pixel_format"] or "None" == _input["layout"] else True
+            self.shape_dict[_input["name"]] = (n, c, h, w)
+            self.dtype_dict[_input["name"]] = _input["dtype"]
+
+            _input["support"] = False if "None" == _input["pixel_format"] else True
             if _input["support"]:
                 if "enable_aipp" not in _input:
                     _input["enable_aipp"] = True
                 elif _input["enable_aipp"] is None:
                     _input["enable_aipp"] = True
+
+                if "uint8" != _input["dtype"]:  # AIPP目前限制输出必须是uint8
+                    logger.warning("input cannot enable aipp, pixel_format -> {} dtype -> {}".format(
+                        _input["pixel_format"], _input["dtype"]))
+                    _input["enable_aipp"] = False
             else:
                 _input["enable_aipp"] = False
 
@@ -128,6 +139,12 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         for _ in range(self.quant_cfg["prof_img_num"]):
             yield self.get_datas(use_norm=False, force_cr=False, use_random=True)
 
+    @staticmethod
+    def _check_dtype(name, data, target_dtype):
+        if data.dtype != target_dtype:
+            logger.error("input({}) dtype mismatch {} vs {}".format(name, data, target_dtype))
+            exit(-1)
+
     def get_datas(self, filepath="", use_norm=False, force_cr=False, use_random=False, to_file=False):
         """获取tvm float/tvm fixed/iss fixed仿真的数据
         @param filepath: 可指定图片输入
@@ -142,7 +159,15 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         in_datas = OrderedDict()  # 保证输入顺序一致
         for idx, _input in enumerate(self.inputs):
             data_path = _input["data_path"] if not filepath else filepath
-            dtype = "uint8" if (_input["support"] and not use_norm) else "float32"
+            dtype = "uint8"
+            if use_norm:  # tvm float
+                dtype = "float32"
+            else:  # tvm/iss fixed, quant
+                if _input["enable_aipp"]:
+                    dtype = "uint8"
+                else:
+                    dtype = _input["dtype"]
+
             data_npy_path = os.path.join(self.result_dir, "{}_{}_{}.npy".format(idx, _input["name"], dtype))
             data_bin_path = os.path.join(self.result_dir, "{}_{}_{}.bin".format(idx, _input["name"], dtype))
             data_txt_path = os.path.join(self.result_dir, "{}_{}_{}.txt".format(idx, _input["name"], dtype))
@@ -150,10 +175,12 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             if data_path and not use_random:
                 if not os.path.exists(data_path):
                     logger.error("Not found data_path -> {}".format(data_path))
-                    return None
+                    exit(-1)
+
                 if not _input["support"]:
                     # not support will use custom preprocess
                     in_datas[_input["name"]] = self.custom_preprocess_cls.get_single_data(data_path, idx)
+                    self._check_dtype(_input["name"], in_datas[_input["name"]], dtype)
                 else:
                     _, ext = os.path.splitext(data_path)
                     if ext == ".npy":   # 随机模式 tvm float 复用
@@ -174,7 +201,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                             resize_type=_input["resize_type"],
                             padding_value=_input["padding_value"],
                             padding_mode=_input["padding_mode"]
-                        )
+                        ).astype(dtype=dtype)
                     else:
                         if _input["pixel_format"] == "RGB":
                             im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)  # AIPP不支持BGR->RGB，需提前转换
@@ -188,6 +215,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                         else:
                             im = np.expand_dims(im, axis=0)
                         in_datas[_input["name"]] = im.transpose((0, 3, 1, 2))  # hwc -> chw, BGR888  uint8
+                        self._check_dtype(_input["name"], in_datas[_input["name"]], "uint8")
             else:
                 # random data
                 logger.warning("Not set data_path, will use random data")
@@ -196,7 +224,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                     in_datas[_input["name"]] = np.load(data_npy_path)
                     logger.info("load data -> {}".format(data_npy_path))
                 else:
-                    if _input["support"] and not use_norm:
+                    if _input["enable_aipp"] and not use_norm:
                         in_datas[_input["name"]] = np.random.randint(low=0, high=255, size=(n, c, h, w), dtype=np.uint8)
                         _input["data_path"] = data_npy_path  # 作为tvm float输入
                     else:
@@ -241,7 +269,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 logger.error("Not support input dtype -> {}".format(in_datas[name].dtype))
                 exit(-1)
             # 与最终量化后的模型输入数据类型相对应
-            in_dtypes[name] = data_type if not _input["support"] else "uint8"
+            in_dtypes[name] = data_type
             norm[name] = {"mean": _input["mean"], "std": _input["std"], "axis": 1}
             logger.info("Input({}) dtype -> {}".format(name, in_dtypes[name]))
             logger.info("Input({}) mean/std -> {}".format(name, norm[name]))
