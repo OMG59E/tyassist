@@ -146,9 +146,13 @@ class Nnp3xxSdkInfer(BaseInfer, ABC):
         chip_cost = self.engine.get_profile_result()["last_model_exec_time"] * 0.001
         self.time_span += chip_cost
 
-        if self.enable_dump == 1 and self.backend != "sdk_iss":
-            self.compare_layer_out()
-            logger.warning("Inference time cannot be output when enable_dump == 1")
+        if self.enable_dump == 1:
+            if self.backend == "chip":
+                self.compare_layer_out()
+            elif self.backend == "sdk_iss":
+                logger.warning("Inference time cannot be output when enable_dump == 1")
+            else:
+                logger.error("Not support backend -> {}".format(self.backend))
 
         # dump输出
         if to_file:
