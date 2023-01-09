@@ -8,7 +8,7 @@ model: {
   inputs: [
     {
       name: "data",
-      shape: [ 1, 3, 227, 227 ],
+      shape: [ 1, 3, 224, 224 ],
       layout: "NCHW",
       pixel_format: "RGB",
       mean: [ 104.0, 117.0, 123.0 ],
@@ -22,8 +22,8 @@ model: {
 
   outputs: [ ],
 
-  model_impl_module: ,
-  model_impl_cls:
+  model_impl_module: "model_impl",
+  model_impl_cls: "SqueezeNetV1_1"
 }
 
 build: {
@@ -43,4 +43,16 @@ build: {
     skip_layer_types: [ ],
   },
   enable_dump: 1,
+}
+
+test: {
+  data_dir: "../../data/datasets/ILSVRC2012/ILSVRC2012_img_val",
+  test_num: 0,
+  dataset_module: "dataset",
+  dataset_cls: "Dataset",
+}
+
+demo: {
+  data_dir: "../../data/datasets/ILSVRC2012/ILSVRC2012_img_val",
+  num: 20,
 }
