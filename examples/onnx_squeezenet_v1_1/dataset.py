@@ -4,7 +4,6 @@
 @File    : dataset.py
 @Time    : 2022/7/21 下午3:10
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 from datasets.imagenet import ILSVRC2012
