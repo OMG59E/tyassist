@@ -127,32 +127,23 @@ def check_config(cfg, phase="build"):
     # 多输入且不使用随机数据的情况下必须定义预处理
     input_lists = cfg["model"]["inputs"]
 
-    use_rand_data = True
-    for _input in input_lists:
-        if _input["data_path"]:
-            use_rand_data = False
-        else:
-            logger.warning("input({}) will use random data".format(_input["name"]))
-
+    # 以下情况必须设置自定义预处理:
+    # 1.多输入指定量化数据目录，表示量化使用指定数据
+    custom_preprocess_cls = cfg["build"]["quant"]["custom_preprocess_cls"]
+    custom_preprocess_module = cfg["build"]["quant"]["custom_preprocess_module"]
     quant_data_dir = cfg["build"]["quant"]["data_dir"]
-    if quant_data_dir:
-        use_rand_data = False
-    else:
-        logger.warning("quant data will use random data")
-
-    if use_rand_data:
-        logger.warning("Model compilation will use random data")
-
-    if len(input_lists) > 1 and (not use_rand_data) and (not cfg["build"]["quant"]["custom_preprocess_cls"]):
+    if len(input_lists) > 1 and quant_data_dir and not custom_preprocess_cls:
         logger.error("multi-input must be setting custom_preprocess")
         return False
-    else:
-        if input_lists[0]["pixel_format"] == "None" and (not use_rand_data) and (not cfg["build"]["quant"]["custom_preprocess_cls"]):
-            logger.error("pixel_format == None, must be setting custom_preprocess")
+    # 2.某输入为非图像数据，且指定输入数据，表示推理仿真使用指定数据
+    for _input in input_lists:
+        if _input["pixel_format"] == "None" and _input["data_path"] and not custom_preprocess_cls:
+            logger.error("There is non-image data, while specifying the input data_path,"
+                         " custom preprocessing must be configured")
             return False
 
-    if cfg["build"]["quant"]["custom_preprocess_cls"]:
-        if not cfg["build"]["quant"]["custom_preprocess_module"]:
+    if custom_preprocess_cls:
+        if not custom_preprocess_module:
             logger.error("custom_preprocess_cls, must be setting custom_preprocess_module")
             return False
 
@@ -249,11 +240,6 @@ def check_config(cfg, phase="build"):
             if not os.path.exists(_input["data_path"]):
                 logger.error("data_path not exist -> {}".format(_input["data_path"]))
                 return False
-
-    # 预处理模块检查
-    if (not cfg["build"]["quant"]["custom_preprocess_module"]) != (not cfg["build"]["quant"]["custom_preprocess_cls"]):
-        logger.error("custom_preprocess_module and custom_preprocess_cls both must be set.")
-        return False
 
     # TODO
     # 检查是否缺少关键字

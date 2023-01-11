@@ -70,6 +70,16 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.model_path = os.path.join(self.model_dir, "{}.ty".format(self.model_name))
         self.model_path_aarch64 = os.path.join(self.model_dir, "{}_aarch64.ty".format(self.model_name))
 
+    def get_dataset(self):
+        quant_data_dir = self.quant_cfg["data_dir"]
+        dataset = quant_data_dir
+        if not quant_data_dir:  # 未配置量化路径使用随机数据情况
+            dataset = self.gen_random_quant_data
+        else:
+            if self.has_custom_preprocess:  # 配置量化数据目录情况下存在自定义预处理
+                dataset = self.custom_preprocess_cls.get_data
+        return dataset
+
     def set_model_name(self):
         if "name" in self.cfg["model"]:
             if self.cfg["model"]["name"]:
@@ -101,8 +111,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                     _input["enable_aipp"] = True
 
                 if "uint8" != _input["dtype"]:  # AIPP目前限制输出必须是uint8
-                    logger.warning("input cannot enable aipp, pixel_format -> {} dtype -> {}".format(
-                        _input["pixel_format"], _input["dtype"]))
+                    logger.warning("input[{}] cannot enable aipp -> pixel_format: {}, dtype: {}".format(
+                        _input["name"], _input["pixel_format"], _input["dtype"]))
                     _input["enable_aipp"] = False
             else:
                 _input["enable_aipp"] = False
@@ -113,6 +123,15 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 _input["std"] = [1.0 for _ in range(c)]
 
             _input["padding_mode"] = PaddingMode.LEFT_TOP if _input["padding_mode"] == 0 else PaddingMode.CENTER
+
+        # 检查多输入配置是否正确，uint8图像必须排列在最前面
+        if len(self.inputs) >= 2:
+            for idx, _input in enumerate(self.inputs):
+                if _input["enable_aipp"] and idx > 0:
+                    # 检查之前的输入是否存在非图像数据
+                    if not self.inputs[idx-1]["enable_aipp"]:
+                        logger.error("Not support input(disable_aipp) in front of input(enable_aipp)")
+                        exit(-1)
 
     @property
     def has_custom_preprocess(self):
@@ -135,117 +154,108 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                     self.custom_preprocess_module, self.custom_preprocess_cls))
                 exit(-1)
 
-    def gen_random_data(self):
-        for _ in range(self.quant_cfg["prof_img_num"]):
-            yield self.get_datas(use_norm=False, force_cr=False, use_random=True)
+    def gen_random_quant_data(self):
+        prof_img_num = self.quant_cfg["prof_img_num"]
+        for _ in range(prof_img_num):
+            yield self.get_datas(force_random=True)
 
     @staticmethod
-    def _check_dtype(name, data, target_dtype):
-        if data.dtype != target_dtype:
-            logger.error("input({}) dtype mismatch {} vs {}".format(name, data, target_dtype))
+    def check_not_exist(filepath):
+        if not os.path.exists(filepath):
+            logger.error("Not found filepath -> {}".format(filepath))
             exit(-1)
 
-    def get_datas(self, filepath="", use_norm=False, force_cr=False, use_random=False, to_file=False):
-        """获取tvm float/tvm fixed/iss fixed仿真的数据
-        @param filepath: 可指定图片输入
-        @param use_norm: 是否归一化，仅tvm float
-        @param force_cr: 是否强制进行cvtColor、resize，仅disable_aipp、tvm fixed
-        @param use_random: 表示量化阶段是否使用随机数据
-        @param to_file:  是否保存数据
+    @staticmethod
+    def check_dtype(name, data, target_dtype):
+        if data.dtype != target_dtype:
+            logger.error("input({}) dtype mismatch {} vs {}".format(name, data.dtype, target_dtype))
+            exit(-1)
+
+    def get_datas(self, filepath="", force_float=False, force_cr=True, force_random=False, to_file=False):
+        """ 生成模型输入数据
+        @param filepath:  外部指定数据
+        @param force_float:  强制输出float数据
+        @param force_cr:　是否强制使能CR
+        @param force_random:  是否强制使用随机数据，主要用于生成量化数据
+        @param to_file:
         @return:
         """
-
-        # TODO 处理多输入
         in_datas = OrderedDict()  # 保证输入顺序一致
         for idx, _input in enumerate(self.inputs):
+            name = _input["name"]
+            pixel_format = _input["pixel_format"]
+            dtype = _input["dtype"]
+            if _input["enable_aipp"]:
+                dtype = "uint8"
             data_path = _input["data_path"] if not filepath else filepath
-            dtype = "uint8"
-            if use_norm:  # tvm float
-                dtype = "float32"
-            else:  # tvm/iss fixed, quant
-                if _input["enable_aipp"]:
-                    dtype = "uint8"
+            data_npy_path = os.path.join(self.result_dir, "{}_{}_{}.npy".format(idx, name, dtype))
+            data_bin_path = os.path.join(self.result_dir, "{}_{}_{}.bin".format(idx, name, dtype))
+            data_txt_path = os.path.join(self.result_dir, "{}_{}_{}.txt".format(idx, name, dtype))
+            n, c, h, w = self.shape_dict[name]
+            if _input["support"]:   # 图像数据，工具内部处理
+                if data_path:   # 指定输入数据
+                    im = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE if pixel_format == "GRAY" else cv2.IMREAD_COLOR)
+                else:   # 未指定输入数据，生成随机图像
+                    logger.warning("input[{}] will use random image".format(name))
+                    im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
+                    if not force_random:  # 非强制随机，保存随机图片
+                        random_im_path = os.path.join(self.result_dir, "{}_{}_random.jpg".format(idx, name))
+                        cv2.imwrite(random_im_path, im)
+                        _input["data_path"] = random_im_path
+                if not _input["enable_aipp"] or force_cr:  # 兼容芯片orISS使能AIPP情况
+                    _input["padding_size"], _ = calc_padding_size(im, (w, h), _input["padding_mode"])
+                    in_datas[name] = default_preprocess(
+                        im,
+                        (w, h),
+                        mean=_input["mean"],
+                        std=_input["std"],
+                        use_norm=False if not force_float else True,  # 量化前relay_func需要norm
+                        use_rgb=True if pixel_format == "RGB" else False,
+                        use_resize=True,
+                        resize_type=_input["resize_type"],
+                        padding_value=_input["padding_value"],
+                        padding_mode=_input["padding_mode"]
+                    ).astype(dtype=dtype if not force_float else "float32")  # 量化前relay_func需要float输入，也可不强转由tvm自定转换
                 else:
-                    dtype = _input["dtype"]
-
-            data_npy_path = os.path.join(self.result_dir, "{}_{}_{}.npy".format(idx, _input["name"], dtype))
-            data_bin_path = os.path.join(self.result_dir, "{}_{}_{}.bin".format(idx, _input["name"], dtype))
-            data_txt_path = os.path.join(self.result_dir, "{}_{}_{}.txt".format(idx, _input["name"], dtype))
-            n, c, h, w = self.shape_dict[_input["name"]]
-            if data_path and not use_random:
-                if not os.path.exists(data_path):
-                    logger.error("Not found data_path -> {}".format(data_path))
-                    exit(-1)
-
-                if not _input["support"]:
-                    # not support will use custom preprocess
-                    in_datas[_input["name"]] = self.custom_preprocess_cls.get_single_data(data_path, idx)
-                    self._check_dtype(_input["name"], in_datas[_input["name"]], dtype)
-                else:
-                    _, ext = os.path.splitext(data_path)
-                    if ext == ".npy":   # 随机模式 tvm float 复用
-                        im = np.load(data_path).squeeze(axis=0).transpose(1, 2, 0)
+                    if pixel_format == "RGB":
+                        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)  # AIPP不支持BGR -> RGB，提前转换
+                    if len(im.shape) not in [2, 3]:
+                        logger.error("Not support image shape -> {}".format(im.shape))
+                        exit(-1)
+                    if len(im.shape) == 2:  # gray
+                        im = np.expand_dims(im, axis=2)
+                        im = np.expand_dims(im, axis=0)
                     else:
-                        # default preprocess，only image channel 1 or 3
-                        im = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE if _input["pixel_format"] == "GRAY" else cv2.IMREAD_COLOR)
-                    if (not _input["enable_aipp"]) or force_cr:
-                        _input["padding_size"], _ = calc_padding_size(im, (w, h), _input["padding_mode"])
-                        in_datas[_input["name"]] = default_preprocess(
-                            im,
-                            (w, h),
-                            mean=_input["mean"],
-                            std=_input["std"],
-                            use_norm=use_norm,
-                            use_rgb=True if _input["pixel_format"] == "RGB" else False,
-                            use_resize=True,
-                            resize_type=_input["resize_type"],
-                            padding_value=_input["padding_value"],
-                            padding_mode=_input["padding_mode"]
-                        ).astype(dtype=dtype)
-                    else:
-                        if _input["pixel_format"] == "RGB":
-                            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)  # AIPP不支持BGR->RGB，需提前转换
-
-                        if len(im.shape) not in [2, 3]:
-                            logger.error("Not support image shape -> {}".format(im.shape))
-                            exit(-1)
-                        if len(im.shape) == 2:  # gray
-                            im = np.expand_dims(im, axis=2)
-                            im = np.expand_dims(im, axis=0)
-                        else:
-                            im = np.expand_dims(im, axis=0)
-                        in_datas[_input["name"]] = im.transpose((0, 3, 1, 2))  # hwc -> chw, BGR888  uint8
-                        self._check_dtype(_input["name"], in_datas[_input["name"]], "uint8")
-            else:
-                # random data
-                logger.warning("Not set data_path, will use random data")
-
-                if not use_random and os.path.exists(data_npy_path):
-                    in_datas[_input["name"]] = np.load(data_npy_path)
-                    logger.info("load data -> {}".format(data_npy_path))
-                else:
-                    if _input["enable_aipp"] and not use_norm:
-                        in_datas[_input["name"]] = np.random.randint(low=0, high=255, size=(n, c, h, w), dtype=np.uint8)
-                        _input["data_path"] = data_npy_path  # 作为tvm float输入
+                        im = np.expand_dims(im, axis=0)
+                    in_datas[name] = im.transpose((0, 3, 1, 2))  # nhwc -> nchw, BGR888  uint8
+            else:  # 非图像数据，由自定义模块处理或随机生成
+                assert not _input["enable_aipp"], "non-image cannot enable AIPP"
+                if data_path:   # 指定输入数据
+                    if not self.has_custom_preprocess:
+                        logger.error("Not set custom preprocess")
+                        exit(-1)
+                    in_datas[name] = self.custom_preprocess_cls.get_single_data(data_path, idx)
+                    self.check_dtype(name, in_datas[name], dtype)
+                else:   # 未指定输入数据
+                    logger.warning("input[{}] will use random data".format(name))
+                    if not force_random and os.path.exists(data_npy_path):
+                        in_datas[name] = np.load(data_npy_path)
+                        logger.warning("load random data -> {}".format(data_npy_path))
                     else:
                         if dtype == "float32":
-                            in_datas[_input["name"]] = np.random.rand(n, c, h, w).astype(dtype=np.float32)
+                            in_datas[name] = np.random.rand(n, c, h, w).astype(dtype=dtype)   # 数值范围[0, 1)
                         elif dtype == "float16":
-                            in_datas[_input["name"]] = np.random.rand(n, c, h, w).astype(dtype=np.float16)
+                            in_datas[name] = np.random.rand(n, c, h, w).astype(dtype=dtype)   # 数值范围[0, 1)
                         elif dtype == "int16":
-                            in_datas[_input["name"]] = np.random.randint(low=-(2**15), high=2**15-1, size=(n, c, h, w), dtype=np.int16)
+                            in_datas[name] = np.random.randint(low=-(2**15), high=2**15-1, size=(n, c, h, w), dtype=dtype)
                         elif dtype == "uint8":
-                            in_datas[_input["name"]] = np.random.randint(low=0, high=255, size=(n, c, h, w), dtype=np.uint8)
-
-                _input["padding_size"] = None  #
-
+                            in_datas[name] = np.random.randint(low=0, high=255, size=(n, c, h, w), dtype=dtype)
             if to_file:
-                # save data
+                data = in_datas[name].copy()
+                np.save(data_npy_path, data)
+                data.tofile(data_bin_path)
+                data.tofile(data_txt_path, sep="\n")
                 logger.info("save data -> {}".format(data_npy_path))
-                np.save(data_npy_path, in_datas[_input["name"]])
-                in_datas[_input["name"]].tofile(data_bin_path)
-                in_datas[_input["name"]].tofile(data_txt_path, sep="\n")
-
         return in_datas
 
     def set_quantization_cfg(self, in_datas):
@@ -256,9 +266,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         in_dtypes, norm = dict(), dict()
         for idx, _input in enumerate(self.inputs):
             name = _input["name"]
-            data_type = "uint8"
             if in_datas[name].dtype == np.uint8:
-                pass
+                data_type = "uint8"
             elif in_datas[name].dtype == np.int16:
                 data_type = "int16"
             elif in_datas[name].dtype == np.float16:

@@ -28,14 +28,6 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         if self.enable_quant:
             quantize_config, norm = self.set_quantization_cfg(in_datas)
 
-            quant_data_dir = self.quant_cfg["data_dir"]
-            dataset = quant_data_dir
-            if not quant_data_dir:  # 未配置量化路径使用随机数据情况
-                dataset = self.gen_random_data
-            else:
-                if self.has_custom_preprocess:  # 配置量化数据目录情况下存在自定义预处理
-                    dataset = self.custom_preprocess_cls.get_data
-
             from tvm.relay.quantization import quantize
             logger.info("################   quantization start  ######################")
             # 保存路径设置
@@ -45,7 +37,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 model_name="opt_ir",
                 # 用户使用云天自带的预处理时，配置为输入量化profile(统计模型的层分布用来 calibrate 生成 scale)
                 # 的图片集路径，支持图片格式为 jpg，jpeg，png，bmp。也可配置为用户自定义的预处理。类型str/generator
-                dataset=dataset,
+                dataset=self.get_dataset(),
                 # 使用校准数据数量
                 prof_img_num=self.quant_cfg["prof_img_num"],
                 # 此配置仅在 dataset 配置为图片集路径（即使用云天自带的预处理），且输入为3通道时有效，对生成芯片模型无效
@@ -214,7 +206,6 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             logger.warning("disable build")
 
         # self.model_analysis()
-        self.get_profile_info()
         iss_fixed_outputs = self.iss_fixed_inference(in_datas, to_file=True)
         self.iss_dump_output(in_datas)
         return iss_fixed_outputs
@@ -264,15 +255,19 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 continue
             op_name = node["name"]
             debug_name = node["debug_name"]
-            op_name_map[op_name] = debug_name
+            op_name_map[debug_name] = op_name
 
         header = ["Id", "OpName", "DDR/Read", "DDR/Write", "MAC", "Cycles", "Span/ms"]
         table = PrettyTable(header)
         func_info = model_profile["func_info"]
-        for idx, op_name in enumerate(func_info):
+        for idx, debug_name in enumerate(op_name_map):
+            op_name = op_name_map[debug_name]
+            if op_name not in func_info:
+                logger.warning("op_name[{}] not in model_profile.json".format(op_name))
+                continue
             table.add_row([
                 idx,
-                op_name_map[op_name],
+                debug_name,
                 func_info[op_name]["ddr_read"],
                 func_info[op_name]["ddr_write"],
                 func_info[op_name]["mac"],
@@ -330,14 +325,13 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
 
         data_dir = self.quant_cfg["data_dir"]
         prof_img_num = self.quant_cfg["prof_img_num"]
-        data_lists = ["" for _ in range(prof_img_num)]
         if os.path.exists(data_dir):
             data_lists = os.listdir(data_dir)
-            if prof_img_num < len(data_lists):
+            if prof_img_num <= len(data_lists):
                 data_lists = data_lists[0:prof_img_num]
-            else:
-                prof_img_num = len(data_lists)
+            np.random.shuffle(data_lists)
         else:
+            data_lists = ["" for _ in range(prof_img_num)]
             logger.warning("Not set data_dir, will use random data")
 
         ret = []
@@ -350,7 +344,8 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 if ext not in [".JPEG", ".jpg", ".bmp", ".png", ".PNG", ".npy"]:
                     continue
                 filepath = os.path.join(data_dir, filename)
-            in_datas = self.get_datas(filepath=filepath, use_norm=False, force_cr=True, use_random=True, to_file=False)
+            # TODO 优化多输入不使用同一图片, 以及非图像数据输入目前随机生成
+            in_datas = self.get_datas(filepath=filepath, force_cr=True, force_random=True, to_file=False)
             outputs = self.tvm_inference(module, in_datas)
             for idx, output in enumerate(outputs):
                 feature_map_count += len(np.where(output.flatten() == 0)[0])
@@ -375,12 +370,13 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
     def infer(self):
         """ infer one time """
         from .nnp3xx_infer import Nnp3xxSdkInfer
-        in_datas = self.get_datas(use_norm=False, force_cr=False, to_file=False)
+        in_datas = self.get_datas(force_cr=False, to_file=False)
         infer = Nnp3xxSdkInfer(enable_dump=self.enable_dump, enable_aipp=True)
         infer.set_input_enable_aipps([_input["enable_aipp"] for _input in self.inputs])
         infer.set_input_pixel_format([_input["pixel_format"] for _input in self.inputs])
         infer.load(self.model_path)
         outputs = infer.run(in_datas, to_file=True)
+        logger.info("[{}] average cost: {:.3f}ms".format(self.target, infer.ave_latency_ms))
         return outputs, infer.backend
 
     def profile(self):
@@ -390,7 +386,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
             target=self.target,
         )
-        in_datas = self.get_datas(use_norm=False, force_cr=True, to_file=False)
+        in_datas = self.get_datas(force_cr=True, to_file=False)
         in_datas = [in_datas[key] for key in in_datas]
         profiler.load(self.model_path)
         profiler.run(in_datas)
