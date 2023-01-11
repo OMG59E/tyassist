@@ -116,6 +116,15 @@ class Nnp3xxSdkInfer(BaseInfer, ABC):
         """设置每个输入的像素格式，支持进行aipp推理"""
         self.input_pixel_formats = pixel_format
 
+    @property
+    def ave_latency_ms(self):
+        if self.enable_dump:
+            logger.warning("Not support dump inference time, while enable_dump")
+            return 0
+        if self.total == 0:
+            return 0
+        return self.time_span / self.total
+
     def run(self, in_datas: dict, to_file=False):
         if isinstance(in_datas, dict):
             in_datas = [in_datas[key] for key in in_datas]  # to list
