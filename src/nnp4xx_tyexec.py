@@ -116,7 +116,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
     def infer(self):
         from .nnp4xx_infer import Nnp4xxSdkInfer
-        in_datas = self.get_datas(use_norm=False, force_cr=True, to_file=False)
+        in_datas = self.get_datas(force_cr=True, to_file=False)
         infer = Nnp4xxSdkInfer(enable_dump=self.enable_dump, enable_aipp=True)
         infer.load(self.model_path)
         outputs = infer.run(in_datas, to_file=True)
