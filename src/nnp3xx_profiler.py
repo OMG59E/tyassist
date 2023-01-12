@@ -131,7 +131,7 @@ class Nnp3xxSdkProfiler(BaseSdkProfiler, abc.ABC):
 
         # TODO multi-iter
         from prettytable import PrettyTable
-        header = ["Id", "OpName", "Cycles", "Span/ms"]
+        header = ["Id", "OpName", "MAC.", "DDR/R", "DDR/W", "Cycles", "Span/ms"]
         table = PrettyTable(header)
         for n in range(0, len(model_drv_block_lines), 2):
             first = model_drv_block_lines[n].strip().split()
@@ -145,7 +145,10 @@ class Nnp3xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             num_ops = int(second[7])
             for idx in range(num_ops):
                 op_name = op_desc_lists[idx]["opName"]
+                mac_num = op_desc_lists[idx]["macNum"]
+                ddr_r = op_desc_lists[idx]["ddrRd"]
+                ddr_w = op_desc_lists[idx]["ddrWt"]
                 hw_cycles = int(second[9 + idx])
                 hw_span = hw_cycles * 2.0 * 10**-3 / 792
-                table.add_row([idx, op_name, hw_cycles, "{:.3f}".format(hw_span)])
+                table.add_row([idx, op_name, mac_num, ddr_r, ddr_w, hw_cycles, "{:.3f}".format(hw_span)])
         logger.info("\n{}".format(table))
