@@ -97,6 +97,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
     def build(self, in_datas):
         if self.enable_build:
             from tvm.contrib.edgex import compile_nnp_model
+            ARM_C_COMPILER = os.getenv("ARM_C_COMPILER")
             # compile edgex lib
             _ = compile_nnp_model(
                 self.relay_quant,
@@ -105,7 +106,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 export_lib_path=[self.model_path, self.model_path_aarch64],
                 opt_level=2,
                 target_host=["llvm -mtriple=x86_64", "llvm -mtriple=aarch64"],
-                target_host_cc=[None, "aarch64-none-linux-gnu-gcc"]
+                target_host_cc=[None, ARM_C_COMPILER]
             )
             logger.info("Executing model on edgex...")
         else:
