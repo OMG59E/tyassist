@@ -258,7 +258,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             debug_name = node["debug_name"]
             op_name_map[debug_name] = op_name
 
-        header = ["Id", "OpName", "DDR/Read", "DDR/Write", "MAC", "Cycles", "Span/ms"]
+        header = ["Id", "OpName", "MAC", "DDR/Read(GB/s)", "DDR/Write(GB/s)", "Cycles", "Span/ms"]
         table = PrettyTable(header)
         func_info = model_profile["func_info"]
         for idx, debug_name in enumerate(op_name_map):
@@ -266,14 +266,18 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             if op_name not in func_info:
                 logger.warning("op_name[{}] not in model_profile.json".format(op_name))
                 continue
+            cycles = func_info[op_name]["cost"]
+            cost = cycles * 2.0 * 10**-3 / self.targets[self.target]
+            ddr_read = int(func_info[op_name]["ddr_read"]) * 1000 / cost / 1024**3
+            ddr_write = int(func_info[op_name]["ddr_write"]) * 1000 / cost / 1024**3
             table.add_row([
                 idx,
                 debug_name,
-                func_info[op_name]["ddr_read"],
-                func_info[op_name]["ddr_write"],
                 func_info[op_name]["mac"],
-                func_info[op_name]["cost"],
-                "{:.3f}".format(func_info[op_name]["cost"] * 2.0 * 10**-3 / self.targets[self.target])
+                "{:.3f}".format(ddr_read),
+                "{:.3f}".format(ddr_write),
+                cycles,
+                "{:.3f}".format(cost)
             ])
         logger.info("model profile:\n{}".format(table))
 

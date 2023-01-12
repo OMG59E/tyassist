@@ -131,7 +131,7 @@ class Nnp3xxSdkProfiler(BaseSdkProfiler, abc.ABC):
 
         # TODO multi-iter
         from prettytable import PrettyTable
-        header = ["Id", "OpName", "MAC.", "DDR/R", "DDR/W", "Cycles", "Span/ms"]
+        header = ["Id", "OpName", "MAC.", "DDR/R(GB/s)", "DDR/W(GB/s)", "Cycles", "Span/ms"]
         table = PrettyTable(header)
         for n in range(0, len(model_drv_block_lines), 2):
             first = model_drv_block_lines[n].strip().split()
@@ -144,11 +144,12 @@ class Nnp3xxSdkProfiler(BaseSdkProfiler, abc.ABC):
                 iter_id, hw_cycles, hw_cycles * 2.0 * 10**-3 / self.targets[self.target], span * 10**-6))
             num_ops = int(second[7])
             for idx in range(num_ops):
+                hw_cycles = int(second[9 + idx])
+                hw_span = hw_cycles * 2.0 * 10**-3 / self.targets[self.target]
                 op_name = op_desc_lists[idx]["opName"]
                 mac_num = op_desc_lists[idx]["macNum"]
-                ddr_r = op_desc_lists[idx]["ddrRd"]
-                ddr_w = op_desc_lists[idx]["ddrWt"]
-                hw_cycles = int(second[9 + idx])
-                hw_span = hw_cycles * 2.0 * 10**-3 / 792
-                table.add_row([idx, op_name, mac_num, ddr_r, ddr_w, hw_cycles, "{:.3f}".format(hw_span)])
+                ddr_r = int(op_desc_lists[idx]["ddrRd"]) * 1000 / hw_span / 1024**3  # GB/s
+                ddr_w = int(op_desc_lists[idx]["ddrWt"]) * 1000 / hw_span / 1024**3  # GB/s
+                table.add_row([idx, op_name, mac_num, "{:.3f}".format(ddr_r), "{:.3f}".format(ddr_w),
+                               hw_cycles, "{:.3f}".format(hw_span)])
         logger.info("\n{}".format(table))
