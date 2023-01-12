@@ -68,6 +68,10 @@ build: {
   # 注意disable之前必须已编译生成模型
   enable_build: true,
 
+  # 是否限制每个融合的最大算子个数，缺省或留空表示false
+  # 该参数仅对300系列芯片生效
+  suppress_long_func: false,
+
   # 量化配置参数，仅在enable_quant为true生效
   quant: {
     # 量化输入数据路径, 留空表示使用随机数据(必须设置)

@@ -64,6 +64,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.shape_dict = dict()
         self.dtype_dict = dict()
 
+        self.set_suppress_long_func()  # 限制每个融合的最大算子个数
         self.set_model_name()
         self.set_input_infos()
         self.set_custom_preprocess()
@@ -79,6 +80,17 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             if self.has_custom_preprocess:  # 配置量化数据目录情况下存在自定义预处理
                 dataset = self.custom_preprocess_cls.get_data
         return dataset
+
+    def set_suppress_long_func(self):
+        if self.target.startswith("nnp4"):
+            logger.warning("Nnp4xx not support set_suppress_long_func")
+            return
+
+        if "suppress_long_func" not in self.cfg["build"]:
+            self.cfg["build"]["suppress_long_func"] = False
+        else:
+            if self.cfg["build"]["suppress_long_func"] is None:
+                self.cfg["build"]["suppress_long_func"] = False
 
     def set_model_name(self):
         if "name" in self.cfg["model"]:

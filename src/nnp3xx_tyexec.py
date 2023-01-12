@@ -182,8 +182,9 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         if self.enable_build:
             input_info = self._set_input_info_for_build()
 
-            # opt_cfg = dict()
-            # opt_cfg["SUPPRESS_LONG_FUNC"] = 1
+            opt_cfg = dict()
+            opt_cfg["SUPPRESS_LONG_FUNC"] = self.cfg["build"]["suppress_long_func"]
+            opt_cfg["FUNC_RUN_TIME_MAX"] = 0
 
             logger.info("################### build start ####################")
             import deepeye
