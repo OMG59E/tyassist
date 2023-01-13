@@ -17,7 +17,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         super(Nnp4xxTyExec, self).__init__(cfg)
 
     @staticmethod
-    def set_nnp4xx_env():
+    def set_env():
         import tvm
         dep_path = "{}/de-dcl/client/lib".format(tvm.__path__[0])
         ld_path = os.getenv("LD_LIBRARY_PATH")
@@ -25,6 +25,18 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         os.environ["LD_LIBRARY_PATH"] = ld_path
         os.environ["EDGEX_DEBUG_ISS"] = "on"
         os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
+
+        # TODO 目前Python设置环境变量不生效，rpath
+        # py_path = os.path.dirname(os.path.abspath(__file__))
+        # degnine_path = os.path.join(py_path, "../../tyhcp/client/x64-linux-gcc7.5/lib")
+        # degnine_path = "/DEngine/tyhcp/client/x64-linux-gcc7.5/lib"
+        # logger.error(degnine_path)
+        # ld_path = os.getenv("LD_LIBRARY_PATH")
+        # logger.error(ld_path)
+        # ld_path = degnine_path if ld_path is None else degnine_path + ":" + ld_path
+        # os.environ["LD_LIBRARY_PATH"] = ld_path
+        # logger.error(os.getenv("LD_LIBRARY_PATH"))
+        # os.system("export")
 
     def get_version(self):
         from tvm.contrib.edgex import get_version

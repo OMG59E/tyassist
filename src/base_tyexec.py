@@ -71,6 +71,10 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.model_path = os.path.join(self.model_dir, "{}.ty".format(self.model_name))
         self.model_path_aarch64 = os.path.join(self.model_dir, "{}_aarch64.ty".format(self.model_name))
 
+    @staticmethod
+    def set_env():
+        raise NotImplementedError
+
     def get_dataset(self):
         quant_data_dir = self.quant_cfg["data_dir"]
         dataset = quant_data_dir

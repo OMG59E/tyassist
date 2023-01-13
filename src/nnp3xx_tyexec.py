@@ -22,6 +22,10 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
     def __init__(self, cfg: dict):
         super(Nnp3xxTyExec, self).__init__(cfg)
 
+    @staticmethod
+    def set_env():
+        pass
+
     def quantization(self, in_datas):
         """量化，将浮点relay函数转为成定点relay函数
         """

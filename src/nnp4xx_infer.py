@@ -18,7 +18,7 @@ from .nnp3xx_infer import Nnp3xxTvmInfer
 class Nnp4xxSdkInfer(BaseInfer, ABC):
     def __init__(
             self,
-            sdk_cfg_file="/DEngine/tyhcp/simu/config/sdk.cfg",
+            sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
             enable_dump=0,
             enable_aipp=False
     ):
