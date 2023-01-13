@@ -437,6 +437,10 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         """get tytvm version"""
         raise NotImplementedError
 
+    def get_profile_info(self):
+        """get tvm profile info"""
+        raise NotImplementedError
+
     def x2relay(self):
         """caffe/onnx/tensorflow/pytorch/mxnet to relay func"""
         if self.framework == "caffe":

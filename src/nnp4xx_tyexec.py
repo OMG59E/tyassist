@@ -32,7 +32,10 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
     def onnx2relay(self):
         from tvm.contrib.edgex import load_model_from_file
-        kwargs = {"dtype": self.dtype_dict}
+        dtype_dict = dict()
+        for _, _input in enumerate(self.inputs):
+            dtype_dict[_input["name"]] = "float32"
+        kwargs = {"dtype": dtype_dict}
         self.relay, self.params = load_model_from_file(self.weight, self.framework, self.shape_dict, **kwargs)
 
     def quantization(self, in_datas):
@@ -97,16 +100,29 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
     def build(self, in_datas):
         if self.enable_build:
             from tvm.contrib.edgex import compile_nnp_model
+            # TODO support c920
+            export_lib_path = [self.model_path]
+            target_host = ["llvm -mtriple=x86_64"]
+            target_host_cc = [None]
             ARM_C_COMPILER = os.getenv("ARM_C_COMPILER")
+            if ARM_C_COMPILER is None:
+                logger.warning("Not found env {}".format(ARM_C_COMPILER))
+            elif not os.path.exists(ARM_C_COMPILER):
+                logger.warning("Not found {}".format(ARM_C_COMPILER))
+            else:
+                export_lib_path.append(self.model_path_aarch64)
+                target_host.append("llvm -mtriple=aarch64")
+                target_host_cc.append(ARM_C_COMPILER)
+
             # compile edgex lib
             _ = compile_nnp_model(
                 self.relay_quant,
                 self.params_quant,
                 working_dir=self.model_dir,
-                export_lib_path=[self.model_path, self.model_path_aarch64],
+                export_lib_path=export_lib_path,
                 opt_level=2,
-                target_host=["llvm -mtriple=x86_64", "llvm -mtriple=aarch64"],
-                target_host_cc=[None, ARM_C_COMPILER]
+                target_host=target_host,
+                target_host_cc=target_host_cc
             )
             logger.info("Executing model on edgex...")
         else:
@@ -181,6 +197,9 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
     def compress_analysis(self):
         logger.warning("Nnp4xx not support compress analysis")
+
+    def get_profile_info(self):
+        logger.warning("Nnp4xx not support profile")
 
     @staticmethod
     def save_relay_to_model(quant_model_path, relay_func, params):
