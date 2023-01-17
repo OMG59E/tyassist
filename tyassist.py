@@ -45,7 +45,6 @@ def get_tyexec(cfg):
         return Nnp3xxTyExec(cfg)
     elif target.startswith("nnp4"):
         tyexec = Nnp4xxTyExec(cfg)
-        tyexec.set_nnp4xx_env()
         return tyexec
     else:
         logger.error("Not support target -> {}".format(target))
@@ -56,7 +55,7 @@ def build(cfg):
     try:
         logger.info("{}".format(cfg))
         tyexec = get_tyexec(cfg)
-
+        tyexec.set_env()
         tyexec.get_version()
         tyexec.x2relay()  # model to relay_func
 
@@ -153,7 +152,6 @@ def test(cfg, dtype):
             exit(-1)
 
         tyexec = get_tyexec(cfg)
-
         if tyexec.num_inputs > 1:
             logger.error("Not support multi-input model")
             exit(-1)
@@ -163,7 +161,6 @@ def test(cfg, dtype):
         dataset_module = cfg["test"]["dataset_module"]
         dataset_cls = cfg["test"]["dataset_cls"]
 
-        dataset = None
         m = importlib.import_module(dataset_module)
         if hasattr(m, dataset_cls):
             # 实例化预处理对象
@@ -175,7 +172,6 @@ def test(cfg, dtype):
         model_impl_module = cfg["model"]["model_impl_module"]
         model_impl_cls = cfg["model"]["model_impl_cls"]
 
-        model = None
         m = importlib.import_module(model_impl_module)
         if hasattr(m, model_impl_cls):
             # 实例化预处理对象
@@ -217,7 +213,6 @@ def demo(cfg, dtype):
         logger.info(cfg)
 
         tyexec = get_tyexec(cfg)
-
         if tyexec.num_inputs > 1:
             logger.error("Not support multi-input model")
             exit(-1)
