@@ -1,0 +1,55 @@
+# config
+
+model: {
+  framework: "onnx",
+  save_dir: "./outputs",
+  weight: "./simplest_input2.onnx",
+  graph: "",
+  inputs: [
+    {
+      name: "input0",
+      shape: [ 1, 3, 32, 32 ],
+      layout: "NCHW",
+      pixel_format: "BGR",
+      mean: [ 127.5, 127.5, 127.5 ],
+      std: [ 127.5, 127.5, 127.5 ],
+      resize_type: 0,
+      padding_value: 128,
+      padding_mode: 0,
+      data_path: "",
+    },
+    {
+      name: "input1",
+      shape: [ 1, 3, 32, 32 ],
+      layout: "NCHW",
+      pixel_format: "RGB",
+      mean: [ 127.5, 127.5, 127.5 ],
+      std: [ 127.5, 127.5, 127.5 ],
+      resize_type: 0,
+      padding_value: 128,
+      padding_mode: 0,
+      data_path: "",
+    }
+  ],
+
+  outputs: [ ],
+}
+
+build: {
+  target: "nnp300",
+  enable_quant: true,
+  enable_build: true,
+  quant: {
+    data_dir: "",
+    prof_img_num: 50,
+    similarity_img_num: 1,
+    similarity_dataset: ,
+    custom_preprocess_module: "",
+    custom_preprocess_cls: "",
+    debug_level: 0,
+    calib_method: "kld",
+    skip_layer_idxes: [ ],
+    skip_layer_types: [ ],
+  },
+  enable_dump: 2
+}
