@@ -211,7 +211,9 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             logger.warning("disable build")
 
         # self.model_analysis()
+        logger.info("ISS inference start")
         iss_fixed_outputs = self.iss_fixed_inference(in_datas, to_file=True)
+        logger.info("ISS inference success")
         self.iss_dump_output(in_datas)
         return iss_fixed_outputs
 
@@ -272,8 +274,13 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 continue
             cycles = func_info[op_name]["cost"]
             cost = cycles * 2.0 * 10**-3 / self.targets[self.target]
-            ddr_read = int(func_info[op_name]["ddr_read"]) * 1000 / cost / 1024**3
-            ddr_write = int(func_info[op_name]["ddr_write"]) * 1000 / cost / 1024**3
+            ddr_read = 0
+            ddr_write = 0
+            if cost != 0:
+                ddr_read = int(func_info[op_name]["ddr_read"]) * 1000 / cost / 1024**3
+                ddr_write = int(func_info[op_name]["ddr_read"]) * 1000 / cost / 1024**3
+            else:
+                logger.warning("vu op[{}] not support dump cycle info".format(debug_name))
             table.add_row([
                 idx,
                 debug_name,
