@@ -80,7 +80,7 @@ class COCO2017Val(BaseDataset):
         return "coco_2017Val"
 
 
-class COCO2014Val(DatasetBase):
+class COCO2014Val(BaseDataset):
     """提供图片path和label
     """
     # TODO
