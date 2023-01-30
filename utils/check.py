@@ -4,7 +4,6 @@
 @File    : check.py
 @Time    : 2022/7/13 上午10:02
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import os
@@ -35,7 +34,7 @@ def check_config(cfg, phase="build"):
         return False
 
     framework = cfg["model"]["framework"]
-    framework_lists = ["caffe", "onnx", "pytorch", "mxnet", "tensorflow", "tflite"]
+    framework_lists = ["caffe", "onnx", "pytorch", "mxnet", "tensorflow", "tflite", "tflite-qnn"]
     if framework not in framework_lists:
         logger.error("framework({}) must be in {}".format(framework, framework_lists))
         return False
@@ -84,6 +83,10 @@ def check_config(cfg, phase="build"):
         logger.error("The key(quant) must be in cfg[build]")
         return False
 
+    if "data_dir" not in cfg["build"]["quant"]:
+        logger.error("The key(data_dir) must be in cfg[build][quant]")
+        return False
+
     if "prof_img_num" not in cfg["build"]["quant"]:
         logger.error("The key(prof_img_num) must be in cfg[build][quant]")
         return False
@@ -121,11 +124,28 @@ def check_config(cfg, phase="build"):
             logger.error("The model weight not exist -> {}".format(weight))
             return False
 
-    # 多输入必须定义预处理
+    # 多输入且不使用随机数据的情况下必须定义预处理
     input_lists = cfg["model"]["inputs"]
-    if len(input_lists) > 1 and not cfg["build"]["quant"]["custom_preprocess_cls"]:
-        logger.error("Multi-input must be setting custom_preprocess")
+
+    # 以下情况必须设置自定义预处理:
+    # 1.多输入指定量化数据目录，表示量化使用指定数据
+    custom_preprocess_cls = cfg["build"]["quant"]["custom_preprocess_cls"]
+    custom_preprocess_module = cfg["build"]["quant"]["custom_preprocess_module"]
+    quant_data_dir = cfg["build"]["quant"]["data_dir"]
+    if len(input_lists) > 1 and quant_data_dir and not custom_preprocess_cls:
+        logger.error("multi-input must be setting custom_preprocess")
         return False
+    # 2.某输入为非图像数据，且指定输入数据，表示推理仿真使用指定数据
+    for _input in input_lists:
+        if _input["pixel_format"] == "None" and _input["data_path"] and not custom_preprocess_cls:
+            logger.error("There is non-image data, while specifying the input data_path,"
+                         " custom preprocessing must be configured")
+            return False
+
+    if custom_preprocess_cls:
+        if not custom_preprocess_module:
+            logger.error("custom_preprocess_cls, must be setting custom_preprocess_module")
+            return False
 
     for _input in input_lists:
         layout = _input["layout"]
@@ -137,6 +157,13 @@ def check_config(cfg, phase="build"):
         if "shape" not in _input:
             logger.error("shape must be in cfg[model][inputs]")
             return False
+
+        if "dtype" in _input:
+            dtype = _input["dtype"]
+            dype_lists = ["uint8", "float32", "int16", "float16"]
+            if dtype not in dype_lists:
+                logger.error("dtype({}) must be in {}".format(dtype, dype_lists))
+                return False
 
         if "mean" not in _input:
             logger.error("mean must be in cfg[model][inputs]")
@@ -185,8 +212,13 @@ def check_config(cfg, phase="build"):
         std = _input["std"]
         if mean is None:
             mean = [0.0 for _ in range(c)]
+        else:
+            if len(mean) == 1:
+                mean = [mean[0] for _ in range(c)]
         if std is None:
             std = [1.0 for _ in range(c)]
+            if len(std) == 1:
+                std = [std[0] for _ in range(c)]
 
         if c != len(mean) or c != len(std) or len(mean) != len(std):
             logger.error("input channel must be equal len(mean/std)")
@@ -196,10 +228,6 @@ def check_config(cfg, phase="build"):
         pixel_format_lists = ["None", "RGB", "BGR", "GRAY"]
         if pixel_format not in pixel_format_lists:
             logger.error("pixel_format({}) must be in {}".format(pixel_format, pixel_format_lists))
-            return False
-
-        if _input["pixel_format"] == "None" and not cfg["build"]["quant"]["custom_preprocess_cls"]:
-            logger.error("Pixel format == None, must be setting custom_preprocess")
             return False
 
         padding_mode = _input["padding_mode"]
@@ -212,11 +240,6 @@ def check_config(cfg, phase="build"):
             if not os.path.exists(_input["data_path"]):
                 logger.error("data_path not exist -> {}".format(_input["data_path"]))
                 return False
-
-    # 预处理模块检查
-    if (not cfg["build"]["quant"]["custom_preprocess_module"]) != (not cfg["build"]["quant"]["custom_preprocess_cls"]):
-        logger.error("custom_preprocess_module and custom_preprocess_cls both must be set.")
-        return False
 
     # TODO
     # 检查是否缺少关键字

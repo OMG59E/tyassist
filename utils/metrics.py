@@ -4,7 +4,6 @@
 @File    : metrics.py
 @Time    : 2022/7/25 下午5:21
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import json

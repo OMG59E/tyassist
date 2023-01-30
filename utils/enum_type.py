@@ -4,7 +4,6 @@
 @File    : enum_type.py
 @Time    : 2022/7/14 上午10:54
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 from enum import Enum

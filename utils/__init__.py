@@ -4,7 +4,6 @@
 @File    : __init__.py.py
 @Time    : 2022/7/1 下午4:21
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import logging

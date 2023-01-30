@@ -4,7 +4,6 @@
 @File    : utils.py
 @Time    : 2022/7/12 下午2:17
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import socket

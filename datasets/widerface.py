@@ -3,18 +3,15 @@
 """ 
 @file: widerface.py 
 @time: 2022/08/10
-@contact: xing.weiguo@intellif.com
-@author: xingwg 
-@site: www.intellif.com
+@Author  : xingwg
 @software: PyCharm 
 """
 import os
-from scipy.io import loadmat
-from base.dataset_base import DatasetBase
+from base.base_dataset import BaseDataset
 from utils import logger
 
 
-class WiderFace(DatasetBase):
+class WiderFace(BaseDataset):
     def __init__(self, root_path, batch_size=1):
         self._root_path = root_path
         if not os.path.exists(self._root_path):

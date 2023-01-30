@@ -4,7 +4,6 @@
 @File    : preprocess.py
 @Time    : 2022/7/6 下午3:06
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import cv2

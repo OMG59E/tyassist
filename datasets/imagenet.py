@@ -4,15 +4,14 @@
 @File    : imagenet.py
 @Time    : 2022/7/15 下午4:32
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import os
 from utils import logger
-from base.dataset_base import DatasetBase
+from base.base_dataset import BaseDataset
 
 
-class ILSVRC2012(DatasetBase):
+class ILSVRC2012(BaseDataset):
     """
     ILSVRC2012 val
     """

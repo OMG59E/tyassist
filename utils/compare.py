@@ -4,7 +4,6 @@
 @File    : compare.py
 @Time    : 2022/7/13 下午3:12
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import os

@@ -21,16 +21,26 @@ model: {
   inputs: [
     {
       name: ,  # 输入名称
-      shape: , # 原模型的实际输入形状
-      layout: ,  # 输入数据布局，支持 NCHW，NHWC, 默认NCHW，可缺省
-      pixel_format: ,  # 像素格式，支持 None(未知), RGB，BGR，GRAY，设置为None时必须配置自定义处理模块
-      mean: [ 0.0, 0.0, 0.0 ],   # 输入均值，不配置，默认为0，可缺省，支持broadcast，存在自定义预处理情况下，无须在自定义模块内进行norm
-      std: [ 1.0, 1.0, 1.0 ],   # 输入方差，不配置，默认为1，可缺省，支持broadcast，存在自定义预处理情况下，无须在自定义模块内进行norm
+      shape: , # 原模型输入形状
+      layout: ,  # 输入数据布局，支持 NCHW，NHWC, 默认NCHW；可缺省；暂不支持其它布局
+      # 输入数据像素格式，支持 None(未知), RGB，BGR，GRAY，设置为None时且不使用随机数据的情况下必须配置自定义处理模块
+      # None表示非图片数据，RGB/BGR/GRAY表示图片数据
+      pixel_format: ,
+      # 模型原始输入数据类型(预处理之前)，支持数据类型uint8, float32, int16, float16
+      # 可缺省, 缺省情况下，若输入为图片数据则为uint8, 否则为float32
+      dtype: "",
+      mean: [ 0.0, 0.0, 0.0 ],   # 输入均值，留空表示为0，也可缺省，支持broadcast
+      std: [ 1.0, 1.0, 1.0 ],   # 输入方差，留空表示为1，也可缺省，支持broadcast
       resize_type: 0,   # resize类型，0-长宽分别resize，1-长边等比例resize
       padding_value: 128,  # resize图像不足部分将自动padding，仅等比例resize生效
       padding_mode: 0,  # 目前仅支持 0: 左上角(LEFT_TOP), 1: 中心点(CENTER)，仅等比例resize生效
       data_path: ,  # 用于比较各阶段输出的相似度，空表示采用随机数，默认随机数，可缺省
-      enable_aipp: true, # 是否使能aipp，内置输入预处理，效率更高，默认true，可缺省，注意自定义的情况下不能使能
+      # 表示是否使能aipp，内置输入预处理，效率更高, 建议缺省或留空
+      # 可缺省或留空，默认为true，true的情况下工具推断能否使能
+      # 以下两种情况true无效
+      # 1.非图像数据即pixel_format为None时，强制为false
+      # 2.非uint8图像时，强制为false
+      enable_aipp: true,
     }
   ],
 
@@ -58,9 +68,13 @@ build: {
   # 注意disable之前必须已编译生成模型
   enable_build: true,
 
+  # 是否限制每个融合的最大算子个数，缺省或留空表示false
+  # 该参数仅对300系列芯片生效
+  suppress_long_func: false,
+
   # 量化配置参数，仅在enable_quant为true生效
   quant: {
-    # 量化输入数据路径(必须设置)
+    # 量化输入数据路径, 留空表示使用随机数据(必须设置)
     data_dir: "/DEngine/tyexamples/data/datasets/ILSVRC2012/ILSVRC2012_img_val",
 
     # 量化使用的数据数量，0表示使用所有数据
@@ -75,8 +89,10 @@ build: {
     # 具体配置参照dataset，可定义为图片集路径，或用户自定义的预处理。
     similarity_dataset: ,
 
-    # 用户自定义量化函数，若不配置此项，则使用默认前处理，多输入或非1,3通道数据必须配置
-    # 必须与yml配置文件同级目录
+    # 用户自定义量化函数，若不配置此项，则使用默认前处理，必须与yml配置文件同级目录
+    # 以下情况必须设置自定义预处理:
+    # 1.多输入指定量化数据目录，表示量化使用指定数据
+    # 2.某输入为非图像数据，且指定输入数据，表示推理仿真使用指定数据
     custom_preprocess_module: ,
     custom_preprocess_cls: ,
 

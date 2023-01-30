@@ -4,13 +4,12 @@
 @File    : dataset_base.py
 @Time    : 2022/7/15 下午4:15
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import abc
 
 
-class DatasetBase(object, metaclass=abc.ABCMeta):
+class BaseDataset(object, metaclass=abc.ABCMeta):
     """提供图片path和label
     """
     @abc.abstractmethod

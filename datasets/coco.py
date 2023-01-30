@@ -4,15 +4,14 @@
 @File    : coco.py
 @Time    : 2022/7/25 下午7:35
 @Author  : xingwg
-@Email   : xing.weiguo@intellif.com
 @Software: PyCharm
 """
 import os
-from base.dataset_base import DatasetBase
+from base.base_dataset import BaseDataset
 from utils import logger
 
 
-class COCO2017Val(DatasetBase):
+class COCO2017Val(BaseDataset):
     """提供图片path和label
     """
     def __init__(self, root_path, batch_size=1):
@@ -81,7 +80,7 @@ class COCO2017Val(DatasetBase):
         return "coco_2017Val"
 
 
-class COCO2014Val(DatasetBase):
+class COCO2014Val(BaseDataset):
     """提供图片path和label
     """
     # TODO

@@ -1,38 +1,38 @@
 # config
 
 model: {
-  framework: "caffe",
+  framework: "onnx",
   save_dir: "./outputs",
-  weight: "../../models/caffe/caffe_centernet_dla34/invasion_dla34.caffemodel",
-  graph: "../../models/caffe/caffe_centernet_dla34/caffe_centernet_dla34_part2.prototxt",
+  weight: "./simplest_input2.onnx",
+  graph: "",
   inputs: [
     {
-      name: "cat_blob11_input",
-      shape: [ 1, 128, 128, 128 ],
+      name: "input0",
+      shape: [ 1, 3, 32, 32 ],
       layout: "NCHW",
-      pixel_format: "None",
-      mean: ,
-      std: ,
+      pixel_format: "BGR",
+      mean: [ 127.5, 127.5, 127.5 ],
+      std: [ 127.5, 127.5, 127.5 ],
       resize_type: 0,
       padding_value: 128,
       padding_mode: 0,
-      data_path: ,
+      data_path: "",
     },
     {
-      name: "relu_blob47_input",
-      shape: [ 1, 64, 64, 64 ],
+      name: "input1",
+      shape: [ 1, 3, 32, 32 ],
       layout: "NCHW",
-      pixel_format: "None",
-      mean: ,
-      std: ,
+      pixel_format: "RGB",
+      mean: [ 127.5, 127.5, 127.5 ],
+      std: [ 127.5, 127.5, 127.5 ],
       resize_type: 0,
       padding_value: 128,
       padding_mode: 0,
-      data_path: ,
+      data_path: "",
     }
   ],
 
-  outputs: [],
+  outputs: [ ],
 }
 
 build: {
@@ -51,5 +51,5 @@ build: {
     skip_layer_idxes: [ ],
     skip_layer_types: [ ],
   },
-  enable_dump: 1
+  enable_dump: 2
 }

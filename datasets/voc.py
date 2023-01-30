@@ -3,19 +3,17 @@
 """ 
 @file: voc.py 
 @time: 2022/08/03
-@contact: xing.weiguo@intellif.com
-@author: xingwg 
-@site: www.intellif.com
+@Author  : xingwg
 @software: PyCharm 
 """
 import os
 import json
 import xml.etree.ElementTree as ET
 from utils import logger
-from base.dataset_base import DatasetBase
+from base.base_dataset import BaseDataset
 
 
-class VOC2007(DatasetBase):
+class VOC2007(BaseDataset):
     def __init__(self, root_path, batch_size=1):
         self._dataset_name = "voc2007"
         self._root_path = root_path
