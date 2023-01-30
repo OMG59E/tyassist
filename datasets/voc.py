@@ -13,7 +13,7 @@ from utils import logger
 from base.base_dataset import BaseDataset
 
 
-class VOC2007(DatasetBase):
+class VOC2007(BaseDataset):
     def __init__(self, root_path, batch_size=1):
         self._dataset_name = "voc2007"
         self._root_path = root_path
