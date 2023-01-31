@@ -17,6 +17,9 @@ class BaseInfer(object, metaclass=abc.ABCMeta):
         self.target = "nnp300"  # nnp300 310 320 3020 400
         self.backend = "chip"  # chip/sdk_iss/tvm
 
+    def load_json(self, model_path):
+        raise NotImplementedError
+
     @abc.abstractmethod
     def load(self, model_path):
         raise NotImplementedError

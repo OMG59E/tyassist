@@ -51,11 +51,18 @@ class BaseModel(object, metaclass=abc.ABCMeta):
             exit(-1)
 
     def load(self, model_path):
-        """加载模型
+        """加载so模型
         :param model_path: 模型目录
         :return:
         """
         self.infer.load(model_path)
+
+    def load_json(self, model_path):
+        """加载json模型
+        :param model_path: 模型目录
+        :return:
+        """
+        self.infer.load_json(model_path)
 
     @abc.abstractmethod
     def _preprocess(self, cv_image):

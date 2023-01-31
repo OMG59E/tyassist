@@ -190,9 +190,9 @@ def test(cfg, dtype):
         if dtype == "int8":
             model.load(tyexec.model_path)
         elif dtype == "tvm-fp32":
-            model.load(tyexec.original_json_path)
+            model.load_json(tyexec.original_json_path)
         elif dtype == "tvm-int8":
-            model.load(tyexec.quant_json_path)
+            model.load_json(tyexec.quant_json_path)
 
         res = model.evaluate()
         del sys.modules[dataset_module]
@@ -247,9 +247,9 @@ def demo(cfg, dtype):
         if dtype == "int8":
             model.load(tyexec.model_path)
         elif dtype == "tvm-fp32":
-            model.load(tyexec.original_json_path)
+            model.load_json(tyexec.original_json_path)
         elif dtype == "tvm-int8":
-            model.load(tyexec.quant_json_path)
+            model.load_json(tyexec.quant_json_path)
 
         for filename in file_list:
             _, ext = os.path.splitext(filename)
