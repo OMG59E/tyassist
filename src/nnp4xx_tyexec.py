@@ -106,7 +106,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         if self.enable_build:
             from tvm.contrib.edgex import compile_nnp_model
             # TODO support c920
-            export_lib_path = [self.model_path]
+            export_lib_path = [self.model_path_x86_64]
             target_host = ["llvm -mtriple=x86_64"]
             target_host_cc = [None]
             ARM_C_COMPILER = os.getenv("ARM_C_COMPILER")

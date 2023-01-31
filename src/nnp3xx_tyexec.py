@@ -390,7 +390,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         infer = Nnp3xxSdkInfer(enable_dump=self.enable_dump, enable_aipp=True)
         infer.set_input_enable_aipps([_input["enable_aipp"] for _input in self.inputs])
         infer.set_input_pixel_format([_input["pixel_format"] for _input in self.inputs])
-        infer.load(self.model_path)
+        infer.load(self.model_path_x86_64)
         outputs = infer.run(in_datas, to_file=True)
         logger.info("[{}] average cost: {:.3f}ms".format(self.target, infer.ave_latency_ms))
         return outputs, infer.backend
@@ -404,7 +404,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         )
         in_datas = self.get_datas(force_cr=True, to_file=False)
         in_datas = [in_datas[key] for key in in_datas]
-        profiler.load(self.model_path)
+        profiler.load(self.model_path_x86_64)
         profiler.run(in_datas)
         profiler.unload()
         profiler.save_profile()

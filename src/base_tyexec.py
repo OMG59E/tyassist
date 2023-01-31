@@ -68,7 +68,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.set_model_name()
         self.set_input_infos()
         self.set_custom_preprocess()
-        self.model_path = os.path.join(self.model_dir, "{}.ty".format(self.model_name))
+        self.model_path_x86_64 = os.path.join(self.model_dir, "{}_x86_64.ty".format(self.model_name))
         self.model_path_aarch64 = os.path.join(self.model_dir, "{}_aarch64.ty".format(self.model_name))
 
     @staticmethod

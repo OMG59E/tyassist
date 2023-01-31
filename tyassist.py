@@ -188,7 +188,7 @@ def test(cfg, dtype):
             exit(-1)
 
         if dtype == "int8":
-            model.load(tyexec.model_path)
+            model.load(tyexec.model_path_x86_64)
         elif dtype == "tvm-fp32":
             model.load_json(tyexec.original_json_path)
         elif dtype == "tvm-int8":
@@ -245,7 +245,7 @@ def demo(cfg, dtype):
             exit(-1)
 
         if dtype == "int8":
-            model.load(tyexec.model_path)
+            model.load(tyexec.model_path_x86_64)
         elif dtype == "tvm-fp32":
             model.load_json(tyexec.original_json_path)
         elif dtype == "tvm-int8":
