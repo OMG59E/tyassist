@@ -16,6 +16,9 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
     def __init__(self, cfg: dict):
         super(Nnp4xxTyExec, self).__init__(cfg)
 
+        self.model_path_x86_64 = os.path.join(self.model_dir, "{}_x86_64.ty".format(self.model_name))
+        self.model_path_aarch64 = os.path.join(self.model_dir, "{}_aarch64.ty".format(self.model_name))
+
         # py_path = os.path.dirname(os.path.abspath(__file__))
         # client_lib_path = os.path.join(py_path, "../../tyhcp/client/x64-linux-gcc7.5/lib")
         # sdk_lib = os.path.join(py_path, "../python/_sdk.cpython-38-x86_64-linux-gnu.so")
@@ -140,10 +143,12 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         from .nnp4xx_infer import Nnp4xxSdkInfer
         in_datas = self.get_datas(force_cr=True, to_file=False)
         infer = Nnp4xxSdkInfer(enable_dump=self.enable_dump, enable_aipp=True)
-        infer.load(self.model_path_aarch64)
+        infer.backend = self.backend
+        model_path = self.model_path_x86_64 if infer.backend == "sdk_iss" else self.model_path_aarch64
+        infer.load(model_path)
         outputs = infer.run(in_datas, to_file=True)
         infer.unload()
-        return outputs, infer.backend
+        return outputs
 
     def profile(self):
         """"""

@@ -32,7 +32,7 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
         self.dump_root_path = ""
         self.result_dir = ""
 
-        self.backend = "sdk_iss"
+        # self.backend = "chip"
 
     def load(self, model_path):
         self.result_dir = os.path.join(os.path.dirname(model_path), "result")
