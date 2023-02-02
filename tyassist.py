@@ -375,8 +375,8 @@ if __name__ == "__main__":
                         help="Please specify a chip target")
     parser.add_argument("--dtype", "-t", type=str, default="int8", choices=("int8", "fp32"),
                         help="Please specify one of them")
-    parser.add_argument("--backend", type=str, required="build" not in sys.argv, choices=("chip", "iss", "tvm"),
-                        help="Please specify one of them")
+    parser.add_argument("--backend", type=str, required=("demo" in sys.argv or "test" in sys.argv or "compare" in sys.argv),
+                        choices=("chip", "iss", "tvm"), help="Please specify one of them")
     parser.add_argument("--log_dir", type=str, default="./logs",
                         help="Please specify a log dir, default ./logs")
 
