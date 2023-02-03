@@ -112,5 +112,5 @@ class Detector(Classifier):
         for det in detections:
             (x1, y1, x2, y2), conf, cls = list(map(int, det[0:4])), det[4], int(det[5])
             cv2.rectangle(cv_image, (x1, y1), (x2, y2), (0, 0, 255), 2, 8)
-            cv2.imwrite(os.path.join(save_results, filename), cv_image)
             logger.info("x1:{}, y1:{}, x2:{}, y2:{}, conf:{:.6f}, cls:{}".format(x1, y1, x2, y2, conf, int(cls)))
+        cv2.imwrite(os.path.join(save_results, filename), cv_image)
