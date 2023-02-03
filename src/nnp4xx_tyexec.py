@@ -174,14 +174,13 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
     def iss_fixed_inference(self, in_datas, to_file=False):
         """x86_64 iss"""
-        model_path = "{}/{}.ty".format(self.model_dir, self.model_name)
-        if not os.path.exists(model_path):
-            logger.error("Not found model path -> {}".format(model_path))
+        if not os.path.exists(self.model_path_x86_64):
+            logger.error("Not found model path -> {}".format(self.model_path_x86_64))
             exit(-1)
         import tvm
         from tvm.contrib import graph_executor
         logger.info("Executing model on edgex...")
-        lib = tvm.runtime.load_module(model_path)
+        lib = tvm.runtime.load_module(self.model_path_x86_64)
         module = graph_executor.GraphModule(lib["default"](tvm.edgex(), tvm.cpu()))
         iss_fixed_outputs = self.tvm_inference(module, in_datas)
         if to_file and len(iss_fixed_outputs) > 0:
