@@ -22,6 +22,8 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
     def __init__(self, cfg: dict):
         super(Nnp3xxTyExec, self).__init__(cfg)
 
+        self.model_path = os.path.join(self.model_dir, "{}.ty".format(self.model_name))
+
     @staticmethod
     def set_env():
         pass
@@ -388,12 +390,14 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         from .nnp3xx_infer import Nnp3xxSdkInfer
         in_datas = self.get_datas(force_cr=False, to_file=False)
         infer = Nnp3xxSdkInfer(enable_dump=self.enable_dump, enable_aipp=True)
+        infer.backend = self.backend
         infer.set_input_enable_aipps([_input["enable_aipp"] for _input in self.inputs])
         infer.set_input_pixel_format([_input["pixel_format"] for _input in self.inputs])
         infer.load(self.model_path)
         outputs = infer.run(in_datas, to_file=True)
-        logger.info("[{}] average cost: {:.3f}ms".format(self.target, infer.ave_latency_ms))
-        return outputs, infer.backend
+        ave_latency_ms = infer.ave_latency_ms
+        logger.info("[{}] average cost: {:.3f}ms".format(self.target, ave_latency_ms))
+        return outputs
 
     def profile(self):
         from .nnp3xx_profiler import Nnp3xxSdkProfiler

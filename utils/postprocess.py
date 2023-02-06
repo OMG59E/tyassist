@@ -10,7 +10,54 @@ import time
 import numpy as np
 import torch
 import torchvision
+import torch.nn.functional as F
+
 from utils import logger
+
+
+def crop_mask(masks, boxes):
+    """
+    "Crop" predicted masks by zeroing out everything not in the predicted bbox.
+    Vectorized by Chong (thanks Chong).
+
+    Args:
+        - masks should be a size [h, w, n] tensor of masks
+        - boxes should be a size [n, 4] tensor of bbox coords in relative point form
+    """
+
+    n, h, w = masks.shape
+    x1, y1, x2, y2 = torch.chunk(boxes[:, :, None], 4, 1)  # x1 shape(1,1,n)
+    r = torch.arange(w, device=masks.device, dtype=x1.dtype)[None, None, :]  # rows shape(1,w,1)
+    c = torch.arange(h, device=masks.device, dtype=x1.dtype)[None, :, None]  # cols shape(h,1,1)
+
+    return masks * ((r >= x1) * (r < x2) * (c >= y1) * (c < y2))
+
+
+def process_mask(protos, masks_in, bboxes, shape, upsample=False):
+    """
+    Crop before upsample.
+    proto_out: [mask_dim, mask_h, mask_w]
+    out_masks: [n, mask_dim], n is number of masks after nms
+    bboxes: [n, 4], n is number of masks after nms
+    shape:input_image_size, (h, w)
+
+    return: h, w, n
+    """
+
+    c, mh, mw = protos.shape  # CHW
+    ih, iw = shape
+    masks = (masks_in @ protos.float().view(c, -1)).sigmoid().view(-1, mh, mw)  # CHW
+
+    downsampled_bboxes = bboxes.clone()
+    downsampled_bboxes[:, 0] *= mw / iw
+    downsampled_bboxes[:, 2] *= mw / iw
+    downsampled_bboxes[:, 3] *= mh / ih
+    downsampled_bboxes[:, 1] *= mh / ih
+
+    masks = crop_mask(masks, downsampled_bboxes)  # CHW
+    if upsample:
+        masks = F.interpolate(masks[None], shape, mode='bilinear', align_corners=False)[0]  # CHW
+    return masks.gt_(0.5)
 
 
 def softmax(x, axis=1):
@@ -125,14 +172,15 @@ def non_max_suppression(
         agnostic=False,
         multi_label=False,
         labels=(),
-        max_det=1000
+        max_det=300,
+        nm=0,  # number of masks
 ):
     """Non-Maximum Suppression (NMS) on inference results to reject overlapping bounding boxes
     Returns:
          list of detections, on (n,6) tensor per image [xyxy, conf, cls]
     """
     bs = prediction.shape[0]  # batch size
-    nc = prediction.shape[2] - 5  # number of classes
+    nc = prediction.shape[2] - nm - 5  # number of classes
     xc = prediction[..., 4] > conf_thres  # candidates
 
     # Checks
@@ -143,18 +191,18 @@ def non_max_suppression(
     # min_wh = 2  # (pixels) minimum box width and height
     max_wh = 7680  # (pixels) maximum box width and height
     max_nms = 30000  # maximum number of boxes into torchvision.ops.nms()
-    time_limit = 0.3 + 0.03 * bs  # seconds to quit after
+    time_limit = 0.5 + 0.05 * bs  # seconds to quit after
     redundant = True  # require redundant detections
     multi_label &= nc > 1  # multiple labels per box (adds 0.5ms/img)
     merge = False  # use merge-NMS
 
     t = time.time()
-    output = [torch.zeros((0, 6), device=prediction.device)] * bs
+    mi = 5 + nc  # mask start index
+    output = [torch.zeros((0, 6 + nm), device=prediction.device)] * bs
     for xi, x in enumerate(prediction):  # image index, image inference
         # Apply constraints
         # x[((x[..., 2:4] < min_wh) | (x[..., 2:4] > max_wh)).any(1), 4] = 0  # width-height
         x = x[xc[xi]]  # confidence
-
         # Cat apriori labels if autolabelling
         if labels and len(labels[xi]):
             lb = labels[xi]
@@ -173,14 +221,15 @@ def non_max_suppression(
 
         # Box (center x, center y, width, height) to (x1, y1, x2, y2)
         box = xywh2xyxy(x[:, :4])
+        mask = x[:, mi:]  # zero columns if no masks
 
         # Detections matrix nx6 (xyxy, conf, cls)
         if multi_label:
-            i, j = (x[:, 5:] > conf_thres).nonzero(as_tuple=False).T
-            x = torch.cat((box[i], x[i, j + 5, None], j[:, None].float()), 1)
+            i, j = (x[:, 5:mi] > conf_thres).nonzero(as_tuple=False).T
+            x = torch.cat((box[i], x[i, j + 5, None], j[:, None].float(), mask[i]), dim=1)
         else:  # best class only
-            conf, j = x[:, 5:].max(1, keepdim=True)
-            x = torch.cat((box, conf, j.float()), 1)[conf.view(-1) > conf_thres]
+            conf, j = x[:, 5:mi].max(1, keepdim=True)
+            x = torch.cat((box, conf, j.float(), mask), dim=1)[conf.view(-1) > conf_thres]
 
         # Filter by class
         if classes is not None:
@@ -190,15 +239,14 @@ def non_max_suppression(
         n = x.shape[0]  # number of boxes
         if not n:  # no boxes
             continue
-        elif n > max_nms:  # excess boxes
-            x = x[x[:, 4].argsort(descending=True)[:max_nms]]  # sort by confidence
+
+        x = x[x[:, 4].argsort(descending=True)[:max_nms]]  # sort by confidence
 
         # Batched NMS
         c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
         boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
         i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
-        if i.shape[0] > max_det:  # limit detections
-            i = i[:max_det]
+        i = i[:max_det]
         if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
             # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
             iou = box_iou(boxes[i], boxes) > iou_thres  # iou matrix

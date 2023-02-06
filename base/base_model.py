@@ -24,38 +24,48 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         self.infer = None
         self.target = kwargs["target"]
         self.dtype = kwargs["dtype"]
+        self.backend = kwargs["backend"]
 
-        self.use_norm = True if self.dtype == "tvm-fp32" else False
+        self.use_norm = True if self.dtype == "fp32" else False
 
         self.total = 0
         self.time_span = 0
 
         if self.target.startswith("nnp3"):
-            if self.dtype == "int8":
-                self.infer = Nnp3xxSdkInfer(enable_dump=0, enable_aipp=self.enable_aipp)
-                self.infer.set_input_enable_aipps([_input["support"] for _input in self.inputs])
-                self.infer.set_input_pixel_format([_input["pixel_format"] for _input in self.inputs])
-            else:
+            if self.backend == "tvm":
                 self.infer = Nnp3xxTvmInfer()
                 self.infer.set_input_names([_input["name"] for _input in self.inputs])
                 self.enable_aipp = False
-        elif self.target.startswith("nnp4"):
-            if self.dtype == "int8":
-                self.infer = Nnp4xxSdkInfer(enable_dump=0, enable_aipp=self.enable_aipp)
             else:
+                self.infer = Nnp3xxSdkInfer(enable_dump=0, enable_aipp=self.enable_aipp)
+                self.infer.set_input_enable_aipps([_input["support"] for _input in self.inputs])
+                self.infer.set_input_pixel_format([_input["pixel_format"] for _input in self.inputs])
+        elif self.target.startswith("nnp4"):
+            if self.backend == "tvm":
                 self.infer = Nnp4xxTvmInfer()
                 self.infer.set_input_names([_input["name"] for _input in self.inputs])
                 self.enable_aipp = False
+            else:
+                self.infer = Nnp4xxSdkInfer(enable_dump=0, enable_aipp=self.enable_aipp)
         else:
             logger.error("Not support target -> {}".format(self.target))
             exit(-1)
 
+        self.infer.backend = self.backend
+
     def load(self, model_path):
-        """加载模型
+        """加载so模型
         :param model_path: 模型目录
         :return:
         """
         self.infer.load(model_path)
+
+    def load_json(self, model_path):
+        """加载json模型
+        :param model_path: 模型目录
+        :return:
+        """
+        self.infer.load_json(model_path)
 
     @abc.abstractmethod
     def _preprocess(self, cv_image):

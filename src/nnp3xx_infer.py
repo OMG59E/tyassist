@@ -226,13 +226,16 @@ class Nnp3xxTvmInfer(BaseInfer, ABC):
         self.backend = "tvm"
         self.input_names = list()
 
-    def load(self, model_path):
+    def load_json(self, model_path):
         import tvm
         from tvm import relay
         logger.info("loading model -> {}".format(model_path))
         relay_func = tvm.relay.quantization.get_ir_from_json(model_path)
         self.engine = Nnp3xxTyExec.build_x86_64(relay_func, {})
         logger.info("load success")
+
+    def load(self, model_path):
+        raise NotImplementedError
 
     def set_input_names(self, input_names: list):
         self.input_names = input_names

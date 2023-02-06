@@ -99,11 +99,15 @@ def build(cfg):
         logger.error("TyAssist failed to build -> {}".format(e))
 
 
-def compare(cfg):
+def compare(cfg, backend):
     try:
+        if backend not in ["sdk_iss", "chip"]:
+            logger.error("Compare phase only support iss and chip")
+            exit(-1)
         logger.info("{}".format(cfg))
         tyexec = get_tyexec(cfg)
-        fixed_outputs, backend = tyexec.infer()
+        tyexec.backend = backend
+        fixed_outputs = tyexec.infer()
 
         # compare
         for idx, fixed_output in enumerate(fixed_outputs):
@@ -119,8 +123,8 @@ def compare(cfg):
             tvm_float_out = np.fromfile(tvm_float_out_path, dtype=fixed_output.dtype)
             dist0 = cosine_distance(fixed_output, tvm_fixed_out)
             dist1 = cosine_distance(fixed_output, tvm_float_out)
-            logger.info("[Compare] fixed({}) vs fixed(tvm) output tensor[{}] similarity={:.6f}".format(backend, idx, dist0))
-            logger.info("[Compare] fixed({}) vs float(tvm) output tensor[{}] similarity={:.6f}".format(backend, idx, dist1))
+            logger.info("[Compare] fixed({}) vs fixed(tvm) output tensor[{}] similarity={:.6f}".format(tyexec.backend, idx, dist0))
+            logger.info("[Compare] fixed({}) vs float(tvm) output tensor[{}] similarity={:.6f}".format(tyexec.backend, idx, dist1))
             if tyexec.enable_dump:
                 iss_fixed_out_path = os.path.join(tyexec.result_dir, "iss_fixed_out_{}.bin".format(idx))
                 if not os.path.exists(iss_fixed_out_path):
@@ -128,7 +132,7 @@ def compare(cfg):
                     exit(-1)
                 iss_fixed_out = np.fromfile(iss_fixed_out_path, dtype=fixed_output.dtype)
                 dist2 = cosine_distance(fixed_output, iss_fixed_out)
-                logger.info("[Compare] fixed({}) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(backend, idx, dist2))
+                logger.info("[Compare] fixed({}) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(tyexec.backend, idx, dist2))
         logger.info("success")
     except Exception as e:
         logger.error("TyAssist failed to compare -> {}".format(e))
@@ -144,7 +148,7 @@ def profile(cfg):
         logger.error("TyAssist failed to profile -> {}".format(e))
 
 
-def test(cfg, dtype):
+def test(cfg, dtype, backend):
     try:
         logging.getLogger("deepeye").setLevel(logging.WARNING)
 
@@ -180,19 +184,28 @@ def test(cfg, dtype):
                 dataset=dataset,
                 test_num=test_num,
                 enable_aipp=True,
-                target=tyexec.target,
-                dtype=dtype,   # int8/tvm-fp32/tvm-int8
+                target=tyexec.target,  # nnp3xx/nnp4xx
+                dtype=dtype,   # int8/fp32
+                backend=backend  # tvm/iss/chip
             )
         else:
             logger.error("{}.py has no class named {}".format(model_impl_module, model_impl_cls))
             exit(-1)
 
-        if dtype == "int8":
-            model.load(tyexec.model_path)
-        elif dtype == "tvm-fp32":
-            model.load(tyexec.original_json_path)
-        elif dtype == "tvm-int8":
-            model.load(tyexec.quant_json_path)
+        if backend == "tvm":
+            if dtype == "fp32":
+                model.load_json(tyexec.original_json_path)
+            elif dtype == "int8":
+                model.load_json(tyexec.quant_json_path)
+        else:  # chip/iss
+            if tyexec.target.startswith("nnp4"):
+                model_path = tyexec.model_path_x86_64 if backend == "sdk_iss" else tyexec.model_path_aarch64
+            elif tyexec.target.startswith("nnp3"):
+                model_path = tyexec.model_path
+            else:
+                logger.error("Not support target({})".format(tyexec.target))
+                exit(-1)
+            model.load(model_path)
 
         res = model.evaluate()
         del sys.modules[dataset_module]
@@ -207,7 +220,7 @@ def test(cfg, dtype):
         logger.error("TyAssist failed to test -> {}".format(e))
 
 
-def demo(cfg, dtype):
+def demo(cfg, dtype, backend):
     try:
         logging.getLogger("deepeye").setLevel(logging.WARNING)
         logger.info(cfg)
@@ -228,7 +241,6 @@ def demo(cfg, dtype):
         file_list = os.listdir(data_dir)
         file_list = file_list if num > len(file_list) else file_list[0:num]
 
-        model = None
         m = importlib.import_module(model_impl_module)
         if hasattr(m, model_impl_cls):
             # 实例化预处理对象
@@ -237,19 +249,28 @@ def demo(cfg, dtype):
                 dataset=None,
                 test_num=0,
                 enable_aipp=True,
-                target=tyexec.target,
-                dtype=dtype,   # int8/tvm-fp32/tvm-int8
+                target=tyexec.target,  # nnp3xx/nnp4xx
+                dtype=dtype,   # int8/fp32
+                backend=backend  # tvm/iss/chip
             )
         else:
             logger.error("{}.py has no class named {}".format(model_impl_module, model_impl_cls))
             exit(-1)
 
-        if dtype == "int8":
-            model.load(tyexec.model_path)
-        elif dtype == "tvm-fp32":
-            model.load(tyexec.original_json_path)
-        elif dtype == "tvm-int8":
-            model.load(tyexec.quant_json_path)
+        if backend == "tvm":
+            if dtype == "fp32":
+                model.load_json(tyexec.original_json_path)
+            elif dtype == "int8":
+                model.load_json(tyexec.quant_json_path)
+        else:  # chip/iss
+            if tyexec.target.startswith("nnp4"):
+                model_path = tyexec.model_path_x86_64 if backend == "sdk_iss" else tyexec.model_path_aarch64
+            elif tyexec.target.startswith("nnp3"):
+                model_path = tyexec.model_path
+            else:
+                logger.error("Not support target({})".format(tyexec.target))
+                exit(-1)
+            model.load(model_path)
 
         for filename in file_list:
             _, ext = os.path.splitext(filename)
@@ -266,7 +287,7 @@ def demo(cfg, dtype):
         logger.error("TyAssist failed to demo -> {}".format(e))
 
 
-def run(config_filepath, phase, dtype, target):
+def run(config_filepath, phase, dtype, target, backend):
     # 补充自定义预处理文件所在目录，必须与配置文件同目录
     config_abspath = os.path.abspath(config_filepath)
     config_dir = os.path.dirname(config_abspath)
@@ -279,15 +300,19 @@ def run(config_filepath, phase, dtype, target):
     if target is not None:
         config["build"]["target"] = target
 
+    # update
+    if backend == "iss":
+        backend = "sdk_iss"
+
     res = dict()
     if phase == "build":
         build(config)
     elif phase == "compare":
-        compare(config)
+        compare(config, backend)
     elif phase == "test":
-        res = test(config, dtype)
+        res = test(config, dtype, backend)
     elif phase == "demo":
-        demo(config, dtype)
+        demo(config, dtype, backend)
     elif phase == "profile":
         profile(config)
 
@@ -295,7 +320,7 @@ def run(config_filepath, phase, dtype, target):
     return res
 
 
-def benchmark(mapping_file, dtype, target):
+def benchmark(mapping_file, dtype, target, backend):
     import csv
     from prettytable import PrettyTable
 
@@ -321,7 +346,7 @@ def benchmark(mapping_file, dtype, target):
             continue
 
         os.chdir(config_dir)  # 切换至模型目录
-        res = run(config_abspath, "test", dtype, target)
+        res = run(config_abspath, "test", dtype, target, backend)
         # logger.info("{}".format(res))
         os.chdir(root)  # 切换根目录
 
@@ -348,8 +373,10 @@ if __name__ == "__main__":
     parser.add_argument("--target", type=str, required=False,
                         choices=("nnp300", "nnp3020", "nnp310", "nnp320", "nnp400"),
                         help="Please specify a chip target")
-    parser.add_argument("--dtype", "-t", type=str, default="int8", choices=("int8", "tvm-fp32", "tvm-int8"),
+    parser.add_argument("--dtype", "-t", type=str, default="int8", choices=("int8", "fp32"),
                         help="Please specify one of them")
+    parser.add_argument("--backend", type=str, required=("demo" in sys.argv or "test" in sys.argv or "compare" in sys.argv),
+                        choices=("chip", "iss", "tvm"), help="Please specify one of them")
     parser.add_argument("--log_dir", type=str, default="./logs",
                         help="Please specify a log dir, default ./logs")
 
@@ -367,7 +394,19 @@ if __name__ == "__main__":
         VERSION = f.readline().decode("gbk").strip()
         logger.info("{} with TyAssist version: {}".format(args.type, VERSION))
 
+    # check
+    if args.backend == "tvm":
+        pass
+    elif args.backend == "iss":
+        if args.dtype not in ["int8"]:
+            logger.error("iss not support dtype({})".format(args.dtype))
+            exit(-1)
+    elif args.backend == "chip":
+        if args.dtype not in ["int8"]:
+            logger.error("chip not support dtype({})".format(args.dtype))
+            exit(-1)
+
     if args.type == "benchmark":
-        benchmark(args.config, args.dtype, args.target)
+        benchmark(args.config, args.dtype, args.target, args.backend)
     else:
-        _ = run(args.config, args.type, args.dtype, args.target)
+        _ = run(args.config, args.type, args.dtype, args.target, args.backend)

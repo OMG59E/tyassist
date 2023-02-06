@@ -63,11 +63,7 @@ class Detector(Classifier):
 
         img_paths = self.dataset.get_datas(num=self.test_num)
 
-        save_results = "results"
-        if "tvm-fp32" == self.dtype:
-            save_results = "results_tvm_fp32"
-        if "tvm-int8" == self.dtype:
-            save_results = "results_tvm_int8"
+        save_results = "results_{}_{}".format(self.backend, self.dtype)
         if not os.path.exists(save_results):
             os.makedirs(save_results)
 
@@ -101,6 +97,11 @@ class Detector(Classifier):
             exit(-1)
         filename = os.path.basename(img_path)
         logger.info("process: {}".format(img_path))
+
+        save_results = "vis_{}_{}".format(self.backend, self.dtype)
+        if not os.path.exists(save_results):
+            os.makedirs(save_results)
+
         cv_image = cv2.imread(img_path)
         if cv_image is None:
             logger.error("Failed to decode img by opencv -> {}".format(img_path))
@@ -108,16 +109,8 @@ class Detector(Classifier):
 
         detections = self.inference(cv_image)
 
-        save_results = "vis"
-        if "tvm-fp32" == self.dtype:
-            save_results = "vis_tvm_fp32"
-        if "tvm-int8" == self.dtype:
-            save_results = "vis_tvm_int8"
-        if not os.path.exists(save_results):
-            os.makedirs(save_results)
-
         for det in detections:
             (x1, y1, x2, y2), conf, cls = list(map(int, det[0:4])), det[4], int(det[5])
             cv2.rectangle(cv_image, (x1, y1), (x2, y2), (0, 0, 255), 2, 8)
-            cv2.imwrite(os.path.join(save_results, filename), cv_image)
             logger.info("x1:{}, y1:{}, x2:{}, y2:{}, conf:{:.6f}, cls:{}".format(x1, y1, x2, y2, conf, int(cls)))
+        cv2.imwrite(os.path.join(save_results, filename), cv_image)

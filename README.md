@@ -30,10 +30,12 @@ PS: 建议使用云天提供的TyHCP和TyTVM环境镜像
 
 ## 使用说明
 
-TyAssist支持5种基础功能，分别是量化编译、精度校验、模型评估、模型demo、以及Benchmark。
+TyAssist支持5种基础功能，分别是量化编译、精度校验、模型评估、模型demo、模型profile以及Benchmark。
 
 ```
-tyassist.py [-h] --config CONFIG [--log_dir LOG_DIR] {demo,test,infer,benchmark,build}
+tyassist.py [-h] --config CONFIG [--target {nnp300,nnp3020,nnp310,nnp320,nnp400}] [--dtype {int8,fp32}]
+                   [--backend {chip,iss,tvm}] [--log_dir LOG_DIR]
+                   {demo,test,compare,benchmark,build,profile}
 其中log_dir默认为logs，可缺省
 ```
 
@@ -46,7 +48,7 @@ tyassist.py [-h] --config CONFIG [--log_dir LOG_DIR] {demo,test,infer,benchmark,
 从TyTVM开发包进入对应docker环境，然后切换至/DEngine/tyassist/examples/caffe_squeezenet_v1_1目录, 执行命令：
 
 ```shell
-sh build.sh
+python3 tyassist.py build -c config.yml --target nnp300 --log_dir ./logs
 ```
 
 ### 精度校验
@@ -62,17 +64,25 @@ sh dump_server.sh
 然后切换至/DEngine/tyassist/examples/caffe_squeezenet_v1_1目录, 执行命令：
 
 ```shell
-sh compare.sh
+python3 tyassist.py compare -c config.yml -t int8 --target nnp300 --backend chip --log_dir ./logs
+```
+
+### 模型profile
+
+需要开启dump_server
+
+```shell
+python3 tyassist.py profile -c config.yml --target nnp300 --log_dir ./logs
 ```
 
 ### 模型评估
 
 ```shell
-python3 tyassist.py test -c config.yml --log_dir ./logs
+python3 tyassist.py test -c config.yml -t int8 --target nnp300 --backend chip --log_dir ./logs
 ```
 
 ### 模型demo
 
 ```shell
-python3 tyassist.py demo -c config.yml --log_dir ./logs
+python3 tyassist.py demo -c config.yml -t int8 --target nnp300 --backend chip --log_dir ./logs
 ```

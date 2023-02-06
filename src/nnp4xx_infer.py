@@ -32,7 +32,7 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
         self.dump_root_path = ""
         self.result_dir = ""
 
-        self.backend = "sdk_iss"
+        # self.backend = "chip"
 
     def load(self, model_path):
         self.result_dir = os.path.join(os.path.dirname(model_path), "result")
@@ -98,8 +98,16 @@ class Nnp4xxTvmInfer(Nnp3xxTvmInfer, ABC):
     def __init__(self):
         super().__init__()
 
-    def load(self, model_path):
+    def load_json(self, model_path):
         import tvm
         from tvm import relay
         relay_func = tvm.relay.quantization.get_ir_from_json(model_path)
         self.engine = Nnp4xxTyExec.build_x86_64(relay_func, {})
+
+    def load(self, model_path):
+        import tvm
+        from tvm.contrib import graph_executor
+        lib = tvm.runtime.load_module(model_path)
+        self.engine = tvm.contrib.graph_executor.GraphModule(lib["default"](tvm.cpu()))
+
+

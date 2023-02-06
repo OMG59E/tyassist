@@ -16,6 +16,9 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
     def __init__(self, cfg: dict):
         super(Nnp4xxTyExec, self).__init__(cfg)
 
+        self.model_path_x86_64 = os.path.join(self.model_dir, "{}_x86_64.ty".format(self.model_name))
+        self.model_path_aarch64 = os.path.join(self.model_dir, "{}_aarch64.ty".format(self.model_name))
+
         # py_path = os.path.dirname(os.path.abspath(__file__))
         # client_lib_path = os.path.join(py_path, "../../tyhcp/client/x64-linux-gcc7.5/lib")
         # sdk_lib = os.path.join(py_path, "../python/_sdk.cpython-38-x86_64-linux-gnu.so")
@@ -106,7 +109,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         if self.enable_build:
             from tvm.contrib.edgex import compile_nnp_model
             # TODO support c920
-            export_lib_path = [self.model_path]
+            export_lib_path = [self.model_path_x86_64]
             target_host = ["llvm -mtriple=x86_64"]
             target_host_cc = [None]
             ARM_C_COMPILER = os.getenv("ARM_C_COMPILER")
@@ -140,10 +143,12 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         from .nnp4xx_infer import Nnp4xxSdkInfer
         in_datas = self.get_datas(force_cr=True, to_file=False)
         infer = Nnp4xxSdkInfer(enable_dump=self.enable_dump, enable_aipp=True)
-        infer.load(self.model_path_aarch64)
+        infer.backend = self.backend
+        model_path = self.model_path_x86_64 if infer.backend == "sdk_iss" else self.model_path_aarch64
+        infer.load(model_path)
         outputs = infer.run(in_datas, to_file=True)
         infer.unload()
-        return outputs, infer.backend
+        return outputs
 
     def profile(self):
         """"""
@@ -169,14 +174,13 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
     def iss_fixed_inference(self, in_datas, to_file=False):
         """x86_64 iss"""
-        model_path = "{}/{}.ty".format(self.model_dir, self.model_name)
-        if not os.path.exists(model_path):
-            logger.error("Not found model path -> {}".format(model_path))
+        if not os.path.exists(self.model_path_x86_64):
+            logger.error("Not found model path -> {}".format(self.model_path_x86_64))
             exit(-1)
         import tvm
         from tvm.contrib import graph_executor
         logger.info("Executing model on edgex...")
-        lib = tvm.runtime.load_module(model_path)
+        lib = tvm.runtime.load_module(self.model_path_x86_64)
         module = graph_executor.GraphModule(lib["default"](tvm.edgex(), tvm.cpu()))
         iss_fixed_outputs = self.tvm_inference(module, in_datas)
         if to_file and len(iss_fixed_outputs) > 0:
