@@ -68,7 +68,8 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
             exit(-1)
 
     def run(self, in_datas: dict, to_file=False):
-        in_datas = [in_datas[key] for key in in_datas]  # to list
+        if isinstance(in_datas, dict):
+            in_datas = [in_datas[key] for key in in_datas]  # to list
         outputs = self.engine.inference(in_datas)
         if to_file:
             logger.info("[{}] predict result: outputs size -> {}".format(self.backend, len(outputs)))

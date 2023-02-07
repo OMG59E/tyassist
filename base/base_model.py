@@ -41,10 +41,10 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                 self.infer.set_input_enable_aipps([_input["support"] for _input in self.inputs])
                 self.infer.set_input_pixel_format([_input["pixel_format"] for _input in self.inputs])
         elif self.target.startswith("nnp4"):
+            self.enable_aipp = False
             if self.backend == "tvm":
                 self.infer = Nnp4xxTvmInfer()
                 self.infer.set_input_names([_input["name"] for _input in self.inputs])
-                self.enable_aipp = False
             else:
                 self.infer = Nnp4xxSdkInfer(enable_dump=0, enable_aipp=self.enable_aipp)
         else:
