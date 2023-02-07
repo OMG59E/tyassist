@@ -8,7 +8,7 @@
 """
 import os
 import sys
-
+import traceback
 import numpy as np
 import argparse
 import importlib
@@ -96,7 +96,7 @@ def build(cfg):
                 logger.info("[Build] fixed(tvm) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(idx, dist))
         logger.info("success")
     except Exception as e:
-        logger.error("TyAssist failed to build -> {}".format(e))
+        logger.error("{}".format(traceback.format_exc()))
 
 
 def compare(cfg, backend):
@@ -135,6 +135,7 @@ def compare(cfg, backend):
                 logger.info("[Compare] fixed({}) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(tyexec.backend, idx, dist2))
         logger.info("success")
     except Exception as e:
+        logger.error("{}".format(traceback.format_exc()))
         logger.error("TyAssist failed to compare -> {}".format(e))
 
 
@@ -145,7 +146,7 @@ def profile(cfg):
         tyexec.profile()
         logger.info("success")
     except Exception as e:
-        logger.error("TyAssist failed to profile -> {}".format(e))
+        logger.error("{}".format(traceback.format_exc()))
 
 
 def test(cfg, dtype, backend):
@@ -217,7 +218,7 @@ def test(cfg, dtype, backend):
         logger.info("success")
         return res
     except Exception as e:
-        logger.error("TyAssist failed to test -> {}".format(e))
+        logger.error("{}".format(traceback.format_exc()))
 
 
 def demo(cfg, dtype, backend):
@@ -284,7 +285,7 @@ def demo(cfg, dtype, backend):
         logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
         logger.info("success")
     except Exception as e:
-        logger.error("TyAssist failed to demo -> {}".format(e))
+        logger.error("{}".format(traceback.format_exc()))
 
 
 def run(config_filepath, phase, dtype, target, backend):
