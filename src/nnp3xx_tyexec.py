@@ -236,7 +236,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
 
     @property
     def targets(self):
-        return {"nnp320": 768, "nnp300": 792, "nnp200": 750}
+        return {"nnp320": 768, "nnp310": 792, "nnp300": 792, "nnp3020": 792, "nnp200": 750}
 
     def get_relay_mac(self):
         from deepeye.util import count_mac
