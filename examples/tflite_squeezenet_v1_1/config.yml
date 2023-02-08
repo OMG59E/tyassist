@@ -3,7 +3,7 @@
 model: {
   framework: "tflite",
   save_dir: "./outputs",
-  weight: "./squeezenet_1_default_1.tflite",
+  weight: "../../models/tflite/tflite_squeezenet_v1_1/squeezenet_1_default_1.tflite",
   graph: "",
   inputs: [
     {
@@ -20,11 +20,7 @@ model: {
     }
   ],
 
-  outputs: [
-    {
-      name: "flatten/Reshape",
-    }
-  ]
+  outputs: []
 }
 
 build: {
