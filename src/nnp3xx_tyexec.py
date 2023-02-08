@@ -517,7 +517,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         for idx, _input in enumerate(self.inputs):
             shape_dict[_input["name"]] = _input["shape"]
             dtype_dict[_input["name"]] = "float32"
-        sym, params = relay.frontend.from_tflite(model, shape_dict, self.dtype_dict)
+        sym, params = relay.frontend.from_tflite(model, shape_dict, dtype_dict)
         self.relay, self.params = relay.relay_pass.tflite_frontend_convert(
             sym,
             params,
