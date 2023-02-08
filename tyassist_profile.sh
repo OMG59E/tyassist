@@ -18,7 +18,7 @@ if [ "$1" ]; then
 fi
 
 mkdir -p logs
-LOG_FILE="logs/tyassist-demo-$NNP-$(date "+%Y-%m-%d-%H-%M-%S").log"
+LOG_FILE="logs/tyassist-profile-$NNP-$(date "+%Y-%m-%d-%H-%M-%S").log"
 
-echo "python3 $DENGINE_ROOT/tyassist/tyassist.py demo --target $NNP --backend $BACKEND $EXTRA -c config.yml 2>&1 | tee $LOG_FILE"
-python3 $DENGINE_ROOT/tyassist/tyassist.py demo --target $NNP --backend $BACKEND $EXTRA -c config.yml 2>&1 | tee $LOG_FILE
+echo "python3 $DENGINE_ROOT/tyassist/tyassist.py profile --target $NNP --backend $BACKEND $EXTRA -c config.yml 2>&1 | tee $LOG_FILE"
+python3 $DENGINE_ROOT/tyassist/tyassist.py profile --target $NNP --backend $BACKEND $EXTRA -c config.yml 2>&1 | tee $LOG_FILE
