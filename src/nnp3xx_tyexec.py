@@ -236,7 +236,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
 
     @property
     def targets(self):
-        return {"nnp320": 768, "nnp300": 792, "nnp200": 750}
+        return {"nnp320": 768, "nnp310": 792, "nnp300": 792, "nnp3020": 792, "nnp200": 750}
 
     def get_relay_mac(self):
         from deepeye.util import count_mac
@@ -517,7 +517,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         for idx, _input in enumerate(self.inputs):
             shape_dict[_input["name"]] = _input["shape"]
             dtype_dict[_input["name"]] = "float32"
-        sym, params = relay.frontend.from_tflite(model, shape_dict, self.dtype_dict)
+        sym, params = relay.frontend.from_tflite(model, shape_dict, dtype_dict)
         self.relay, self.params = relay.relay_pass.tflite_frontend_convert(
             sym,
             params,
