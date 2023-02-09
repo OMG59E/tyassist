@@ -73,7 +73,7 @@ def build(cfg):
         tyexec.compress_analysis()
         tyexec.get_profile_info()
         tyexec.get_relay_mac()  # print mac/flops/cycles info
-        tyexec.get_device_type()  # print op backend info
+        # tyexec.get_device_type()  # print op backend info
 
         # 计算相似度
         for idx in range(len(tvm_float_output)):
