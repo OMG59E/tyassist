@@ -13,8 +13,12 @@ if [ ! $BACKEND ]; then
   log_highlight "[warn] you didn't export BACKEND in environment variable, that will use default backend iss."
 fi
 
+if [ "$1" ]; then
+  EXTRA=$1
+fi
+
 mkdir -p logs
 LOG_FILE="logs/tyassist-compare-$NNP-$(date "+%Y-%m-%d-%H-%M-%S").log"
 
-echo "python3 $DENGINE_ROOT/tyassist/tyassist.py compare --target $NNP --backend $BACKEND -c config.yml 2>&1 | tee $LOG_FILE"
-python3 $DENGINE_ROOT/tyassist/tyassist.py compare --target $NNP --backend $BACKEND -c config.yml 2>&1 | tee $LOG_FILE
+echo "python3 $DENGINE_ROOT/tyassist/tyassist.py compare --target $NNP --backend $BACKEND $EXTRA -c config.yml 2>&1 | tee $LOG_FILE"
+python3 $DENGINE_ROOT/tyassist/tyassist.py compare --target $NNP --backend $BACKEND $EXTRA -c config.yml 2>&1 | tee $LOG_FILE

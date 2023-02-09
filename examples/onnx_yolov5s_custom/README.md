@@ -85,13 +85,13 @@ python3 /DEngine/tyassist/tyassist.py build -c config.yml --target nnp300
 依赖tyhcp容器环境
 
 ```shell
-python3 /DEngine/tyassist/tyassist.py compare -c config.yml --target nnp300
+python3 /DEngine/tyassist/tyassist.py compare -c config.yml --target nnp300 --backend chip
 ```
 
 ### step8 - demo
 
 ```shell
-python3 /DEngine/tyassist/tyassist.py demo -c config.yml --target nnp300
+python3 /DEngine/tyassist/tyassist.py demo -c config.yml --target nnp300 --backend chip
 ```
 
 

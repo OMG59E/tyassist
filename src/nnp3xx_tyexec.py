@@ -267,6 +267,16 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             op_name_map[debug_name] = op_name
 
         header = ["Id", "OpName", "MAC", "DDR/Read(GB/s)", "DDR/Write(GB/s)", "Cycles", "Span/ms"]
+        ops_dict = dict()
+        if self.enable_dump > 0:
+            header.append("DeviceType")
+            try:
+                import deepeye
+                ops_dict = deepeye.util.get_device_type(self.model_dir, node_name=None)
+            except Exception as e:
+                logger.error("Failed to get op device type -> {}".format(e))
+                ops_dict = dict()
+
         table = PrettyTable(header)
         func_info = model_profile["func_info"]
         for idx, debug_name in enumerate(op_name_map):
@@ -283,15 +293,12 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 ddr_write = int(func_info[op_name]["ddr_read"]) * 1000 / cost / 1024**3
             else:
                 logger.warning("vu op[{}] not support dump cycle info".format(debug_name))
-            table.add_row([
-                idx,
-                debug_name,
-                func_info[op_name]["mac"],
-                "{:.3f}".format(ddr_read),
-                "{:.3f}".format(ddr_write),
-                cycles,
-                "{:.3f}".format(cost)
-            ])
+
+            row = [idx, debug_name, func_info[op_name]["mac"],
+                   "{:.3f}".format(ddr_read), "{:.3f}".format(ddr_write), cycles, "{:.3f}".format(cost)]
+            if self.enable_dump > 0:
+                row.append("unknown" if debug_name not in ops_dict else ops_dict[debug_name])
+            table.add_row(row)
         logger.info("model profile:\n{}".format(table))
 
     def get_device_type(self):

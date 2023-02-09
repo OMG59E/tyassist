@@ -73,7 +73,7 @@ def build(cfg):
         tyexec.compress_analysis()
         tyexec.get_profile_info()
         tyexec.get_relay_mac()  # print mac/flops/cycles info
-        tyexec.get_device_type()  # print op backend info
+        # tyexec.get_device_type()  # print op backend info
 
         # 计算相似度
         for idx in range(len(tvm_float_output)):
@@ -375,11 +375,11 @@ if __name__ == "__main__":
                         choices=("nnp300", "nnp3020", "nnp310", "nnp320", "nnp400"),
                         help="Please specify a chip target")
     parser.add_argument("--dtype", "-t", type=str, default="int8", choices=("int8", "fp32"),
-                        help="Please specify one of them")
+                        help="Please specify one of them， default is int8")
     parser.add_argument("--backend", type=str, required=("demo" in sys.argv or "test" in sys.argv or "compare" in sys.argv),
                         choices=("chip", "iss", "tvm"), help="Please specify one of them")
     parser.add_argument("--log_dir", type=str, default="./logs",
-                        help="Please specify a log dir, default ./logs")
+                        help="Please specify a log dir, default is ./logs")
 
     args = parser.parse_args()
 
