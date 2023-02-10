@@ -7,6 +7,7 @@
 @Software: PyCharm
 """
 import time
+import cv2
 import numpy as np
 import torch
 import torchvision
@@ -94,7 +95,28 @@ def scale_coords(img1_shape, coords, img0_shape, ratio_pad=None):
     coords[:, [0, 2]] -= pad[0]  # x padding
     coords[:, [1, 3]] -= pad[1]  # y padding
     coords[:, :4] /= gain
-    clip_coords(coords, img0_shape)
+    # clip_coords(coords, img0_shape)
+    return coords
+
+
+def scale_coords_kpt(img1_shape, coords, img0_shape, ratio_pad=None):
+    if len(coords) == 0:
+        return coords
+    if ratio_pad is None:  # calculate from img0_shape
+        gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])  # gain  = old / new
+        pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (img1_shape[0] - img0_shape[0] * gain) / 2  # wh padding
+    else:
+        gain = ratio_pad[0][0]
+        pad = ratio_pad[1]
+
+    coords[:, 2] -= pad[0]  # x padding
+    coords[:, 3] -= pad[1]  # y padding
+    coords[:, 7::3] -= pad[0]
+    coords[:, 8::3] -= pad[1]
+    coords[:, 2:6] /= gain
+    coords[:, 7::3] /= gain
+    coords[:, 8::3] /= gain
+    # clip_coords(coords, img0_shape)
     return coords
 
 
@@ -139,7 +161,8 @@ def bbox_overlap(bb_test, bb_gt):
     w = np.maximum(0., xx2 - xx1)
     h = np.maximum(0., yy2 - yy1)
     wh = w * h
-    overlap = wh / ((bb_test[2]-bb_test[0])*(bb_test[3]-bb_test[1]) + (bb_gt[2]-bb_gt[0])*(bb_gt[3]-bb_gt[1]) - wh)
+    overlap = wh / ((bb_test[2] - bb_test[0]) * (bb_test[3] - bb_test[1]) + (bb_gt[2] - bb_gt[0]) * (
+            bb_gt[3] - bb_gt[1]) - wh)
 
     return overlap
 
@@ -261,6 +284,159 @@ def non_max_suppression(
             break  # time limit exceeded
 
     return output
+
+
+def output_to_keypoint(output):
+    # Convert model output to target format [batch_id, class_id, x, y, w, h, conf]
+    targets = []
+    for i, o in enumerate(output):
+        kpts = o[:, 6:]
+        o = o[:, :6]
+        for idx, (*box, conf, cls) in enumerate(o.detach().cpu().numpy()):
+            targets.append(
+                [i, cls, *list(*xyxy2xywh(np.array(box)[None])), conf, *list(kpts.detach().cpu().numpy()[idx])])
+    return np.array(targets)
+
+
+def non_max_suppression_kpt(prediction, conf_thres=0.25, iou_thres=0.45,
+                            classes=None, agnostic=False, multi_label=False, labels=(),
+                            kpt_label=False, nc=None, nkpt=None):
+    """ Runs Non-Maximum Suppression (NMS) on inference results
+    Returns:
+         list of detections, on (n,6) tensor per image [xyxy, conf, cls]
+    """
+    if nc is None:
+        nc = prediction.shape[2] - 5 if not kpt_label else prediction.shape[2] - 56  # number of classes
+    xc = prediction[..., 4] > conf_thres  # candidates
+
+    # Settings
+    min_wh, max_wh = 2, 4096  # (pixels) minimum and maximum box width and height
+    max_det = 300  # maximum number of detections per image
+    max_nms = 30000  # maximum number of boxes into torchvision.ops.nms()
+    time_limit = 10.0  # seconds to quit after
+    redundant = True  # require redundant detections
+    multi_label &= nc > 1  # multiple labels per box (adds 0.5ms/img)
+    merge = False  # use merge-NMS
+
+    t = time.time()
+    output = [torch.zeros((0, 6), device=prediction.device)] * prediction.shape[0]
+    for xi, x in enumerate(prediction):  # image index, image inference
+        # Apply constraints
+        # x[((x[..., 2:4] < min_wh) | (x[..., 2:4] > max_wh)).any(1), 4] = 0  # width-height
+        x = x[xc[xi]]  # confidence
+
+        # Cat apriori labels if autolabelling
+        if labels and len(labels[xi]):
+            l = labels[xi]
+            v = torch.zeros((len(l), nc + 5), device=x.device)
+            v[:, :4] = l[:, 1:5]  # box
+            v[:, 4] = 1.0  # conf
+            v[range(len(l)), l[:, 0].long() + 5] = 1.0  # cls
+            x = torch.cat((x, v), 0)
+
+        # If none remain process next image
+        if not x.shape[0]:
+            continue
+
+        # Compute conf
+        x[:, 5:5 + nc] *= x[:, 4:5]  # conf = obj_conf * cls_conf
+
+        # Box (center x, center y, width, height) to (x1, y1, x2, y2)
+        box = xywh2xyxy(x[:, :4])
+
+        # Detections matrix nx6 (xyxy, conf, cls)
+        if multi_label:
+            i, j = (x[:, 5:] > conf_thres).nonzero(as_tuple=False).T
+            x = torch.cat((box[i], x[i, j + 5, None], j[:, None].float()), 1)
+        else:  # best class only
+            if not kpt_label:
+                conf, j = x[:, 5:].max(1, keepdim=True)
+                x = torch.cat((box, conf, j.float()), 1)[conf.view(-1) > conf_thres]
+            else:
+                kpts = x[:, 6:]
+                conf, j = x[:, 5:6].max(1, keepdim=True)
+                x = torch.cat((box, conf, j.float(), kpts), 1)[conf.view(-1) > conf_thres]
+
+        # Filter by class
+        if classes is not None:
+            x = x[(x[:, 5:6] == torch.tensor(classes, device=x.device)).any(1)]
+
+        # Apply finite constraint
+        # if not torch.isfinite(x).all():
+        #     x = x[torch.isfinite(x).all(1)]
+
+        # Check shape
+        n = x.shape[0]  # number of boxes
+        if not n:  # no boxes
+            continue
+        elif n > max_nms:  # excess boxes
+            x = x[x[:, 4].argsort(descending=True)[:max_nms]]  # sort by confidence
+
+        # Batched NMS
+        c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
+        boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
+        i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
+        if i.shape[0] > max_det:  # limit detections
+            i = i[:max_det]
+        if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
+            # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
+            iou = box_iou(boxes[i], boxes) > iou_thres  # iou matrix
+            weights = iou * scores[None]  # box weights
+            x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
+            if redundant:
+                i = i[iou.sum(1) > 1]  # require redundancy
+
+        output[xi] = x[i]
+        if (time.time() - t) > time_limit:
+            print(f'WARNING: NMS time limit {time_limit}s exceeded')
+            break  # time limit exceeded
+
+    return output
+
+
+def plot_skeleton_kpts(im, kpts, steps, orig_shape=None):
+    # Plot the skeleton and keypointsfor coco datatset
+    palette = np.array([[255, 128, 0], [255, 153, 51], [255, 178, 102],
+                        [230, 230, 0], [255, 153, 255], [153, 204, 255],
+                        [255, 102, 255], [255, 51, 255], [102, 178, 255],
+                        [51, 153, 255], [255, 153, 153], [255, 102, 102],
+                        [255, 51, 51], [153, 255, 153], [102, 255, 102],
+                        [51, 255, 51], [0, 255, 0], [0, 0, 255], [255, 0, 0],
+                        [255, 255, 255]])
+
+    skeleton = [[16, 14], [14, 12], [17, 15], [15, 13], [12, 13], [6, 12],
+                [7, 13], [6, 7], [6, 8], [7, 9], [8, 10], [9, 11], [2, 3],
+                [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7]]
+
+    pose_limb_color = palette[[9, 9, 9, 9, 7, 7, 7, 0, 0, 0, 0, 0, 16, 16, 16, 16, 16, 16, 16]]
+    pose_kpt_color = palette[[16, 16, 16, 16, 16, 0, 0, 0, 0, 0, 0, 9, 9, 9, 9, 9, 9]]
+    radius = 5
+    num_kpts = len(kpts) // steps
+
+    for kid in range(num_kpts):
+        r, g, b = pose_kpt_color[kid]
+        x_coord, y_coord = kpts[steps * kid], kpts[steps * kid + 1]
+        if not (x_coord % 640 == 0 or y_coord % 640 == 0):
+            if steps == 3:
+                conf = kpts[steps * kid + 2]
+                if conf < 0.5:
+                    continue
+            cv2.circle(im, (int(x_coord), int(y_coord)), radius, (int(r), int(g), int(b)), -1)
+
+    for sk_id, sk in enumerate(skeleton):
+        r, g, b = pose_limb_color[sk_id]
+        pos1 = (int(kpts[(sk[0] - 1) * steps]), int(kpts[(sk[0] - 1) * steps + 1]))
+        pos2 = (int(kpts[(sk[1] - 1) * steps]), int(kpts[(sk[1] - 1) * steps + 1]))
+        if steps == 3:
+            conf1 = kpts[(sk[0] - 1) * steps + 2]
+            conf2 = kpts[(sk[1] - 1) * steps + 2]
+            if conf1 < 0.5 or conf2 < 0.5:
+                continue
+        if pos1[0] % 640 == 0 or pos1[1] % 640 == 0 or pos1[0] < 0 or pos1[1] < 0:
+            continue
+        if pos2[0] % 640 == 0 or pos2[1] % 640 == 0 or pos2[0] < 0 or pos2[1] < 0:
+            continue
+        cv2.line(im, pos1, pos2, (int(r), int(g), int(b)), thickness=2)
 
 
 def cpu_nms(detections, iou_threshold):
