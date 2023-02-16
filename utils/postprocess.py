@@ -120,6 +120,27 @@ def scale_coords_kpt(img1_shape, coords, img0_shape, ratio_pad=None):
     return coords
 
 
+def scale_coords_mask(img1_shape, contours, img0_shape, ratio_pad=None):
+    if len(contours) == 0:
+        return contours
+    if ratio_pad is None:  # calculate from img0_shape
+        gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])  # gain  = old / new
+        pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (img1_shape[0] - img0_shape[0] * gain) / 2  # wh padding
+    else:
+        gain = ratio_pad[0][0]
+        pad = ratio_pad[1]
+
+    for idx in range(len(contours)):
+        contours[idx] = contours[idx].astype("float32")
+        contours[idx][:, :, 0] -= pad[0]  # x padding
+        contours[idx][:, :, 1] -= pad[1]  # y padding
+        contours[idx] /= gain
+        contours[idx][:, :, 0] = np.clip(contours[idx][:, :, 0], 0, img0_shape[1] - 1)
+        contours[idx][:, :, 1] = np.clip(contours[idx][:, :, 1], 0, img0_shape[0] - 1)
+        contours[idx] = contours[idx].round().astype("int32")
+    return contours
+
+
 def box_area(box):
     # box = xyxy(4,n)
     return (box[2] - box[0]) * (box[3] - box[1])
