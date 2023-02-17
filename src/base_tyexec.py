@@ -222,10 +222,12 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                         im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
                     else:
                         random_im_path = os.path.join(self.result_dir, "{}_{}_random.jpg".format(idx, name))
-                        if os.path.exists(random_im_path):
-                            im = cv2.imread(random_im_path, cv2.IMREAD_GRAYSCALE if pixel_format == "GRAY" else cv2.IMREAD_COLOR)
+                        random_npy_path = os.path.join(self.result_dir, "{}_{}_random.npy".format(idx, name))
+                        if os.path.exists(random_npy_path):
+                            im = np.load(random_npy_path)
                         else:
                             im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
+                            np.save(random_npy_path, im)
                             cv2.imwrite(random_im_path, im)
                 if not _input["enable_aipp"] or force_cr:  # 兼容芯片orISS使能AIPP情况
                     _input["padding_size"], _ = calc_padding_size(im, (w, h), _input["padding_mode"])
@@ -263,18 +265,29 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                     self.check_dtype(name, in_datas[name], dtype)
                 else:   # 未指定输入数据
                     logger.warning("input[{}] will use random data".format(name))
-                    if not force_random and os.path.exists(data_npy_path):
-                        in_datas[name] = np.load(data_npy_path)
-                        logger.warning("load random data -> {}".format(data_npy_path))
+
+                    def gen_data(_dtype):
+                        if _dtype == "float32":
+                            _data = np.random.rand(n, c, h, w).astype(dtype=_dtype)   # 数值范围[0, 1)
+                        elif _dtype == "float16":
+                            _data = np.random.rand(n, c, h, w).astype(dtype=_dtype)   # 数值范围[0, 1)
+                        elif _dtype == "int16":
+                            _data = np.random.randint(low=-(2**15), high=2**15-1, size=(n, c, h, w), dtype=_dtype)
+                        elif _dtype == "uint8":
+                            _data = np.random.randint(low=0, high=255, size=(n, c, h, w), dtype=_dtype)
+                        else:
+                            logger.error("Not support dtype -> {}".format(_dtype))
+                            exit(-1)
+                        return _data
+
+                    if force_random:  # 用于量化和统计含零情况
+                        in_datas[name] = gen_data(dtype)
                     else:
-                        if dtype == "float32":
-                            in_datas[name] = np.random.rand(n, c, h, w).astype(dtype=dtype)   # 数值范围[0, 1)
-                        elif dtype == "float16":
-                            in_datas[name] = np.random.rand(n, c, h, w).astype(dtype=dtype)   # 数值范围[0, 1)
-                        elif dtype == "int16":
-                            in_datas[name] = np.random.randint(low=-(2**15), high=2**15-1, size=(n, c, h, w), dtype=dtype)
-                        elif dtype == "uint8":
-                            in_datas[name] = np.random.randint(low=0, high=255, size=(n, c, h, w), dtype=dtype)
+                        if os.path.exists(data_npy_path):
+                            in_datas[name] = np.load(data_npy_path)
+                        else:
+                            in_datas[name] = gen_data(dtype)
+
             if to_file:
                 data = in_datas[name].copy()
                 np.save(data_npy_path, data)
