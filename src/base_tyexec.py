@@ -133,6 +133,9 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             else:
                 _input["enable_aipp"] = False
 
+            if self.target.startswith("nnp4"):  # 4xx不支持aipp
+                _input["enable_aipp"] = False
+
             if not _input["mean"]:
                 _input["mean"] = [0.0 for _ in range(c)]
             if not _input["std"]:
@@ -203,6 +206,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             dtype = _input["dtype"]
             if _input["enable_aipp"]:
                 dtype = "uint8"
+            if force_float:
+                dtype = "float32"
             data_path = _input["data_path"] if not filepath else filepath
             data_npy_path = os.path.join(self.result_dir, "{}_{}_{}.npy".format(idx, name, dtype))
             data_bin_path = os.path.join(self.result_dir, "{}_{}_{}.bin".format(idx, name, dtype))
