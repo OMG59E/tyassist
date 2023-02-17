@@ -218,11 +218,15 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                     im = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE if pixel_format == "GRAY" else cv2.IMREAD_COLOR)
                 else:   # 未指定输入数据，生成随机图像
                     logger.warning("input[{}] will use random image".format(name))
-                    im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
-                    if not force_random:  # 非强制随机，保存随机图片
+                    if force_random:  # 用于量化和统计含零情况
+                        im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
+                    else:
                         random_im_path = os.path.join(self.result_dir, "{}_{}_random.jpg".format(idx, name))
-                        cv2.imwrite(random_im_path, im)
-                        _input["data_path"] = random_im_path
+                        if os.path.exists(random_im_path):
+                            im = cv2.imread(random_im_path, cv2.IMREAD_GRAYSCALE if pixel_format == "GRAY" else cv2.IMREAD_COLOR)
+                        else:
+                            im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
+                            cv2.imwrite(random_im_path, im)
                 if not _input["enable_aipp"] or force_cr:  # 兼容芯片orISS使能AIPP情况
                     _input["padding_size"], _ = calc_padding_size(im, (w, h), _input["padding_mode"])
                     in_datas[name] = default_preprocess(
