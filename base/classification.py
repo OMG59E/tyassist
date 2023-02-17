@@ -55,7 +55,6 @@ class Classifier(BaseModel, ABC):
         if bs != 1:
             logger.error("only support bs=1, please check")
             exit(-1)
-        outputs = outputs.flatten()
         return outputs
 
     @property
@@ -97,7 +96,7 @@ class Classifier(BaseModel, ABC):
                 continue
 
             chip_output = self.inference(cv_image)
-            idxes = np.argsort(-chip_output, kind="quicksort").flatten()[0:k]  # 降序
+            idxes = np.argsort(-chip_output, axis=1, kind="quicksort").flatten()[0:k]  # 降序
             # logger.info("pred = {}, gt = {}".format(idxes, labels[idx]))
             if labels[idx] == idxes[0]:
                 top1 += 1
@@ -126,6 +125,6 @@ class Classifier(BaseModel, ABC):
             exit(-1)
 
         chip_output = self.inference(cv_image)
-        max_idx = np.argmax(chip_output)
-        max_prob = chip_output[max_idx]
+        max_idx = np.argmax(chip_output, axis=1).flatten()[0]
+        max_prob = chip_output[0][max_idx].flatten()[0]
         logger.info("predict cls = {}, prob = {:.6f}".format(max_idx, max_prob))
