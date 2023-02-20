@@ -231,7 +231,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                             cv2.imwrite(random_im_path, im)
                 if not _input["enable_aipp"] or force_cr:  # 兼容芯片orISS使能AIPP情况
                     _input["padding_size"], _ = calc_padding_size(im, (w, h), _input["padding_mode"])
-                    in_datas[name] = default_preprocess(
+                    in_data = default_preprocess(
                         im,
                         (w, h),
                         mean=_input["mean"],
@@ -243,6 +243,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                         padding_value=_input["padding_value"],
                         padding_mode=_input["padding_mode"]
                     ).astype(dtype=dtype if not force_float else "float32")  # 量化前relay_func需要float输入，也可不强转由tvm自定转换
+                    in_datas[name] = np.ascontiguousarray(in_data)
                 else:
                     if pixel_format == "RGB":
                         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)  # AIPP不支持BGR -> RGB，提前转换
@@ -254,7 +255,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                         im = np.expand_dims(im, axis=0)
                     else:
                         im = np.expand_dims(im, axis=0)
-                    in_datas[name] = im.transpose((0, 3, 1, 2))  # nhwc -> nchw, BGR888  uint8
+                    in_datas[name] = np.ascontiguousarray(im.transpose((0, 3, 1, 2)))  # nhwc -> nchw, BGR888  uint8
             else:  # 非图像数据，由自定义模块处理或随机生成
                 assert not _input["enable_aipp"], "non-image cannot enable AIPP"
                 if data_path:   # 指定输入数据
