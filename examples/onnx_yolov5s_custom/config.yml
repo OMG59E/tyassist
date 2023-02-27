@@ -43,7 +43,7 @@ build: {
     skip_layer_idxes: [ ],
     skip_layer_types: [ ],
   },
-  enable_dump: 0,
+  enable_dump: 1,
 }
 
 test: {
