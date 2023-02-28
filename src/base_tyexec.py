@@ -328,9 +328,9 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         quantize_config["calib_method"] = self.quant_cfg["calib_method"]
 
         quantize_config["float_list"] = list()
-        skip_layer_idxes = self.quant_cfg["skip_layer_idxes"]
-        skip_layer_types = self.quant_cfg["skip_layer_types"]
-        skip_layer_names = self.quant_cfg["skip_layer_names"]
+        skip_layer_idxes = self.quant_cfg.get("skip_layer_idxes", list())
+        skip_layer_types = self.quant_cfg.get("skip_layer_types", list())
+        skip_layer_names = self.quant_cfg.get("skip_layer_names", list())
         if skip_layer_idxes:
             quantize_config["float_list"].extend(skip_layer_idxes)
         if skip_layer_types:
