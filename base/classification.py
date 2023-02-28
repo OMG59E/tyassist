@@ -48,9 +48,13 @@ class Classifier(BaseModel, ABC):
 
     def _postprocess(self, outputs, cv_image=None):
         if len(outputs) != 1:
-            logger.error("only one output, please check")
+            logger.error("only support signal output, please check")
             exit(-1)
-        outputs = outputs[0]  # bs=1
+        outputs = outputs[0]  # [bs, num_cls] or [num_cls] for 4xx iss
+        bs = outputs.shape[0]
+        if bs != 1:
+            logger.error("only support bs=1, please check")
+            exit(-1)
         return outputs
 
     @property
@@ -122,5 +126,5 @@ class Classifier(BaseModel, ABC):
 
         chip_output = self.inference(cv_image)
         max_idx = np.argmax(chip_output, axis=1).flatten()[0]
-        max_prob = chip_output[:, max_idx].flatten()[0]
+        max_prob = chip_output[0][max_idx].flatten()[0]
         logger.info("predict cls = {}, prob = {:.6f}".format(max_idx, max_prob))

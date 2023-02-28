@@ -133,6 +133,9 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             else:
                 _input["enable_aipp"] = False
 
+            if self.target.startswith("nnp4"):  # 4xx不支持aipp
+                _input["enable_aipp"] = False
+
             if not _input["mean"]:
                 _input["mean"] = [0.0 for _ in range(c)]
             if not _input["std"]:
@@ -203,6 +206,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             dtype = _input["dtype"]
             if _input["enable_aipp"]:
                 dtype = "uint8"
+            if force_float:
+                dtype = "float32"
             data_path = _input["data_path"] if not filepath else filepath
             data_npy_path = os.path.join(self.result_dir, "{}_{}_{}.npy".format(idx, name, dtype))
             data_bin_path = os.path.join(self.result_dir, "{}_{}_{}.bin".format(idx, name, dtype))
@@ -213,14 +218,20 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                     im = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE if pixel_format == "GRAY" else cv2.IMREAD_COLOR)
                 else:   # 未指定输入数据，生成随机图像
                     logger.warning("input[{}] will use random image".format(name))
-                    im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
-                    if not force_random:  # 非强制随机，保存随机图片
+                    if force_random:  # 用于量化和统计含零情况
+                        im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
+                    else:
                         random_im_path = os.path.join(self.result_dir, "{}_{}_random.jpg".format(idx, name))
-                        cv2.imwrite(random_im_path, im)
-                        _input["data_path"] = random_im_path
+                        random_npy_path = os.path.join(self.result_dir, "{}_{}_random.npy".format(idx, name))
+                        if os.path.exists(random_npy_path):
+                            im = np.load(random_npy_path)
+                        else:
+                            im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
+                            np.save(random_npy_path, im)
+                            cv2.imwrite(random_im_path, im)
                 if not _input["enable_aipp"] or force_cr:  # 兼容芯片orISS使能AIPP情况
                     _input["padding_size"], _ = calc_padding_size(im, (w, h), _input["padding_mode"])
-                    in_datas[name] = default_preprocess(
+                    in_data = default_preprocess(
                         im,
                         (w, h),
                         mean=_input["mean"],
@@ -232,6 +243,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                         padding_value=_input["padding_value"],
                         padding_mode=_input["padding_mode"]
                     ).astype(dtype=dtype if not force_float else "float32")  # 量化前relay_func需要float输入，也可不强转由tvm自定转换
+                    in_datas[name] = np.ascontiguousarray(in_data)
                 else:
                     if pixel_format == "RGB":
                         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)  # AIPP不支持BGR -> RGB，提前转换
@@ -243,7 +255,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                         im = np.expand_dims(im, axis=0)
                     else:
                         im = np.expand_dims(im, axis=0)
-                    in_datas[name] = im.transpose((0, 3, 1, 2))  # nhwc -> nchw, BGR888  uint8
+                    in_datas[name] = np.ascontiguousarray(im.transpose((0, 3, 1, 2)))  # nhwc -> nchw, BGR888  uint8
             else:  # 非图像数据，由自定义模块处理或随机生成
                 assert not _input["enable_aipp"], "non-image cannot enable AIPP"
                 if data_path:   # 指定输入数据
@@ -254,18 +266,29 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                     self.check_dtype(name, in_datas[name], dtype)
                 else:   # 未指定输入数据
                     logger.warning("input[{}] will use random data".format(name))
-                    if not force_random and os.path.exists(data_npy_path):
-                        in_datas[name] = np.load(data_npy_path)
-                        logger.warning("load random data -> {}".format(data_npy_path))
+
+                    def gen_data(_dtype):
+                        if _dtype == "float32":
+                            _data = np.random.rand(n, c, h, w).astype(dtype=_dtype)   # 数值范围[0, 1)
+                        elif _dtype == "float16":
+                            _data = np.random.rand(n, c, h, w).astype(dtype=_dtype)   # 数值范围[0, 1)
+                        elif _dtype == "int16":
+                            _data = np.random.randint(low=-(2**15), high=2**15-1, size=(n, c, h, w), dtype=_dtype)
+                        elif _dtype == "uint8":
+                            _data = np.random.randint(low=0, high=255, size=(n, c, h, w), dtype=_dtype)
+                        else:
+                            logger.error("Not support dtype -> {}".format(_dtype))
+                            exit(-1)
+                        return _data
+
+                    if force_random:  # 用于量化和统计含零情况
+                        in_datas[name] = gen_data(dtype)
                     else:
-                        if dtype == "float32":
-                            in_datas[name] = np.random.rand(n, c, h, w).astype(dtype=dtype)   # 数值范围[0, 1)
-                        elif dtype == "float16":
-                            in_datas[name] = np.random.rand(n, c, h, w).astype(dtype=dtype)   # 数值范围[0, 1)
-                        elif dtype == "int16":
-                            in_datas[name] = np.random.randint(low=-(2**15), high=2**15-1, size=(n, c, h, w), dtype=dtype)
-                        elif dtype == "uint8":
-                            in_datas[name] = np.random.randint(low=0, high=255, size=(n, c, h, w), dtype=dtype)
+                        if os.path.exists(data_npy_path):
+                            in_datas[name] = np.load(data_npy_path)
+                        else:
+                            in_datas[name] = gen_data(dtype)
+
             if to_file:
                 data = in_datas[name].copy()
                 np.save(data_npy_path, data)
@@ -305,10 +328,15 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         quantize_config["calib_method"] = self.quant_cfg["calib_method"]
 
         quantize_config["float_list"] = list()
-        if self.quant_cfg["skip_layer_idxes"]:
-            quantize_config["float_list"].extend(self.quant_cfg["skip_layer_idxes"])
-        if self.quant_cfg["skip_layer_types"]:
-            quantize_config["float_list"].extend(self.quant_cfg["skip_layer_types"])
+        skip_layer_idxes = self.quant_cfg["skip_layer_idxes"]
+        skip_layer_types = self.quant_cfg["skip_layer_types"]
+        skip_layer_names = self.quant_cfg["skip_layer_names"]
+        if skip_layer_idxes:
+            quantize_config["float_list"].extend(skip_layer_idxes)
+        if skip_layer_types:
+            quantize_config["float_list"].extend(skip_layer_types)
+        if skip_layer_names:
+            quantize_config["float_list"].extend(skip_layer_names)
         return quantize_config, norm
 
     @staticmethod

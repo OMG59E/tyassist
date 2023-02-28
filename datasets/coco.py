@@ -22,6 +22,7 @@ class COCO2017Val(BaseDataset):
             exit(-1)
 
         self._annotations_file = os.path.join(self._root_path, "..", "annotations", "instances_val2017.json")
+        self._annotations_kpt = os.path.join(self._root_path, "..", "annotations", "person_keypoints_val2017.json")
         if not os.path.exists(self._annotations_file):
             logger.error("annotations_file not exist -> {}".format(self._annotations_file))
             exit(-1)
@@ -51,6 +52,10 @@ class COCO2017Val(BaseDataset):
     @property
     def annotations_file(self):
         return self._annotations_file
+
+    @property
+    def annotations_kpt(self):
+        return self._annotations_kpt
 
     @property
     def image_ids(self):
