@@ -67,7 +67,7 @@ class CustomTensorFlowImgD(BaseCustomPreprocess):
             out -= np.array(mean, dtype=np.float32)
             out /= np.array(std, dtype=np.float32)
 
-        out = np.expand_dims(out.transpose((2, 0, 1)), axis=0)
+        out = np.expand_dims(out.transpose((2, 0, 1)), axis=0).astype("float32")
         return out
 
     def get_single_data(self, filepath, idx):
