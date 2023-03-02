@@ -285,10 +285,10 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 logger.warning("op_name[{}] not in model_profile.json".format(op_name))
                 continue
             cycles = func_info[op_name]["cost"]
-            cost = cycles * 2.0 * 10**-3 / self.targets[self.target]
+            cost = cycles * 2.0 * 10**-3 / self.targets[self.target]  #
             ddr_read = 0
             ddr_write = 0
-            if cost != 0:
+            if cost > 0 and cycles > 0:
                 ddr_read = int(func_info[op_name]["ddr_read"]) * 1000 / cost / 1024**3
                 ddr_write = int(func_info[op_name]["ddr_read"]) * 1000 / cost / 1024**3
             else:
