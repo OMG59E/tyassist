@@ -188,7 +188,7 @@ class Nnp3xxSdkInfer(BaseInfer, ABC):
         src = os.path.join(self.dump_root_path, model_name)
         if not os.path.exists(src):
             logger.error("Not found model dump path -> {}".format(src))
-            exit(-1)
+            return
 
         chip_dump_out = os.path.join(self.result_dir, "chip_dump_out")
         if os.path.exists(chip_dump_out):
