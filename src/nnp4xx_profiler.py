@@ -9,6 +9,7 @@
 import os
 import abc
 import json
+import shutil
 import traceback
 from .base_profiler import BaseSdkProfiler
 from utils import logger
@@ -88,6 +89,8 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             profile_str = json.dumps(res, indent=2)
             with open("profile.json", "w") as f:
                 f.write(profile_str)
+            # delete ai_core.bin
+            os.remove(profile_file)
         except Exception as e:
             logger.error("Failed to parse profile -> {}\n{}".format(e, traceback.format_exc()))
             exit(-1)
