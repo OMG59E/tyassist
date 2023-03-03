@@ -31,7 +31,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         ld_path = os.getenv("LD_LIBRARY_PATH")
         ld_path = dep_path if ld_path is None else dep_path + ":" + ld_path
         os.environ["LD_LIBRARY_PATH"] = ld_path
-        os.environ["EDGEX_DEBUG_ISS"] = "on"
+        # os.environ["EDGEX_DEBUG_ISS"] = "on"
         os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
     def get_version(self):
