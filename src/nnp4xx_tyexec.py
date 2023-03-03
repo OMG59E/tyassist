@@ -107,7 +107,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
     def build(self, in_datas):
         if self.enable_build:
-            from tvm.contrib.edgex import compile_nnp_model
+            from tvm.contrib.edgex import compile_nnp_model, optimize_nnp_model
             # TODO support c920
             export_lib_path = [self.model_path_x86_64]
             target_host = ["llvm -mtriple=x86_64"]
@@ -122,16 +122,37 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 target_host.append("llvm -mtriple=aarch64")
                 target_host_cc.append(ARM_C_COMPILER)
 
-            # compile edgex lib
-            _ = compile_nnp_model(
+            opt_mod, opt_params = optimize_nnp_model(
                 self.relay_quant,
                 self.params_quant,
+                opt_level=2,
+                opt_config={
+                    "enable_global_channel_padding": True,
+                    "enable_cascade_fuse": False
+                },
+                keep_params=True
+            )
+
+            _ = compile_nnp_model(
+                opt_mod,
+                opt_params,
                 working_dir=self.model_dir,
                 export_lib_path=export_lib_path,
-                opt_level=2,
+                opt_level=0,
                 target_host=target_host,
                 target_host_cc=target_host_cc
             )
+
+            # # compile edgex lib
+            # _ = compile_nnp_model(
+            #     self.relay_quant,
+            #     self.params_quant,
+            #     working_dir=self.model_dir,
+            #     export_lib_path=export_lib_path,
+            #     opt_level=2,
+            #     target_host=target_host,
+            #     target_host_cc=target_host_cc
+            # )
             logger.info("Executing model on edgex...")
         else:
             logger.warning("nnp4xx disable build")
@@ -149,10 +170,6 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         outputs = infer.run(in_datas, to_file=True)
         infer.unload()
         return outputs
-
-    def profile(self):
-        """"""
-        logger.warning("Nnp4xx not support profile")
 
     def tvm_float_inference(self, in_datas, to_file=False):
         tvm_float_outputs = self.tvm_inference(
@@ -197,6 +214,15 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             import tvm
             from tvm import relay
             layer_outs = tvm.relay.quantization.compare_layer_outputs(self.result_dir)
+
+    def profile(self):
+        from .nnp4xx_profiler import Nnp4xxSdkProfiler
+        profiler = Nnp4xxSdkProfiler(sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg")
+        in_datas = self.get_datas(force_cr=True, to_file=False)
+        profiler.load(self.model_path_aarch64)
+        profiler.run(in_datas)
+        profiler.unload()
+        profiler.parse()
 
     def get_relay_mac(self):
         logger.warning("Nnp4xx not support get relay mac")
