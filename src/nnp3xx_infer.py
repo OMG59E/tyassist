@@ -133,7 +133,6 @@ class Nnp3xxSdkInfer(BaseInfer, ABC):
                 shape = in_data.shape
                 h = shape[2]
                 w = shape[3]
-                image_format = 70  # 70 -> RGB888, 71 -> BGR888
                 if shape[1] == 3:
                     image_format = 70 if self.input_pixel_formats[idx] == "RGB" else 71
                 elif shape[1] == 1:
@@ -188,7 +187,7 @@ class Nnp3xxSdkInfer(BaseInfer, ABC):
         src = os.path.join(self.dump_root_path, model_name)
         if not os.path.exists(src):
             logger.error("Not found model dump path -> {}".format(src))
-            exit(-1)
+            return
 
         chip_dump_out = os.path.join(self.result_dir, "chip_dump_out")
         if os.path.exists(chip_dump_out):

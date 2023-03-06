@@ -11,12 +11,9 @@ import abc
 
 class BaseSdkProfiler(object, metaclass=abc.ABCMeta):
     def __init__(self,
-                 net_cfg_file="/DEngine/tyhcp/net.cfg",
                  sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
                  target="nnp300"):
-        self.ip = "127.0.0.1"
-        self.port = 9090
-        self.net_cfg_file = net_cfg_file
+
         self.sdk_cfg_file = sdk_cfg_file
         self.engine = None
         self.sdk = None
@@ -25,7 +22,7 @@ class BaseSdkProfiler(object, metaclass=abc.ABCMeta):
 
     @property
     def targets(self):
-        return {"nnp320": 768, "nnp300": 792, "nnp200": 750}
+        return {"nnp200": 750, "nnp300": 792, "nnp310": 792, "nnp3020": 792, "nnp320": 768, "nnp400": 792}
 
     @abc.abstractmethod
     def load(self, model_path):
@@ -42,8 +39,4 @@ class BaseSdkProfiler(object, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def unload(self):
-        pass
-
-    @abc.abstractmethod
-    def save_profile(self):
         pass

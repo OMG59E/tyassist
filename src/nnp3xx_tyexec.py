@@ -136,7 +136,21 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 logger.error("Not found netbin_file -> {}".format(netbin_file))
                 exit(-1)
 
-            iss_fixed_outputs = run_net_bin(netbin_file, in_datas, work_path=self.model_dir, target=self.target)  # disable aipp
+            # aipp_info = [
+            #     {"enable": 1,  # 必须为 1
+            #      "format": 70,  # 图片格式 70<==>RGB  71<==>BGR
+            #      "src_width": 224,  # 图片宽
+            #      "src_height": 224,  # 图片高
+            #      "crop_enable": 0,  # 是否使能图片剪裁
+            #      "crop_co_x": 0,  # 剪裁起始横坐标
+            #      "crop_co_y": 0,  # 剪裁起始纵坐标
+            #      "crop_width": 224,  # 剪裁宽度
+            #      "crop_height": 224,  # 剪裁高度
+            #      }
+            # ]
+            aipp_info = None
+            iss_fixed_outputs = run_net_bin(netbin_file, in_datas, work_path=self.model_dir,
+                                            target=self.target, aipp_info=aipp_info)
             iss_fixed_outputs = [iss_fixed_outputs[name] for name in iss_fixed_outputs]  # dict to list
             if to_file and len(iss_fixed_outputs) > 0:
                 for idx, iss_fixed_output in enumerate(iss_fixed_outputs):
@@ -284,11 +298,11 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             if op_name not in func_info:
                 logger.warning("op_name[{}] not in model_profile.json".format(op_name))
                 continue
-            cycles = func_info[op_name]["cost"]
-            cost = cycles * 2.0 * 10**-3 / self.targets[self.target]
+            cycles = 0 if func_info[op_name]["cost"] < 0 else func_info[op_name]["cost"]
+            cost = cycles * 2.0 * 10**-3 / self.targets[self.target]  #
             ddr_read = 0
             ddr_write = 0
-            if cost != 0:
+            if cost > 0 and cycles > 0:
                 ddr_read = int(func_info[op_name]["ddr_read"]) * 1000 / cost / 1024**3
                 ddr_write = int(func_info[op_name]["ddr_read"]) * 1000 / cost / 1024**3
             else:

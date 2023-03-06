@@ -97,6 +97,7 @@ def build(cfg):
         logger.info("success")
     except Exception as e:
         logger.error("{}".format(traceback.format_exc()))
+        logger.error("TyAssist failed to build -> {}".format(e))
 
 
 def compare(cfg, backend):
@@ -147,6 +148,7 @@ def profile(cfg):
         logger.info("success")
     except Exception as e:
         logger.error("{}".format(traceback.format_exc()))
+        logger.error("TyAssist failed to profile -> {}".format(e))
 
 
 def test(cfg, dtype, backend):
@@ -219,6 +221,7 @@ def test(cfg, dtype, backend):
         return res
     except Exception as e:
         logger.error("{}".format(traceback.format_exc()))
+        logger.error("TyAssist failed to test -> {}".format(e))
 
 
 def demo(cfg, dtype, backend):
@@ -286,6 +289,7 @@ def demo(cfg, dtype, backend):
         logger.info("success")
     except Exception as e:
         logger.error("{}".format(traceback.format_exc()))
+        logger.error("TyAssist failed to demo -> {}".format(e))
 
 
 def run(config_filepath, phase, dtype, target, backend):

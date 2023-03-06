@@ -335,7 +335,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             quantize_config["float_list"].extend(skip_layer_idxes)
         if skip_layer_types:
             quantize_config["float_list"].extend(skip_layer_types)
-        if skip_layer_names:
+        if skip_layer_names and self.target.startswith("nnp3"):
             quantize_config["float_list"].extend(skip_layer_names)
         return quantize_config, norm
 

@@ -16,7 +16,10 @@ from utils import logger
 class Nnp3xxSdkProfiler(BaseSdkProfiler, abc.ABC):
     def __init__(self, net_cfg_file="/DEngine/tyhcp/net.cfg", sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
                  target="nnp300"):
-        super(Nnp3xxSdkProfiler, self).__init__(net_cfg_file, sdk_cfg_file, target)
+        super(Nnp3xxSdkProfiler, self).__init__(sdk_cfg_file, target)
+
+        self.ip = "127.0.0.1"
+        self.port = 9090
 
         with open(net_cfg_file, "r") as f:
             net_cfg = f.read().strip()
