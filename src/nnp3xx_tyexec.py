@@ -298,6 +298,8 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             if op_name not in func_info:
                 logger.warning("op_name[{}] not in model_profile.json".format(op_name))
                 continue
+            if "cost" not in func_info[op_name]:  # 跳过自定义算子
+                continue
             cycles = 0 if func_info[op_name]["cost"] < 0 else func_info[op_name]["cost"]
             cost = cycles * 2.0 * 10**-3 / self.targets[self.target]  #
             ddr_read = 0

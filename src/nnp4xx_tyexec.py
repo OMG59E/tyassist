@@ -26,11 +26,6 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
     @staticmethod
     def set_env():
-        import tvm
-        dep_path = "{}/de-dcl/client/lib".format(tvm.__path__[0])
-        ld_path = os.getenv("LD_LIBRARY_PATH")
-        ld_path = dep_path if ld_path is None else dep_path + ":" + ld_path
-        os.environ["LD_LIBRARY_PATH"] = ld_path
         # os.environ["EDGEX_DEBUG_ISS"] = "on"
         os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
@@ -142,7 +137,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 target_host=target_host,
                 target_host_cc=target_host_cc
             )
-
+            #
             # # compile edgex lib
             # _ = compile_nnp_model(
             #     self.relay_quant,
