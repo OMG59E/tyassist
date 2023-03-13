@@ -333,7 +333,7 @@ def benchmark(mapping_file, dtype, target, backend):
 
     header = ["ModelName", "InputSize", "Dataset", "Num", "Acc./mAP.", "Latency(ms)"]
     table = PrettyTable(header)
-    csv_filepath = "benchmark.csv"
+    csv_filepath = "benchmark_{}_{}_{}.csv".format(backend, dtype, target)
     f = open(csv_filepath, "w")
     f_csv = csv.writer(f)
     f_csv.writerow(header)
