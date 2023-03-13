@@ -108,7 +108,7 @@ def compare(cfg, backend):
         logger.info("{}".format(cfg))
         tyexec = get_tyexec(cfg)
         tyexec.backend = backend
-        fixed_outputs = tyexec.infer()
+        fixed_outputs = tyexec.infer()  # defalut disable aipp
 
         # compare
         for idx, fixed_output in enumerate(fixed_outputs):
@@ -167,6 +167,7 @@ def test(cfg, dtype, backend):
         test_num = cfg["test"]["test_num"]
         dataset_module = cfg["test"]["dataset_module"]
         dataset_cls = cfg["test"]["dataset_cls"]
+        enable_aipp = cfg["test"].get("enable_aipp", False)
 
         m = importlib.import_module(dataset_module)
         if hasattr(m, dataset_cls):
@@ -186,7 +187,7 @@ def test(cfg, dtype, backend):
                 inputs=tyexec.inputs,
                 dataset=dataset,
                 test_num=test_num,
-                enable_aipp=True,
+                enable_aipp=enable_aipp,
                 target=tyexec.target,  # nnp3xx/nnp4xx
                 dtype=dtype,   # int8/fp32
                 backend=backend  # tvm/iss/chip
@@ -241,6 +242,7 @@ def demo(cfg, dtype, backend):
         num = cfg["demo"]["num"]
         model_impl_module = cfg["model"]["model_impl_module"]
         model_impl_cls = cfg["model"]["model_impl_cls"]
+        enable_aipp = cfg["demo"].get("enable_aipp", False)
 
         file_list = os.listdir(data_dir)
         file_list = file_list if num > len(file_list) else file_list[0:num]
@@ -252,7 +254,7 @@ def demo(cfg, dtype, backend):
                 inputs=tyexec.inputs,
                 dataset=None,
                 test_num=0,
-                enable_aipp=True,
+                enable_aipp=enable_aipp,
                 target=tyexec.target,  # nnp3xx/nnp4xx
                 dtype=dtype,   # int8/fp32
                 backend=backend  # tvm/iss/chip

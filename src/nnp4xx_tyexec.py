@@ -72,7 +72,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         self.save_compare_layer_outputs()
 
     @staticmethod
-    def build_x86_64(relay_func, params, save_path=""):
+    def build_x86_64(relay_func, params, target, save_path=""):
         try:
             import tvm
             from tvm.contrib import graph_executor
@@ -168,7 +168,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
     def tvm_float_inference(self, in_datas, to_file=False):
         tvm_float_outputs = self.tvm_inference(
-            self.build_x86_64(self.relay, self.params, self.cpu_model_float_path), in_datas)
+            self.build_x86_64(self.relay, self.params, self.target, self.cpu_model_float_path), in_datas)
         if to_file and len(tvm_float_outputs) > 0:
             for idx, output in enumerate(tvm_float_outputs):
                 output.tofile(os.path.join(self.result_dir, "tvm_float_out_{}.bin".format(idx)))
@@ -177,7 +177,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
     def tvm_fixed_inference(self, in_datas, to_file=False):
         tvm_fixed_outputs = self.tvm_inference(
-            self.build_x86_64(self.relay_quant, self.params_quant, self.cpu_model_fixed_path), in_datas)
+            self.build_x86_64(self.relay_quant, self.params_quant, self.target, self.cpu_model_fixed_path), in_datas)
         if to_file and len(tvm_fixed_outputs) > 0:
             for idx, output in enumerate(tvm_fixed_outputs):
                 output.tofile(os.path.join(self.result_dir, "tvm_fixed_out_{}.bin".format(idx)))

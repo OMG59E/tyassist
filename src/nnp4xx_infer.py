@@ -103,7 +103,7 @@ class Nnp4xxTvmInfer(Nnp3xxTvmInfer, ABC):
         import tvm
         from tvm import relay
         relay_func = tvm.relay.quantization.get_ir_from_json(model_path)
-        self.engine = Nnp4xxTyExec.build_x86_64(relay_func, {})
+        self.engine = Nnp4xxTyExec.build_x86_64(relay_func, {}, self.target)
 
     def load(self, model_path):
         import tvm
