@@ -42,7 +42,7 @@ build: {
     calib_method: "l2norm",
     skip_layer_names: [ "Conv_198", "Conv_217", "Conv_236" ],
   },
-  enable_dump: 2,
+  enable_dump: 1,
 }
 
 test: {
