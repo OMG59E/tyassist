@@ -126,6 +126,8 @@ DetectionOut(int input_num, int output_num, void *input, int *input_shape, char 
                 max_conf = score;
             }
         }
+        if (max_conf < conf_threshold)
+            continue;
         detection.cls = num_cls;
         detection.conf = max_conf;
         detections.emplace_back(detection);
