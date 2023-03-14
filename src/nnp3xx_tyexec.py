@@ -197,6 +197,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         while opt_level >= 0:
             try:
                 engine = internal_build(relay_func, params, opt_level)
+                break
             except Exception as _:
                 logger.warning("Failed to build host model with opt_level={}, and try opt_level={}".format(
                     opt_level, opt_level-1))
@@ -218,7 +219,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
 
             opt_cfg = dict()
             opt_cfg["SUPPRESS_LONG_FUNC"] = self.cfg["build"]["suppress_long_func"]
-            # opt_cfg["FUNC_RUN_TIME_MAX"] = 0
+            opt_cfg["FUNC_RUN_TIME_MAX"] = 0
 
             logger.info("################### build start ####################")
             import deepeye
