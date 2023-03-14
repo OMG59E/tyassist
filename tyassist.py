@@ -342,13 +342,14 @@ def benchmark(mapping_file, dtype, target, backend):
     models_dict = read_yaml_to_dict(mapping_file)["models"]
     root = os.getcwd()
     for model_name in models_dict:
+        logger.info("Process {}".format(model_name))
         config_filepath = models_dict[model_name]
         config_abspath = os.path.abspath(config_filepath)
         config_dir = os.path.dirname(config_abspath)
         # 判断是否已存在模型
         model_cfg = read_yaml_to_dict(config_abspath)
         save_path = os.path.abspath(model_cfg["model"]["save_dir"])
-        if not os.path.join(save_path, "net_combine.bin"):
+        if not os.path.join(save_path, model_cfg["model"].get("name", "net_combine.ty")):
             logger.warning("Model not found -> {}".format(save_path))
             continue
 
@@ -366,6 +367,7 @@ def benchmark(mapping_file, dtype, target, backend):
             row = [model_name, res["input_size"], res["dataset"], res["num"], "{}/{}/{}".format(res["easy"], res["medium"], res["hard"]), res["latency"]]
         table.add_row(row)
         f_csv.writerow(row)
+        logger.info("Finish {}".format(model_name))
     f.close()
     logger.info("\n{}".format(table))
     logger.info("success")
