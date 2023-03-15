@@ -331,9 +331,25 @@ def benchmark(mapping_file, dtype, target, backend):
     import csv
     from prettytable import PrettyTable
 
+    try:
+        if target.startswith("nnp3"):
+            import deepeye
+            version = deepeye.util.get_version()
+            version = "v{}".format(version)
+        elif target.startswith("nnp4"):
+            from tvm.contrib.edgex import get_version
+            version = get_version()
+            version = version["TYTVM_VERSION"].split("-")[-1]
+        else:
+            logger.error("Not support target -> {}".format(target))
+            exit(-1)
+    except Exception as e:
+        logger.error("Failed to get tytvm version -> {}\n{}".format(e, traceback.format_exc()))
+        exit(-1)
+
     header = ["ModelName", "InputSize", "Dataset", "Num", "Acc./mAP.", "Latency(ms)"]
     table = PrettyTable(header)
-    csv_filepath = "benchmark_{}_{}_{}.csv".format(backend, dtype, target)
+    csv_filepath = "benchmark_{}_{}_{}_{}.csv".format(backend, dtype, target, version)
     f = open(csv_filepath, "w")
     f_csv = csv.writer(f)
     f_csv.writerow(header)
