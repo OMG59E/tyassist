@@ -54,6 +54,10 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
                 logger.error("Failed to load model")
                 exit(-1)
             logger.info("load model success")
+
+            json_graph = self.engine.get_json_graph()
+            with open(os.path.join(self.result_dir, "graph.json"), "w") as f:
+                f.write(json_graph)
         except Exception as e:
             logger.error("load failed -> {}".format(e))
             exit(-1)
@@ -61,8 +65,7 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
     def run(self, in_datas: dict, to_file=False):
         if isinstance(in_datas, dict):
             in_datas = [in_datas[key] for key in in_datas]  # to list
-        for _ in range(5):
-            outputs = self.engine.inference(in_datas)
+        _ = self.engine.inference(in_datas)
 
     def unload(self):
         if self.engine:
@@ -76,21 +79,47 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
         self.unload()
 
     def parse(self):
+        graph_json = os.path.join(self.result_dir, "graph.json")
+        if not os.path.exists(graph_json):
+            logger.error("Not found {}".format(graph_json))
+            exit(-1)
+
         profile_file = os.path.join(self.profile_dir, "ai_core.bin")
         if not os.path.exists(profile_file):
             logger.error("Not found profile file -> {}".format(profile_file))
             exit(-1)
         try:
             import python._sdk as _sdk
-            profile_str = _sdk.parse(profile_file)
-            logger.info(profile_str)
-            res = json.loads(profile_str)
+            profile_json = _sdk.parse(profile_file)
+            profile = json.loads(profile_json)
             # dump
-            profile_str = json.dumps(res, indent=2)
-            with open("profile.json", "w") as f:
-                f.write(profile_str)
+            profile_json = json.dumps(profile, indent=2)
+            with open(os.path.join(self.result_dir, "profile.json"), "w") as f:
+                f.write(profile_json)
             # delete ai_core.bin
             os.remove(profile_file)
+
+            op_names = dict()
+            with open(graph_json, "r") as f:
+                graph = json.load(f)
+            nodes = graph["nodes"]
+            for node in nodes:
+                if "attrs" not in node:
+                    continue
+                if "func_name" not in node["attrs"]:
+                    continue
+                func_name = node["attrs"]["func_name"]
+                key = func_name.split("_")[0]
+                op_names[key] = func_name
+
+            for p in profile:
+                ops = p["ops"]
+                for op in ops:
+                    idx = op["id"]
+                    exec_cycle = op["exec_cyc"]
+                    gap_cycle = op["gap_cyc"]
+                    op_name = op_names["f{}".format(idx)]
+                    print(op_name, exec_cycle, gap_cycle)
         except Exception as e:
             logger.error("Failed to parse profile -> {}\n{}".format(e, traceback.format_exc()))
             exit(-1)
