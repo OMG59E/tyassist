@@ -22,7 +22,7 @@ class BaseSdkProfiler(object, metaclass=abc.ABCMeta):
 
     @property
     def targets(self):
-        return {"nnp200": 750, "nnp300": 792, "nnp310": 792, "nnp3020": 792, "nnp320": 768, "nnp400": 792}
+        return {"nnp200": 750, "nnp300": 792, "nnp310": 792, "nnp3020": 792, "nnp320": 768, "nnp400": 500}
 
     @abc.abstractmethod
     def load(self, model_path):
