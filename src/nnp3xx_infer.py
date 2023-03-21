@@ -230,7 +230,7 @@ class Nnp3xxTvmInfer(BaseInfer, ABC):
         from tvm import relay
         logger.info("loading model -> {}".format(model_path))
         relay_func = tvm.relay.quantization.get_ir_from_json(model_path)
-        self.engine = Nnp3xxTyExec.build_x86_64(relay_func, {})
+        self.engine = Nnp3xxTyExec.build_x86_64(relay_func, {}, self.target)
         logger.info("load success")
 
     def load(self, model_path):

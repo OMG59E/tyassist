@@ -135,6 +135,8 @@ test: {
   # 数据集模块名(必须设置), 必须与yml配置文件同级目录
   dataset_module: ,
   dataset_cls: ,
+  # 是否使能aipp，前提必须编译模型时enable_aipp, 仅对chip/iss生效
+  enable_aipp: false,
 }
 
 demo: {
@@ -143,4 +145,7 @@ demo: {
   
   # demo测试样例数，实际测试数为数据路径内数据数与本数的较小者，配置0为数据路径内所有数据
   num: 20,
+
+  # 是否使能aipp，前提必须编译模型时enable_aipp, 仅对chip/iss生效
+  enable_aipp: false,
 }

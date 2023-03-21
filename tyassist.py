@@ -108,7 +108,7 @@ def compare(cfg, backend):
         logger.info("{}".format(cfg))
         tyexec = get_tyexec(cfg)
         tyexec.backend = backend
-        fixed_outputs = tyexec.infer()
+        fixed_outputs = tyexec.infer()  # defalut disable aipp
 
         # compare
         for idx, fixed_output in enumerate(fixed_outputs):
@@ -167,6 +167,7 @@ def test(cfg, dtype, backend):
         test_num = cfg["test"]["test_num"]
         dataset_module = cfg["test"]["dataset_module"]
         dataset_cls = cfg["test"]["dataset_cls"]
+        enable_aipp = cfg["test"].get("enable_aipp", False)
 
         m = importlib.import_module(dataset_module)
         if hasattr(m, dataset_cls):
@@ -186,7 +187,7 @@ def test(cfg, dtype, backend):
                 inputs=tyexec.inputs,
                 dataset=dataset,
                 test_num=test_num,
-                enable_aipp=True,
+                enable_aipp=enable_aipp,
                 target=tyexec.target,  # nnp3xx/nnp4xx
                 dtype=dtype,   # int8/fp32
                 backend=backend  # tvm/iss/chip
@@ -241,6 +242,7 @@ def demo(cfg, dtype, backend):
         num = cfg["demo"]["num"]
         model_impl_module = cfg["model"]["model_impl_module"]
         model_impl_cls = cfg["model"]["model_impl_cls"]
+        enable_aipp = cfg["demo"].get("enable_aipp", False)
 
         file_list = os.listdir(data_dir)
         file_list = file_list if num > len(file_list) else file_list[0:num]
@@ -252,7 +254,7 @@ def demo(cfg, dtype, backend):
                 inputs=tyexec.inputs,
                 dataset=None,
                 test_num=0,
-                enable_aipp=True,
+                enable_aipp=enable_aipp,
                 target=tyexec.target,  # nnp3xx/nnp4xx
                 dtype=dtype,   # int8/fp32
                 backend=backend  # tvm/iss/chip
@@ -329,9 +331,25 @@ def benchmark(mapping_file, dtype, target, backend):
     import csv
     from prettytable import PrettyTable
 
+    try:
+        if target.startswith("nnp3"):
+            import deepeye
+            version = deepeye.util.get_version()
+            version = "v{}".format(version)
+        elif target.startswith("nnp4"):
+            from tvm.contrib.edgex import get_version
+            version = get_version()
+            version = version["TYTVM_VERSION"].split("-")[-1]
+        else:
+            logger.error("Not support target -> {}".format(target))
+            exit(-1)
+    except Exception as e:
+        logger.error("Failed to get tytvm version -> {}\n{}".format(e, traceback.format_exc()))
+        exit(-1)
+
     header = ["ModelName", "InputSize", "Dataset", "Num", "Acc./mAP.", "Latency(ms)"]
     table = PrettyTable(header)
-    csv_filepath = "benchmark.csv"
+    csv_filepath = "benchmark_{}_{}_{}_{}.csv".format(backend, dtype, target, version)
     f = open(csv_filepath, "w")
     f_csv = csv.writer(f)
     f_csv.writerow(header)
@@ -340,13 +358,14 @@ def benchmark(mapping_file, dtype, target, backend):
     models_dict = read_yaml_to_dict(mapping_file)["models"]
     root = os.getcwd()
     for model_name in models_dict:
+        logger.info("Process {}".format(model_name))
         config_filepath = models_dict[model_name]
         config_abspath = os.path.abspath(config_filepath)
         config_dir = os.path.dirname(config_abspath)
         # 判断是否已存在模型
         model_cfg = read_yaml_to_dict(config_abspath)
         save_path = os.path.abspath(model_cfg["model"]["save_dir"])
-        if not os.path.join(save_path, "net_combine.bin"):
+        if not os.path.join(save_path, model_cfg["model"].get("name", "net_combine.ty")):
             logger.warning("Model not found -> {}".format(save_path))
             continue
 
@@ -364,6 +383,7 @@ def benchmark(mapping_file, dtype, target, backend):
             row = [model_name, res["input_size"], res["dataset"], res["num"], "{}/{}/{}".format(res["easy"], res["medium"], res["hard"]), res["latency"]]
         table.add_row(row)
         f_csv.writerow(row)
+        logger.info("Finish {}".format(model_name))
     f.close()
     logger.info("\n{}".format(table))
     logger.info("success")

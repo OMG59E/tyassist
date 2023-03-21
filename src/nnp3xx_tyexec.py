@@ -109,7 +109,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         return input_info
 
     def tvm_float_inference(self, in_datas, to_file=False):
-        engine = self.build_x86_64(self.relay, self.params)
+        engine = self.build_x86_64(self.relay, self.params, self.target)
         tvm_float_outputs = self.tvm_inference(engine, in_datas)
         # tvm_float_outputs = tvm_float_outputs.values()  # dict to list
         if to_file and len(tvm_float_outputs) > 0:
@@ -119,7 +119,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         return tvm_float_outputs
 
     def tvm_fixed_inference(self, in_datas, to_file=False):
-        engine = self.build_x86_64(self.relay_quant, self.params_quant)
+        engine = self.build_x86_64(self.relay_quant, self.params_quant, self.target)
         tvm_float_outputs = self.tvm_inference(engine, in_datas)
         if to_file and len(tvm_float_outputs) > 0:
             for idx, output in enumerate(tvm_float_outputs):
@@ -169,30 +169,45 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 pickle.dump(weight, fp)
 
     @staticmethod
-    def build_x86_64(relay_func, params, save_path=""):
+    def build_x86_64(relay_func, params, target, save_path=""):
         """ build tvm cpu model
         @param relay_func:
         @param params:
+        @param target:
         @param save_path:
         @return:
         """
-        try:
+        def internal_build(func, p, opt_level=3):
             import tvm
             from tvm import relay
             from tvm.contrib import graph_runtime
             from deepeye.relay_pass import rewrite_for_cpu
-            relay_func = relay.relay_pass.bind_params(relay_func, params)
-            relay_func.ret_type = None
-            relay_func, cpu_params = rewrite_for_cpu(relay_func, sim_target="nnp300")
+            func = relay.relay_pass.bind_params(func, p)
+            func.ret_type = None
+            func, cpu_params = rewrite_for_cpu(func, sim_target=target)
             ctx = tvm.cpu(0)
-            with relay.build_config(opt_level=3):
-                graph, lib, cpu_params = relay.build(relay_func, "llvm", params=cpu_params)
+            with relay.build_config(opt_level=opt_level):
+                graph, lib, cpu_params = relay.build(func, "llvm", params=cpu_params)
             engine = graph_runtime.create(graph, lib, ctx)
             engine.set_input(**cpu_params)
             return engine
-        except Exception as e:
-            logger.error("Failed to compile model -> {}".format(e))
+
+        engine = None
+        opt_level = 3
+        while opt_level >= 0:
+            try:
+                engine = internal_build(relay_func, params, opt_level)
+                break
+            except Exception as _:
+                logger.warning("Failed to build host model with opt_level={}, and try opt_level={}".format(
+                    opt_level, opt_level-1))
+                opt_level -= 1
+                engine = None
+        if engine is None:
+            logger.error("Failed to build_x86_64 model")
             exit(-1)
+
+        return engine
 
     def build(self, in_datas):
         """build relay quant
@@ -217,7 +232,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 model_name="opt_ir",
                 return_buffer=False,
                 debug_level=1 if self.enable_dump else 0,
-                opt_cfg=None,
+                opt_cfg=opt_cfg,
                 extra_info=""
             )
             logger.info("################### build end ####################")
@@ -411,8 +426,8 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
     def infer(self):
         """ infer one time """
         from .nnp3xx_infer import Nnp3xxSdkInfer
-        in_datas = self.get_datas(force_cr=False, to_file=False)
-        infer = Nnp3xxSdkInfer(enable_dump=self.enable_dump, enable_aipp=True)
+        in_datas = self.get_datas(force_cr=True, to_file=False)
+        infer = Nnp3xxSdkInfer(enable_dump=self.enable_dump, enable_aipp=False)
         infer.backend = self.backend
         infer.set_input_enable_aipps([_input["enable_aipp"] for _input in self.inputs])
         infer.set_input_pixel_format([_input["pixel_format"] for _input in self.inputs])

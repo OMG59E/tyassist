@@ -406,7 +406,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
 
     @staticmethod
     @abc.abstractmethod
-    def build_x86_64(relay_func, params, save_path=""):
+    def build_x86_64(relay_func, params, target, save_path=""):
         """compile cpu model"""
         raise NotImplementedError
 

@@ -16,7 +16,7 @@ model: {
       resize_type: 0,
       padding_value: 128,
       padding_mode: 0,
-      data_path: "../../data/pic/rgbd/rgb/banana.png",
+      data_path: "rgbd/rgb/banana.png",
     }
   ],
 
@@ -31,17 +31,16 @@ build: {
   target: "nnp300",
   enable_quant: true,
   enable_build: true,
+  suppress_long_func: true,
   quant: {
-    data_dir: "../../data/pic/rgbd",
-    prof_img_num: 50,
+    data_dir: "rgbd",
+    prof_img_num: 1,
     similarity_img_num: 1,
     similarity_dataset: ,
     custom_preprocess_module: "custom_preprocess",
     custom_preprocess_cls: "CustomTensorFlowImgD",
     debug_level: 0,
     calib_method: "kld",
-    skip_layer_idxes: [ 3, 131 ],
-    skip_layer_types: [ ],
   },
   enable_dump: 1,
 }

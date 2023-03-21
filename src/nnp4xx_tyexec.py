@@ -6,6 +6,7 @@
 @Author  : xingwg
 @software: PyCharm 
 """
+import json
 import os
 from abc import ABC
 from utils import logger
@@ -72,7 +73,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         self.save_compare_layer_outputs()
 
     @staticmethod
-    def build_x86_64(relay_func, params, save_path=""):
+    def build_x86_64(relay_func, params, target, save_path=""):
         try:
             import tvm
             from tvm.contrib import graph_executor
@@ -168,7 +169,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
     def tvm_float_inference(self, in_datas, to_file=False):
         tvm_float_outputs = self.tvm_inference(
-            self.build_x86_64(self.relay, self.params, self.cpu_model_float_path), in_datas)
+            self.build_x86_64(self.relay, self.params, self.target, self.cpu_model_float_path), in_datas)
         if to_file and len(tvm_float_outputs) > 0:
             for idx, output in enumerate(tvm_float_outputs):
                 output.tofile(os.path.join(self.result_dir, "tvm_float_out_{}.bin".format(idx)))
@@ -177,7 +178,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
     def tvm_fixed_inference(self, in_datas, to_file=False):
         tvm_fixed_outputs = self.tvm_inference(
-            self.build_x86_64(self.relay_quant, self.params_quant, self.cpu_model_fixed_path), in_datas)
+            self.build_x86_64(self.relay_quant, self.params_quant, self.target, self.cpu_model_fixed_path), in_datas)
         if to_file and len(tvm_fixed_outputs) > 0:
             for idx, output in enumerate(tvm_fixed_outputs):
                 output.tofile(os.path.join(self.result_dir, "tvm_fixed_out_{}.bin".format(idx)))
@@ -229,7 +230,14 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         logger.warning("Nnp4xx not support compress analysis")
 
     def get_profile_info(self):
-        logger.warning("Nnp4xx not support profile")
+        from tvm.contrib.edgex import estimate_FLOPs
+        from tvm.contrib.edgex import estimate_cycles
+        flops = estimate_FLOPs(self.relay_quant)
+        cycles = estimate_cycles(self.relay_quant)
+        with open(os.path.join(self.result_dir, "flops.json"), "w") as f:
+            f.write(json.dumps(flops, indent=2))
+        with open(os.path.join(self.result_dir, "cycles.json"), "w") as f:
+            f.write(json.dumps(cycles, indent=2))
 
     @staticmethod
     def save_relay_to_model(quant_model_path, relay_func, params):
