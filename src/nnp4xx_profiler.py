@@ -10,6 +10,8 @@ import os
 import abc
 import json
 import time
+import shutil
+import uuid
 import traceback
 from .base_profiler import BaseSdkProfiler
 from utils import logger
@@ -36,6 +38,7 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             cfg = json.load(f)
         self.profile_dir = cfg["profiler"]["host_output"]
         self.result_dir = ""
+        self.uuid = str(uuid.uuid1())
 
     def load(self, model_path):
         self.result_dir = os.path.join(os.path.dirname(model_path), "result")
@@ -87,12 +90,17 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             self.engine = None
             import python._sdk as _sdk
             _sdk.finalize()
+            # rename
+            shutil.move(os.path.join(self.profile_dir, "dcl_api.bin"),
+                        os.path.join(self.profile_dir, "dcl_api_{}.bin".format(self.uuid)))
+            shutil.move(os.path.join(self.profile_dir, "ai_core.bin"),
+                        os.path.join(self.profile_dir, "ai_core_{}.bin".format(self.uuid)))
 
     def __del__(self):
         self.unload()
 
     def parse_dcl_api(self):
-        dcl_api_bin = os.path.join(self.profile_dir, "dcl_api.bin")
+        dcl_api_bin = os.path.join(self.profile_dir, "dcl_api_{}.bin".format(self.uuid))
         if not os.path.exists(dcl_api_bin):
             logger.error("Not found profile file -> {}".format(dcl_api_bin))
             exit(-1)
@@ -101,9 +109,6 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             import python._sdk as _sdk
             profile_json = _sdk.parse_dcl_api(dcl_api_bin)
             profile = json.loads(profile_json)
-            # delete ai_core.bin
-            os.remove(dcl_api_bin)
-
             total_time = profile["dclmdlExecute"] / 10**6 / 10
             return total_time
 
@@ -119,7 +124,7 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             logger.error("Not found {}".format(graph_json))
             exit(-1)
 
-        ai_core_bin = os.path.join(self.profile_dir, "ai_core.bin")
+        ai_core_bin = os.path.join(self.profile_dir, "ai_core_{}.bin".format(self.uuid))
         if not os.path.exists(ai_core_bin):
             logger.error("Not found profile file -> {}".format(ai_core_bin))
             exit(-1)
@@ -131,8 +136,6 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             profile_json = json.dumps(profile, indent=2)
             with open(os.path.join(self.result_dir, "profile.json"), "w") as f:
                 f.write(profile_json)
-            # delete ai_core.bin
-            os.remove(ai_core_bin)
 
             op_names = dict()
             with open(graph_json, "r") as f:

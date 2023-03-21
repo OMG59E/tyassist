@@ -7,6 +7,8 @@
 @software: PyCharm 
 """
 import os
+import shutil
+import uuid
 import json
 import traceback
 from abc import ABC
@@ -37,6 +39,7 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
 
         self.dump_root_path = ""
         self.result_dir = ""
+        self.uuid = str(uuid.uuid1())
 
     def load(self, model_path):
         self.result_dir = os.path.join(os.path.dirname(model_path), "result")
@@ -99,13 +102,16 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
             self.engine = None
             import python._sdk as _sdk
             _sdk.finalize()
+            # rename
+            shutil.move(os.path.join(self.profile_dir, "dcl_api.bin"),
+                        os.path.join(self.profile_dir, "dcl_api_{}.bin".format(self.uuid)))
 
     def __del__(self):
         self.unload()
 
     @property
     def ave_latency_ms(self):
-        profile_file = os.path.join(self.profile_dir, "dcl_api.bin")
+        profile_file = os.path.join(self.profile_dir, "dcl_api_{}.bin".format(self.uuid))
         if not os.path.exists(profile_file):
             logger.error("Not found profile file -> {}".format(profile_file))
             exit(-1)
@@ -114,9 +120,6 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
             import python._sdk as _sdk
             profile_json = _sdk.parse_dcl_api(profile_file)
             profile = json.loads(profile_json)
-            # delete ai_core.bin
-            os.remove(profile_file)
-
             total_time = profile["dclmdlExecute"] / 10**6 / self.total
             return total_time
 
