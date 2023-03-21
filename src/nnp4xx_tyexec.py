@@ -165,6 +165,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         infer.load(model_path)
         outputs = infer.run(in_datas, to_file=True)
         infer.unload()
+        ave_latency_ms = infer.ave_latency_ms
+        logger.info("[{}] average cost: {:.3f}ms".format(self.target, ave_latency_ms))
         return outputs
 
     def tvm_float_inference(self, in_datas, to_file=False):

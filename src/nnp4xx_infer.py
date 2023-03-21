@@ -7,12 +7,16 @@
 @software: PyCharm 
 """
 import os
-import time
+import shutil
+import uuid
+import json
+import traceback
 from abc import ABC
 from utils import logger
 from .base_infer import BaseInfer
 from .nnp4xx_tyexec import Nnp4xxTyExec
 from .nnp3xx_infer import Nnp3xxTvmInfer
+from .nnp4xx_profiler import Nnp4xxProfileTypeEnum
 
 
 class Nnp4xxSdkInfer(BaseInfer, ABC):
@@ -26,13 +30,16 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
 
         self.sdk_cfg_file = sdk_cfg_file
 
+        with open(self.sdk_cfg_file) as f:
+            cfg = json.load(f)
+        self.profile_dir = cfg["profiler"]["host_output"]
+
         self.enable_dump = enable_dump
         self.enable_aipp = enable_aipp
 
         self.dump_root_path = ""
         self.result_dir = ""
-
-        # self.backend = "chip"
+        self.uuid = str(uuid.uuid1())
 
     def load(self, model_path):
         self.result_dir = os.path.join(os.path.dirname(model_path), "result")
@@ -58,6 +65,10 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
 
             self.engine = _sdk.CNetOperator()
 
+            if not self.engine.profile(Nnp4xxProfileTypeEnum.DCL_PROF_DCL_API):  # profile
+                logger.error("Failed to set profile")
+                exit(-1)
+
             logger.info("load model " + model_path)
             if not self.engine.load(model_path):
                 logger.error("Failed to load model")
@@ -71,6 +82,7 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
         if isinstance(in_datas, dict):
             in_datas = [in_datas[key] for key in in_datas]  # to list
         outputs = self.engine.inference(in_datas)
+        self.total += 1
         if to_file:
             logger.info("[{}] predict result: outputs size -> {}".format(self.backend, len(outputs)))
             for idx, output in enumerate(outputs):
@@ -90,9 +102,30 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
             self.engine = None
             import python._sdk as _sdk
             _sdk.finalize()
+            # rename
+            shutil.move(os.path.join(self.profile_dir, "dcl_api.bin"),
+                        os.path.join(self.profile_dir, "dcl_api_{}.bin".format(self.uuid)))
 
     def __del__(self):
         self.unload()
+
+    @property
+    def ave_latency_ms(self):
+        profile_file = os.path.join(self.profile_dir, "dcl_api_{}.bin".format(self.uuid))
+        if not os.path.exists(profile_file):
+            logger.error("Not found profile file -> {}".format(profile_file))
+            exit(-1)
+
+        try:
+            import python._sdk as _sdk
+            profile_json = _sdk.parse_dcl_api(profile_file)
+            profile = json.loads(profile_json)
+            total_time = profile["dclmdlExecute"] / 10**6 / self.total
+            return total_time
+
+        except Exception as e:
+            logger.error("Failed to parse profile -> {}\n{}".format(e, traceback.format_exc()))
+            exit(-1)
 
 
 class Nnp4xxTvmInfer(Nnp3xxTvmInfer, ABC):
@@ -110,5 +143,3 @@ class Nnp4xxTvmInfer(Nnp3xxTvmInfer, ABC):
         from tvm.contrib import graph_executor
         lib = tvm.runtime.load_module(model_path)
         self.engine = tvm.contrib.graph_executor.GraphModule(lib["default"](tvm.cpu()))
-
-

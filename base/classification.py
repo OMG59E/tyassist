@@ -59,6 +59,7 @@ class Classifier(BaseModel, ABC):
 
     @property
     def ave_latency_ms(self):
+        self.infer.unload()
         return self.infer.ave_latency_ms
 
     @property

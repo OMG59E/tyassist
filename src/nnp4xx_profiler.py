@@ -9,11 +9,22 @@
 import os
 import abc
 import json
-import shutil
 import time
+import shutil
+import uuid
 import traceback
 from .base_profiler import BaseSdkProfiler
 from utils import logger
+
+
+class Nnp4xxProfileTypeEnum(object):
+    DCL_PROF_DCL_API = 0x0001
+    DCL_PROF_TASK_TIME = 0x0002
+    DCL_PROF_AICORE_METRICS = 0x0004
+    DCL_PROF_AICPU = 0x0008
+    DCL_PROF_MODEL_METRICS = 0x0010
+    DCL_PROF_RUNTIME_API = 0x0020
+    DCL_PROF_UNVALID = 0x8000
 
 
 class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
@@ -27,6 +38,7 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             cfg = json.load(f)
         self.profile_dir = cfg["profiler"]["host_output"]
         self.result_dir = ""
+        self.uuid = str(uuid.uuid1())
 
     def load(self, model_path):
         self.result_dir = os.path.join(os.path.dirname(model_path), "result")
@@ -46,7 +58,7 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
 
             self.engine = _sdk.CNetOperator()
 
-            if not self.engine.profile():  # profile
+            if not self.engine.profile(Nnp4xxProfileTypeEnum.DCL_PROF_AICORE_METRICS | Nnp4xxProfileTypeEnum.DCL_PROF_DCL_API):  # profile
                 logger.error("Failed to set profile")
                 exit(-1)
 
@@ -78,30 +90,52 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             self.engine = None
             import python._sdk as _sdk
             _sdk.finalize()
+            # rename
+            shutil.move(os.path.join(self.profile_dir, "dcl_api.bin"),
+                        os.path.join(self.profile_dir, "dcl_api_{}.bin".format(self.uuid)))
+            shutil.move(os.path.join(self.profile_dir, "ai_core.bin"),
+                        os.path.join(self.profile_dir, "ai_core_{}.bin".format(self.uuid)))
 
     def __del__(self):
         self.unload()
 
+    def parse_dcl_api(self):
+        dcl_api_bin = os.path.join(self.profile_dir, "dcl_api_{}.bin".format(self.uuid))
+        if not os.path.exists(dcl_api_bin):
+            logger.error("Not found profile file -> {}".format(dcl_api_bin))
+            exit(-1)
+
+        try:
+            import python._sdk as _sdk
+            profile_json = _sdk.parse_dcl_api(dcl_api_bin)
+            profile = json.loads(profile_json)
+            total_time = profile["dclmdlExecute"] / 10**6 / 10
+            return total_time
+
+        except Exception as e:
+            logger.error("Failed to parse profile -> {}\n{}".format(e, traceback.format_exc()))
+            exit(-1)
+
     def parse(self):
+        ave_latency_ms = self.parse_dcl_api()
+
         graph_json = os.path.join(self.result_dir, "graph.json")
         if not os.path.exists(graph_json):
             logger.error("Not found {}".format(graph_json))
             exit(-1)
 
-        profile_file = os.path.join(self.profile_dir, "ai_core.bin")
-        if not os.path.exists(profile_file):
-            logger.error("Not found profile file -> {}".format(profile_file))
+        ai_core_bin = os.path.join(self.profile_dir, "ai_core_{}.bin".format(self.uuid))
+        if not os.path.exists(ai_core_bin):
+            logger.error("Not found profile file -> {}".format(ai_core_bin))
             exit(-1)
         try:
             import python._sdk as _sdk
-            profile_json = _sdk.parse(profile_file)
+            profile_json = _sdk.parse_ai_core(ai_core_bin)
             profile = json.loads(profile_json)
             # dump
             profile_json = json.dumps(profile, indent=2)
             with open(os.path.join(self.result_dir, "profile.json"), "w") as f:
                 f.write(profile_json)
-            # delete ai_core.bin
-            os.remove(profile_file)
 
             op_names = dict()
             with open(graph_json, "r") as f:
@@ -192,12 +226,13 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             mean_total_exec_cycles = int(total_exec_cycles / num_iter)
             mean_total_gap_cycles = int(total_gap_cycles / num_iter)
             mean_total_time = int(total_time / num_iter)  # ns
-            logger.info("NumIter: {}, Exec Span: {:.3f}ms, Gap Span: {:.3f}ms, Total Span: {:.3f}ms".format(
+            logger.info("NumIter: {}, Exec Span: {:.3f}ms, Gap Span: {:.3f}ms, Task Span: {:.3f}ms".format(
                 num_iter,
                 mean_total_exec_cycles * 2.0 * 10**-3 / self.targets[self.target],
                 mean_total_gap_cycles * 2.0 * 10**-3 / self.targets[self.target],
                 mean_total_time * 10**-6
             ))
+            logger.info("[{}] average cost: {:.3f}ms".format(self.target, ave_latency_ms))
 
         except Exception as e:
             logger.error("Failed to parse profile -> {}\n{}".format(e, traceback.format_exc()))
