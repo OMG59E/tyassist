@@ -65,9 +65,10 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
 
             self.engine = _sdk.CNetOperator()
 
-            if not self.engine.profile(Nnp4xxProfileTypeEnum.DCL_PROF_DCL_API):  # profile
-                logger.error("Failed to set profile")
-                exit(-1)
+            if self.backend != "iss":
+                if not self.engine.profile(Nnp4xxProfileTypeEnum.DCL_PROF_DCL_API):  # profile
+                    logger.error("Failed to set profile")
+                    exit(-1)
 
             logger.info("load model " + model_path)
             if not self.engine.load(model_path):
@@ -103,14 +104,19 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
             import python._sdk as _sdk
             _sdk.finalize()
             # rename
-            shutil.move(os.path.join(self.profile_dir, "dcl_api.bin"),
-                        os.path.join(self.profile_dir, "dcl_api_{}.bin".format(self.uuid)))
+            dcl_api_bin = os.path.join(self.profile_dir, "dcl_api.bin")
+            if os.path.exists(dcl_api_bin):
+                shutil.move(os.path.join(self.profile_dir, "dcl_api.bin"),
+                            os.path.join(self.profile_dir, "dcl_api_{}.bin".format(self.uuid)))
 
     def __del__(self):
         self.unload()
 
     @property
     def ave_latency_ms(self):
+        if self.backend == "iss":
+            return 0
+
         profile_file = os.path.join(self.profile_dir, "dcl_api_{}.bin".format(self.uuid))
         if not os.path.exists(profile_file):
             logger.error("Not found profile file -> {}".format(profile_file))
