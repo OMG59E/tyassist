@@ -38,6 +38,12 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             cfg = json.load(f)
         self.profile_dir = cfg["profiler"]["host_output"]
         self.result_dir = ""
+
+        self.ip = cfg["rpc"]["ip_addr"]
+        if self.ip == "127.0.0.1":   # TODO 非127.0.0.1的地址也可能是ISS服务
+            logger.error("ISS mode not support profile")
+            exit(-1)
+
         self.uuid = str(uuid.uuid1())
 
     def load(self, model_path):

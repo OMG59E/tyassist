@@ -321,7 +321,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             ddr_write = 0
             if cost > 0 and cycles > 0:
                 ddr_read = int(func_info[op_name]["ddr_read"]) * 1000 / cost / 1024**3
-                ddr_write = int(func_info[op_name]["ddr_read"]) * 1000 / cost / 1024**3
+                ddr_write = int(func_info[op_name]["ddr_write"]) * 1000 / cost / 1024**3
             else:
                 logger.warning("vu op[{}] not support dump cycle info".format(debug_name))
 
