@@ -33,6 +33,10 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
         with open(self.sdk_cfg_file) as f:
             cfg = json.load(f)
         self.profile_dir = cfg["profiler"]["host_output"]
+        self.ip = cfg["rpc"]["ip_addr"]
+        self.backend = "chip"
+        if self.ip == "127.0.0.1":   # TODO 非127.0.0.1的地址也可能是ISS服务
+            self.backend = "sdk_iss"
 
         self.enable_dump = enable_dump
         self.enable_aipp = enable_aipp
@@ -65,7 +69,7 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
 
             self.engine = _sdk.CNetOperator()
 
-            if self.backend != "iss":
+            if self.backend != "sdk_iss":
                 if not self.engine.profile(Nnp4xxProfileTypeEnum.DCL_PROF_DCL_API):  # profile
                     logger.error("Failed to set profile")
                     exit(-1)
@@ -114,7 +118,7 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
 
     @property
     def ave_latency_ms(self):
-        if self.backend == "iss":
+        if self.backend == "sdk_iss":
             return 0
 
         profile_file = os.path.join(self.profile_dir, "dcl_api_{}.bin".format(self.uuid))
