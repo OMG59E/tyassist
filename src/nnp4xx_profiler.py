@@ -36,7 +36,7 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
 
         with open(self.sdk_cfg_file) as f:
             cfg = json.load(f)
-        self.profile_dir = cfg["profiler"]["host_output"]
+        # self.profile_dir = cfg["profiler"]["host_output"]
         self.result_dir = ""
 
         self.ip = cfg["rpc"]["ip_addr"]
@@ -45,6 +45,9 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             exit(-1)
 
         self.uuid = str(uuid.uuid1())
+        self.profile_dir = os.path.join("/tmp", self.uuid)
+        if not os.path.exists(self.profile_dir):
+            os.makedirs(self.profile_dir)
 
     def load(self, model_path):
         self.result_dir = os.path.join(os.path.dirname(model_path), "result")
@@ -64,7 +67,7 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
 
             self.engine = _sdk.CNetOperator()
 
-            if not self.engine.profile(Nnp4xxProfileTypeEnum.DCL_PROF_AICORE_METRICS | Nnp4xxProfileTypeEnum.DCL_PROF_DCL_API):  # profile
+            if not self.engine.profile(Nnp4xxProfileTypeEnum.DCL_PROF_AICORE_METRICS | Nnp4xxProfileTypeEnum.DCL_PROF_DCL_API, self.profile_dir):  # profile
                 logger.error("Failed to set profile")
                 exit(-1)
 
@@ -96,24 +99,19 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             self.engine = None
             import python._sdk as _sdk
             _sdk.finalize()
-            # rename
-            shutil.move(os.path.join(self.profile_dir, "dcl_api.bin"),
-                        os.path.join(self.profile_dir, "dcl_api_{}.bin".format(self.uuid)))
-            shutil.move(os.path.join(self.profile_dir, "ai_core.bin"),
-                        os.path.join(self.profile_dir, "ai_core_{}.bin".format(self.uuid)))
 
     def __del__(self):
         self.unload()
 
     def parse_dcl_api(self):
-        dcl_api_bin = os.path.join(self.profile_dir, "dcl_api_{}.bin".format(self.uuid))
-        if not os.path.exists(dcl_api_bin):
-            logger.error("Not found profile file -> {}".format(dcl_api_bin))
+        model_profile = os.path.join(self.profile_dir, "model_prof.bin")
+        if not os.path.exists(model_profile):
+            logger.error("Not found profile file -> {}".format(model_profile))
             exit(-1)
 
         try:
             import python._sdk as _sdk
-            profile_json = _sdk.parse_dcl_api(dcl_api_bin)
+            profile_json = _sdk.parse_dcl_api(model_profile)
             profile = json.loads(profile_json)
             total_time = profile["dclmdlExecute"] / 10**6 / 10
             return total_time
@@ -123,20 +121,20 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             exit(-1)
 
     def parse(self):
-        ave_latency_ms = self.parse_dcl_api()
+        # ave_latency_ms = self.parse_dcl_api()
 
         graph_json = os.path.join(self.result_dir, "graph.json")
         if not os.path.exists(graph_json):
             logger.error("Not found {}".format(graph_json))
             exit(-1)
 
-        ai_core_bin = os.path.join(self.profile_dir, "ai_core_{}.bin".format(self.uuid))
-        if not os.path.exists(ai_core_bin):
-            logger.error("Not found profile file -> {}".format(ai_core_bin))
+        model_profile = os.path.join(self.profile_dir, "model_prof.bin")
+        if not os.path.exists(model_profile):
+            logger.error("Not found profile file -> {}".format(model_profile))
             exit(-1)
         try:
             import python._sdk as _sdk
-            profile_json = _sdk.parse_ai_core(ai_core_bin)
+            profile_json = _sdk.parse_ai_core(model_profile)
             profile = json.loads(profile_json)
             # dump
             profile_json = json.dumps(profile, indent=2)
@@ -238,7 +236,7 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
                 mean_total_gap_cycles * 2.0 * 10**-3 / self.targets[self.target],
                 mean_total_time * 10**-6
             ))
-            logger.info("[{}] average cost: {:.3f}ms".format(self.target, ave_latency_ms))
+            # logger.info("[{}] average cost: {:.3f}ms".format(self.target, ave_latency_ms))
 
         except Exception as e:
             logger.error("Failed to parse profile -> {}\n{}".format(e, traceback.format_exc()))

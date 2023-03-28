@@ -32,7 +32,11 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
 
         with open(self.sdk_cfg_file) as f:
             cfg = json.load(f)
-        self.profile_dir = cfg["profiler"]["host_output"]
+        # self.profile_dir = cfg["profiler"]["host_output"]
+        self.ip = cfg["rpc"]["ip_addr"]
+        self.backend = "chip"
+        if self.ip == "127.0.0.1":   # TODO 非127.0.0.1的地址也可能是ISS服务
+            self.backend = "sdk_iss"
 
         self.enable_dump = enable_dump
         self.enable_aipp = enable_aipp
@@ -40,6 +44,9 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
         self.dump_root_path = ""
         self.result_dir = ""
         self.uuid = str(uuid.uuid1())
+        self.profile_dir = os.path.join("/tmp", self.uuid)
+        if not os.path.exists(self.profile_dir):
+            os.makedirs(self.profile_dir)
 
     def load(self, model_path):
         self.result_dir = os.path.join(os.path.dirname(model_path), "result")
@@ -65,8 +72,8 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
 
             self.engine = _sdk.CNetOperator()
 
-            if self.backend != "iss":
-                if not self.engine.profile(Nnp4xxProfileTypeEnum.DCL_PROF_DCL_API):  # profile
+            if self.backend != "sdk_iss":
+                if not self.engine.profile(Nnp4xxProfileTypeEnum.DCL_PROF_AICORE_METRICS, self.profile_dir):  # profile
                     logger.error("Failed to set profile")
                     exit(-1)
 
@@ -104,20 +111,20 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
             import python._sdk as _sdk
             _sdk.finalize()
             # rename
-            dcl_api_bin = os.path.join(self.profile_dir, "dcl_api.bin")
-            if os.path.exists(dcl_api_bin):
-                shutil.move(os.path.join(self.profile_dir, "dcl_api.bin"),
-                            os.path.join(self.profile_dir, "dcl_api_{}.bin".format(self.uuid)))
+            # dcl_api_bin = os.path.join(self.profile_dir, "dcl_api.bin")
+            # if os.path.exists(dcl_api_bin):
+            #     shutil.move(os.path.join(self.profile_dir, "dcl_api.bin"),
+            #                 os.path.join(self.profile_dir, "dcl_api_{}.bin".format(self.uuid)))
 
     def __del__(self):
         self.unload()
 
     @property
     def ave_latency_ms(self):
-        if self.backend == "iss":
+        if self.backend == "sdk_iss":
             return 0
 
-        profile_file = os.path.join(self.profile_dir, "dcl_api_{}.bin".format(self.uuid))
+        profile_file = os.path.join(self.profile_dir, "model_prof.bin")
         if not os.path.exists(profile_file):
             logger.error("Not found profile file -> {}".format(profile_file))
             exit(-1)
