@@ -73,7 +73,7 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
             self.engine = _sdk.CNetOperator()
 
             if self.backend != "sdk_iss":
-                if not self.engine.profile(Nnp4xxProfileTypeEnum.DCL_PROF_AICORE_METRICS, self.profile_dir):  # profile
+                if not self.engine.profile(Nnp4xxProfileTypeEnum.DCL_PROF_DCL_API, self.profile_dir):  # profile
                     logger.error("Failed to set profile")
                     exit(-1)
 
