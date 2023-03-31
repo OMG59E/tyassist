@@ -179,8 +179,10 @@ class Nnp3xxSdkInfer(BaseInfer, ABC):
         if self.engine:
             self.engine.unload_model()
             logger.info("unload model")
+            self.engine = None
         if self.sdk:
             self.sdk.sdk_finalize()
+            self.sdk = None
 
     def compare_layer_out(self):
         model_name = "opt_ir"

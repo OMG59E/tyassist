@@ -99,8 +99,10 @@ class Nnp3xxSdkProfiler(BaseSdkProfiler, abc.ABC):
         if self.engine:
             self.engine.unload_model()
             logger.info("unload model")
+            self.engine = None
         if self.sdk:
             self.sdk.sdk_finalize()
+            self.sdk = None
 
     def __del__(self):
         self.unload()
