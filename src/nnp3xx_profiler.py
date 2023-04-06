@@ -102,7 +102,7 @@ class Nnp3xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             self.engine = None
         if self.sdk:
             self.sdk.sdk_finalize()
-            self.sdk = None
+            # self.sdk = None
 
     def __del__(self):
         self.unload()
