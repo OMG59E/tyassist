@@ -74,13 +74,18 @@ def compare_dump_out2(tvm_fixed_dump_path, tvm_fp32_dump_path):
     assert os.path.isfile(tvm_fixed_dump_path)
     assert os.path.isfile(tvm_fp32_dump_path)
 
-    f = open(tvm_fixed_dump_path, "rb")
-    tvm_fixed_dump_out = pickle.load(f)
-    f.close()
+    def load_pkl(path):
+        res = {}
+        with open(path, "rb") as f_d:
+            while True:
+                try:
+                    res.update(pickle.load(f_d))
+                except EOFError:
+                    break
+        return res
 
-    f = open(tvm_fp32_dump_path, "rb")
-    tvm_fp32_dump_out = pickle.load(f)
-    f.close()
+    tvm_fixed_dump_out = load_pkl(tvm_fixed_dump_path)
+    tvm_fp32_dump_out = load_pkl(tvm_fp32_dump_path)
 
     from prettytable import PrettyTable
 

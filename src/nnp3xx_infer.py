@@ -208,17 +208,17 @@ class Nnp3xxSdkInfer(BaseInfer, ABC):
         logger.info("Layer compare ==> tvm[fixed]  vs iss[fixed]  vs chip[fixed] ")
         compare_dump_out(chip_dump_out, iss_fixed_dump_out, cpu_fixed_dump_out)
 
-        # tvm_fixed_dump_out = os.path.join(self.result_dir, "quant", "output_tensors.params")
-        # if not os.path.exists(tvm_fixed_dump_out):
-        #     logger.warning("Not found tvm_fixed_dump_out -> {}".format(tvm_fixed_dump_out))
-        #     tvm_fixed_dump_out = None
-        # tvm_fp32_dump_out = os.path.join(self.result_dir, "fp32", "output_tensors.params")
-        # if not os.path.exists(tvm_fp32_dump_out):
-        #     logger.warning("Not found tvm_fp32_dump_out -> {}".format(tvm_fp32_dump_out))
-        #     tvm_fp32_dump_out = None
-        # if tvm_fp32_dump_out and tvm_fixed_dump_out:
-        #     logger.info("Layer compare ==> tvm[fixed] vs tvm[float]")
-        #     compare_dump_out2(tvm_fp32_dump_out, tvm_fixed_dump_out)
+        tvm_fixed_dump_out = os.path.join(self.result_dir, "quant", "output_tensors.params")
+        if not os.path.exists(tvm_fixed_dump_out):
+            logger.warning("Not found tvm_fixed_dump_out -> {}".format(tvm_fixed_dump_out))
+            tvm_fixed_dump_out = None
+        tvm_fp32_dump_out = os.path.join(self.result_dir, "fp32", "output_tensors.params")
+        if not os.path.exists(tvm_fp32_dump_out):
+            logger.warning("Not found tvm_fp32_dump_out -> {}".format(tvm_fp32_dump_out))
+            tvm_fp32_dump_out = None
+        if tvm_fp32_dump_out and tvm_fixed_dump_out:
+            logger.info("Layer compare ==> tvm[fixed] vs tvm[float]")
+            compare_dump_out2(tvm_fp32_dump_out, tvm_fixed_dump_out)
 
     def __del__(self):
         self.unload()
