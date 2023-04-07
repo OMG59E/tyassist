@@ -162,11 +162,13 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         if self.enable_dump == 1:
             # iss芯片软仿，生成每个融合算子在iss上的输出数据，用于和芯片硬仿做对比。
             from deepeye.relay_pass import dump_func_output
-            dump_dict, weight = dump_func_output(self.model_dir, in_datas, self.target)
+            dump_dict, cpu_dump, weight = dump_func_output(self.model_dir, in_datas, self.target, dump_cpu=True)
             with open(os.path.join(self.result_dir, "iss_fused_out.pickle"), "wb") as fp:
                 pickle.dump(dump_dict, fp)
             with open(os.path.join(self.result_dir, "iss_fused_weight.pickle"), "wb") as fp:
                 pickle.dump(weight, fp)
+            with open(os.path.join(self.result_dir, "cpu_fused_out.pickle"), "wb") as fp:
+                pickle.dump(cpu_dump, fp)
 
     @staticmethod
     def build_x86_64(relay_func, params, target, save_path=""):
