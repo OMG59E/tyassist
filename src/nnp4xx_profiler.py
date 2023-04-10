@@ -207,12 +207,12 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
                 mean_op_ddr_read_bytes = int(total_op_ddr_read_bytes[op_name] / num_iter)
                 mean_op_ddr_write_bytes = int(total_op_ddr_write_bytes[op_name] / num_iter)
                 mac_num = 0
-                ddr_read_span = mean_op_ddr_read_cycles * 2.0 * 10**-3 / self.targets[self.target]
-                ddr_write_span = mean_op_ddr_write_cycles * 2.0 * 10**-3 / self.targets[self.target]
+                ddr_read_span = mean_op_ddr_read_cycles * 10**-3 / self.targets[self.target]
+                ddr_write_span = mean_op_ddr_write_cycles * 10**-3 / self.targets[self.target]
                 ddr_read_bw = mean_op_ddr_read_bytes * 1000 / ddr_read_span / 1024**3  # GB/s
                 ddr_write_bw = mean_op_ddr_write_bytes * 1000 / ddr_write_span / 1024**3  # GB/s
-                mean_op_exec_span = mean_op_exec_cycles * 2.0 * 10**-3 / self.targets[self.target]  # ms
-                mean_op_gap_span = mean_op_gap_cycles * 2.0 * 10**-3 / self.targets[self.target]  # ms
+                mean_op_exec_span = mean_op_exec_cycles * 10**-3 / self.targets[self.target]  # ms
+                mean_op_gap_span = mean_op_gap_cycles * 10**-3 / self.targets[self.target]  # ms
                 table.add_row([
                     idx,
                     op_name,
@@ -232,8 +232,8 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             mean_total_time = int(total_time / num_iter)  # ns
             logger.info("NumIter: {}, Exec Span: {:.3f}ms, Gap Span: {:.3f}ms, Task Span: {:.3f}ms".format(
                 num_iter,
-                mean_total_exec_cycles * 2.0 * 10**-3 / self.targets[self.target],
-                mean_total_gap_cycles * 2.0 * 10**-3 / self.targets[self.target],
+                mean_total_exec_cycles * 10**-3 / self.targets[self.target],
+                mean_total_gap_cycles * 10**-3 / self.targets[self.target],
                 mean_total_time * 10**-6
             ))
             # logger.info("[{}] average cost: {:.3f}ms".format(self.target, ave_latency_ms))
