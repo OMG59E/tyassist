@@ -38,7 +38,7 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
         if self.ip == "127.0.0.1":   # TODO 非127.0.0.1的地址也可能是ISS服务
             self.backend = "sdk_iss"
 
-        self.enable_dump = enable_dump
+        self.enable_dump = True if enable_dump == 1 else False
         self.enable_aipp = enable_aipp
 
         self.dump_root_path = ""
@@ -50,6 +50,9 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
 
     def load(self, model_path):
         self.result_dir = os.path.join(os.path.dirname(model_path), "result")
+        self.dump_root_path = os.path.join(self.result_dir, "dump", self.backend)
+        if not os.path.exists(self.dump_root_path):
+            os.makedirs(self.dump_root_path)
         if not os.path.exists(self.result_dir):
             logger.error("Not found result_dir -> {}".format(self.result_dir))
             exit(-1)
@@ -57,12 +60,6 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
         if not os.path.isfile(model_path):
             logger.error("netbin_file not file -> {}".format(model_path))
             exit(-1)
-
-        if self.enable_aipp:
-            logger.warning("Nnp4xx not support aipp")
-
-        if self.enable_dump:
-            logger.warning("Nnp4xx not support dump")
 
         try:
             import python._sdk as _sdk
@@ -78,7 +75,7 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
                     exit(-1)
 
             logger.info("load model " + model_path)
-            if not self.engine.load(model_path):
+            if not self.engine.load(model_path, self.enable_dump, self.dump_root_path):
                 logger.error("Failed to load model")
                 exit(-1)
             logger.info("load model success")
@@ -121,7 +118,7 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
 
     @property
     def ave_latency_ms(self):
-        if self.backend == "sdk_iss":
+        if self.backend == "sdk_iss" or self.enable_dump:
             return 0
 
         profile_file = os.path.join(self.profile_dir, "model_prof.bin")

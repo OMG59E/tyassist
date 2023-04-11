@@ -138,8 +138,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 target_host=target_host,
                 target_host_cc=target_host_cc
             )
-            #
-            # # compile edgex lib
+
+            # compile edgex lib
             # _ = compile_nnp_model(
             #     self.relay_quant,
             #     self.params_quant,
@@ -154,6 +154,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             logger.warning("nnp4xx disable build")
 
         iss_fixed_outputs = self.iss_fixed_inference(in_datas, to_file=True)
+        self.iss_dump_output(in_datas)
         return iss_fixed_outputs
 
     def infer(self):
@@ -168,6 +169,14 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         ave_latency_ms = infer.ave_latency_ms
         logger.info("[{}] average cost: {:.3f}ms".format(self.target, ave_latency_ms))
         return outputs
+
+    def iss_dump_output(self, in_datas):
+        if self.enable_dump == 1:
+            import pickle
+            from tvm.contrib.edgex import iss_layerwise_input_output
+            layerwise_inputs, layerwise_outputs = iss_layerwise_input_output(in_datas, self.model_path_x86_64)
+            with open(os.path.join(self.result_dir, "iss_fused_out.pickle"), "wb") as fp:
+                pickle.dump(layerwise_outputs, fp)
 
     def tvm_float_inference(self, in_datas, to_file=False):
         tvm_float_outputs = self.tvm_inference(
