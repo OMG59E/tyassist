@@ -118,42 +118,43 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 target_host.append("llvm -mtriple=aarch64")
                 target_host_cc.append(ARM_C_COMPILER)
 
-            opt_mod, opt_params = optimize_nnp_model(
-                self.relay_quant,
-                self.params_quant,
-                opt_level=2,
-                opt_config={
-                    "enable_global_channel_padding": True,
-                    "enable_cascade_fuse": False
-                },
-                keep_params=True
-            )
-
-            _ = compile_nnp_model(
-                opt_mod,
-                opt_params,
-                working_dir=self.model_dir,
-                export_lib_path=export_lib_path,
-                opt_level=0,
-                target_host=target_host,
-                target_host_cc=target_host_cc
-            )
-            #
-            # # compile edgex lib
-            # _ = compile_nnp_model(
+            # opt_mod, opt_params = optimize_nnp_model(
             #     self.relay_quant,
             #     self.params_quant,
+            #     opt_level=2,
+            #     opt_config={
+            #         "enable_global_channel_padding": True,
+            #         "enable_cascade_fuse": False
+            #     },
+            #     keep_params=True
+            # )
+            #
+            # _ = compile_nnp_model(
+            #     opt_mod,
+            #     opt_params,
             #     working_dir=self.model_dir,
             #     export_lib_path=export_lib_path,
-            #     opt_level=2,
+            #     opt_level=0,
             #     target_host=target_host,
             #     target_host_cc=target_host_cc
             # )
+
+            # compile edgex lib
+            _ = compile_nnp_model(
+                self.relay_quant,
+                self.params_quant,
+                working_dir=self.model_dir,
+                export_lib_path=export_lib_path,
+                opt_level=2,
+                target_host=target_host,
+                target_host_cc=target_host_cc
+            )
             logger.info("Executing model on edgex...")
         else:
             logger.warning("nnp4xx disable build")
 
         iss_fixed_outputs = self.iss_fixed_inference(in_datas, to_file=True)
+        self.iss_dump_output(in_datas)
         return iss_fixed_outputs
 
     def infer(self):
@@ -168,6 +169,16 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         ave_latency_ms = infer.ave_latency_ms
         logger.info("[{}] average cost: {:.3f}ms".format(self.target, ave_latency_ms))
         return outputs
+
+    def iss_dump_output(self, in_datas):
+        if self.enable_dump == 1:
+            import pickle
+            from tvm.contrib.edgex import iss_layerwise_input_output
+            layerwise_inputs, layerwise_outputs = iss_layerwise_input_output(in_datas, self.model_path_x86_64)
+            with open(os.path.join(self.result_dir, "iss_fused_out.pickle"), "wb") as fp:
+                pickle.dump(layerwise_outputs, fp)
+            with open(os.path.join(self.result_dir, "iss_fused_in.pickle"), "wb") as fp:
+                pickle.dump(layerwise_inputs, fp)
 
     def tvm_float_inference(self, in_datas, to_file=False):
         tvm_float_outputs = self.tvm_inference(
@@ -234,12 +245,12 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
     def get_profile_info(self):
         from tvm.contrib.edgex import estimate_FLOPs
         from tvm.contrib.edgex import estimate_cycles
-        flops = estimate_FLOPs(self.relay_quant)
-        cycles = estimate_cycles(self.relay_quant)
-        with open(os.path.join(self.result_dir, "flops.json"), "w") as f:
-            f.write(json.dumps(flops, indent=2))
-        with open(os.path.join(self.result_dir, "cycles.json"), "w") as f:
-            f.write(json.dumps(cycles, indent=2))
+        # flops = estimate_FLOPs(self.relay_quant)
+        # cycles = estimate_cycles(self.relay_quant)
+        # with open(os.path.join(self.result_dir, "flops.json"), "w") as f:
+        #     f.write(json.dumps(flops, indent=2))
+        # with open(os.path.join(self.result_dir, "cycles.json"), "w") as f:
+        #     f.write(json.dumps(cycles, indent=2))
 
     @staticmethod
     def save_relay_to_model(quant_model_path, relay_func, params):

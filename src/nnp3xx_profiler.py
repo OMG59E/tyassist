@@ -99,8 +99,10 @@ class Nnp3xxSdkProfiler(BaseSdkProfiler, abc.ABC):
         if self.engine:
             self.engine.unload_model()
             logger.info("unload model")
+            self.engine = None
         if self.sdk:
             self.sdk.sdk_finalize()
+            # self.sdk = None
 
     def __del__(self):
         self.unload()
@@ -144,11 +146,11 @@ class Nnp3xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             hw_cycles = int(first[-3])
             span = int(first[-1])
             logger.info("iter_id[{}] hw_cycles: {}, hw_span: {:.3f}ms, span: {:.3f}ms".format(
-                iter_id, hw_cycles, hw_cycles * 2.0 * 10**-3 / self.targets[self.target], span * 10**-6))
+                iter_id, hw_cycles, hw_cycles * 10**-3 / self.targets[self.target], span * 10**-6))
             num_ops = int(second[7])
             for idx in range(num_ops):
                 hw_cycles = int(second[9 + idx])
-                hw_span = hw_cycles * 2.0 * 10**-3 / self.targets[self.target]
+                hw_span = hw_cycles * 10**-3 / self.targets[self.target]
                 op_name = op_desc_lists[idx]["opName"]
                 mac_num = op_desc_lists[idx]["macNum"]
                 ddr_r = int(op_desc_lists[idx]["ddrRd"]) * 1000 / hw_span / 1024**3  # GB/s

@@ -13,6 +13,41 @@ from utils.enum_type import PaddingMode
 
 
 def calc_padding_size(im, target_size, padding_mode):
+    top, bottom, left, right = 0, 0, 0, 0
+    tw, th = target_size
+    h, w = im.shape[0], im.shape[1]
+    sw, sh = float(w) / tw, float(h) / th
+    if sw > sh:
+        s = sw
+        nw = tw
+        nh = int(h / s)
+        if padding_mode == PaddingMode.LEFT_TOP:
+            bottom = th - nh
+        elif padding_mode == PaddingMode.CENTER:
+            top = int((th - nh) * 0.5)
+            bottom = th - nh - top
+        else:
+            logger.error("Not support padding mode -> {}".format(padding_mode))
+            exit(-1)
+    else:
+        s = sh
+        nh = th
+        nw = int(w / s)
+        if padding_mode == PaddingMode.LEFT_TOP:
+            right = tw - nw
+        elif padding_mode == PaddingMode.CENTER:
+            left = int((tw - nw) * 0.5)
+            right = tw - nw - left
+        else:
+            logger.error("Not support padding mode -> {}".format(padding_mode))
+            exit(-1)
+
+    padding_size = [top, left, bottom, right]
+    size = (nh, nw)
+    return padding_size, size
+
+
+def calc_padding_size2(im, target_size, padding_mode):
     """
     计算padding_size
     :param im:
@@ -24,7 +59,6 @@ def calc_padding_size(im, target_size, padding_mode):
 
     tw, th = target_size
     h, w = im.shape[0], im.shape[1]
-    nh, nw = 0, 0
     if h > w:
         nh = th
         s = float(h) / nh
@@ -52,7 +86,7 @@ def calc_padding_size(im, target_size, padding_mode):
             exit(-1)
 
     padding_size = [top, left, bottom, right]
-    size =(nh, nw)
+    size = (nh, nw)
     return padding_size, size
 
 
