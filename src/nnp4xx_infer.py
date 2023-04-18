@@ -7,16 +7,21 @@
 @software: PyCharm 
 """
 import os
-import shutil
+import pickle
 import uuid
 import json
 import traceback
+import csv
+import numpy as np
+from prettytable import PrettyTable
 from abc import ABC
 from utils import logger
 from .base_infer import BaseInfer
 from .nnp4xx_tyexec import Nnp4xxTyExec
 from .nnp3xx_infer import Nnp3xxTvmInfer
 from .nnp4xx_profiler import Nnp4xxProfileTypeEnum
+from utils.dist_metrics import cosine_distance
+from utils.compare import compare_dump_out2
 
 
 class Nnp4xxSdkInfer(BaseInfer, ABC):
@@ -50,7 +55,7 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
 
     def load(self, model_path):
         self.result_dir = os.path.join(os.path.dirname(model_path), "result")
-        self.dump_root_path = os.path.join(self.result_dir, "dump", self.backend)
+        self.dump_root_path = os.path.join(self.result_dir, "chip_dump_out")
         if not os.path.exists(self.dump_root_path):
             os.makedirs(self.dump_root_path)
         if not os.path.exists(self.result_dir):
@@ -88,6 +93,15 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
             in_datas = [in_datas[key] for key in in_datas]  # to list
         outputs = self.engine.inference(in_datas)
         self.total += 1
+
+        if self.enable_dump == 1:
+            if self.backend == "chip":
+                self.compare_layer_out()
+            elif self.backend == "sdk_iss":
+                logger.warning("Inference time cannot be output when enable_dump == 1")
+            else:
+                logger.error("Not support backend -> {}".format(self.backend))
+
         if to_file:
             logger.info("[{}] predict result: outputs size -> {}".format(self.backend, len(outputs)))
             for idx, output in enumerate(outputs):
@@ -107,14 +121,57 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
             self.engine = None
             import python._sdk as _sdk
             _sdk.finalize()
-            # rename
-            # dcl_api_bin = os.path.join(self.profile_dir, "dcl_api.bin")
-            # if os.path.exists(dcl_api_bin):
-            #     shutil.move(os.path.join(self.profile_dir, "dcl_api.bin"),
-            #                 os.path.join(self.profile_dir, "dcl_api_{}.bin".format(self.uuid)))
 
     def __del__(self):
         self.unload()
+
+    def compare_layer_out(self):
+        if not os.path.exists(self.dump_root_path):
+            logger.error("Not found model dump path -> {}".format(self.dump_root_path))
+            return
+
+        iss_fixed_dump_out = os.path.join(self.result_dir, "iss_fused_out.pickle")
+        if not os.path.join(iss_fixed_dump_out):
+            logger.error("Not found iss_fixed_dump_out -> {}".format(iss_fixed_dump_out))
+            exit(-1)
+
+        logger.info("Layer compare ==> iss[fixed]  vs chip[fixed]")
+        with open(iss_fixed_dump_out, "rb") as f:
+            iss_fixed_dump_out = pickle.load(f)
+
+        header = ["Id", "OpName", "Dtype", "Shape", "ISS(fixed) vs Chip(fixed)"]
+        table = PrettyTable(header)
+        csv_filepath = os.path.join(self.dump_root_path, "similarity.csv")
+        f = open(csv_filepath, "w")
+        f_csv = csv.writer(f)
+        f_csv.writerow(header)
+        for op_idx, opname in enumerate(iss_fixed_dump_out):
+            iss_fixed_outs = iss_fixed_dump_out[opname]
+            for out_idx in range(len(iss_fixed_outs)):
+                iss_fixed_out = iss_fixed_outs[out_idx].flatten()
+                chip_out_path = os.path.join(self.dump_root_path, "{}_out{}.bin".format(opname, out_idx))
+                assert os.path.isfile(chip_out_path), "chip_out_path -> {}".format(chip_out_path)
+                shape = iss_fixed_out.shape
+                dtype = iss_fixed_out.dtype
+                chip_fixed_out = np.fromfile(chip_out_path, dtype=iss_fixed_out.dtype)
+                chip_fixed_vs_iss_fixed_dist = "{:.6f}".format(cosine_distance(iss_fixed_out, chip_fixed_out))
+                result = [op_idx, opname, dtype, shape, chip_fixed_vs_iss_fixed_dist]
+                table.add_row(result)
+                f_csv.writerow(result)
+        f.close()
+        logger.info("\n{}".format(table))
+
+        tvm_fixed_dump_out = os.path.join(self.result_dir, "quant", "output_tensors.params")
+        if not os.path.exists(tvm_fixed_dump_out):
+            logger.warning("Not found tvm_fixed_dump_out -> {}".format(tvm_fixed_dump_out))
+            tvm_fixed_dump_out = None
+        tvm_fp32_dump_out = os.path.join(self.result_dir, "fp32", "output_tensors.params")
+        if not os.path.exists(tvm_fp32_dump_out):
+            logger.warning("Not found tvm_fp32_dump_out -> {}".format(tvm_fp32_dump_out))
+            tvm_fp32_dump_out = None
+        if tvm_fp32_dump_out and tvm_fixed_dump_out:
+            logger.info("Layer compare ==> tvm[fixed] vs tvm[float]")
+            compare_dump_out2(tvm_fp32_dump_out, tvm_fixed_dump_out)
 
     @property
     def ave_latency_ms(self):
