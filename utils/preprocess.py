@@ -165,4 +165,4 @@ def default_preprocess(im, size, mean=None, std=None, use_norm=True, use_rgb=Fal
     else:
         im = np.expand_dims(im, 0)
 
-    return im.transpose((0, 3, 1, 2))
+    return np.ascontiguousarray(im.transpose((0, 3, 1, 2)))
