@@ -118,34 +118,13 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 target_host.append("llvm -mtriple=aarch64")
                 target_host_cc.append(ARM_C_COMPILER)
 
-            # opt_mod, opt_params = optimize_nnp_model(
-            #     self.relay_quant,
-            #     self.params_quant,
-            #     opt_level=2,
-            #     opt_config={
-            #         "enable_global_channel_padding": True,
-            #         "enable_cascade_fuse": False
-            #     },
-            #     keep_params=True
-            # )
-            #
-            # _ = compile_nnp_model(
-            #     opt_mod,
-            #     opt_params,
-            #     working_dir=self.model_dir,
-            #     export_lib_path=export_lib_path,
-            #     opt_level=0,
-            #     target_host=target_host,
-            #     target_host_cc=target_host_cc
-            # )
-
             # compile edgex lib
             _ = compile_nnp_model(
                 self.relay_quant,
                 self.params_quant,
                 working_dir=self.model_dir,
                 export_lib_path=export_lib_path,
-                opt_level=2,
+                opt_level=self.opt_level,
                 target_host=target_host,
                 target_host_cc=target_host_cc
             )

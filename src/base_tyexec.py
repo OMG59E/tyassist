@@ -48,6 +48,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.relay = None
         self.params = None
         self.model_name = "net_combine"  # default
+        self.opt_level = cfg["build"].get("opt_level", 0)
 
         self.model_dir = os.path.join(self.cfg["model"]["save_dir"], self.target)
         self.result_dir = os.path.join(self.model_dir, "result")
