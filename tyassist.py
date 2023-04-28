@@ -14,6 +14,7 @@ import argparse
 import importlib
 import logging
 import time
+from prettytable import PrettyTable
 from utils import logger
 from utils.glog_format import GLogFormatter
 from utils.parser import read_yaml_to_dict
@@ -75,25 +76,31 @@ def build(cfg):
         tyexec.get_relay_mac()  # print mac/flops/cycles info
         # tyexec.get_device_type()  # print op backend info
 
+        # print span
+        header = ["Phase", "Span/s"]
+        table = PrettyTable(header)
+        table.add_row(["quantization", "{:.3f}".format(tyexec.quantization_span)])
+        table.add_row(["build", "{:.3f}".format(tyexec.build_span)])
+        table.add_row(["iss_simu", "{:.3f}".format(tyexec.iss_simu_span)])
+        table.add_row(["tvm_layerwise_dump", "{:.3f}".format(tyexec.tvm_layerwise_dump_span)])
+        table.add_row(["iss_layerwise_dump", "{:.3f}".format(tyexec.iss_layerwise_dump_span)])
+        logger.info("\n{}".format(table))
+
         # 计算相似度
+        header = ["Idx", "Tensor-A", "Tensor-B", "Cosine similarity"]
+        table = PrettyTable(header)
         for idx in range(len(tvm_float_output)):
             dist = cosine_distance(tvm_float_output[idx], tvm_fixed_output[idx])
-            logger.info("[Build] float(tvm) output tensor[{}] shape:{} dtype:{}".format(
-                idx, tvm_float_output[idx].shape, tvm_float_output[idx].dtype))
-            logger.info("[Build] fixed(tvm) output tensor[{}] shape:{} dtype:{}".format(
-                idx, tvm_fixed_output[idx].shape, tvm_fixed_output[idx].dtype))
+            logger.info("[Build] float(tvm) output tensor[{}] shape:{} dtype:{}".format(idx, tvm_float_output[idx].shape, tvm_float_output[idx].dtype))
+            logger.info("[Build] fixed(tvm) output tensor[{}] shape:{} dtype:{}".format(idx, tvm_fixed_output[idx].shape, tvm_fixed_output[idx].dtype))
+            table.add_row([idx, "float(tvm)", "fixed(tvm)", "{:.6f}".format(dist)])
             if iss_fixed_output:
-                logger.info("[Build] fixed(iss) output tensor[{}] shape:{} dtype:{}".format(
-                    idx, iss_fixed_output[idx].shape, iss_fixed_output[idx].dtype))
-            logger.info("[Build] float(tvm) vs fixed(tvm) output tensor[{}] similarity={:.6f}".format(idx, dist))
-            if iss_fixed_output:
+                logger.info("[Build] fixed(iss) output tensor[{}] shape:{} dtype:{}".format(idx, iss_fixed_output[idx].shape, iss_fixed_output[idx].dtype))
                 dist = cosine_distance(tvm_float_output[idx], iss_fixed_output[idx])
-                logger.info("[Build] float(tvm) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(idx, dist))
-
-        for idx in range(len(tvm_fixed_output)):
-            if iss_fixed_output:
+                table.add_row([idx, "float(tvm)", "fixed(iss)", "{:.6f}".format(dist)])
                 dist = cosine_distance(tvm_fixed_output[idx], iss_fixed_output[idx])
-                logger.info("[Build] fixed(tvm) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(idx, dist))
+                table.add_row([idx, "fixed(tvm)", "fixed(iss)", "{:.6f}".format(dist)])
+        logger.info("\n{}".format(table))
         logger.info("success")
     except Exception as e:
         logger.error("{}".format(traceback.format_exc()))
