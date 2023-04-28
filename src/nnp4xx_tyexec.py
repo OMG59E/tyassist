@@ -6,6 +6,7 @@
 @Author  : xingwg
 @software: PyCharm 
 """
+import time
 import json
 import os
 from abc import ABC
@@ -45,6 +46,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
     def quantization(self, in_datas):
         """量化，将浮点relay函数转为成定点relay函数
         """
+        t_start = time.time()
         if self.enable_quant:
             quantize_config, norm = self.set_quantization_cfg(in_datas)
 
@@ -69,8 +71,11 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             self.save_relay_to_model(self.quant_json_path, self.relay_quant, self.params_quant)
         else:
             self.relay_quant = self.load_relay_from_json(self.quant_json_path)
+        self.quantization_span = time.time() - t_start
 
+        t_start = time.time()
         self.save_compare_layer_outputs()
+        self.tvm_layerwise_dump_span = time.time() - t_start
 
     @staticmethod
     def build_x86_64(relay_func, params, target, save_path=""):
@@ -102,6 +107,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             exit(-1)
 
     def build(self, in_datas):
+        t_start = time.time()
         if self.enable_build:
             from tvm.contrib.edgex import compile_nnp_model, optimize_nnp_model
             # TODO support c920
@@ -131,9 +137,13 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             logger.info("Executing model on edgex...")
         else:
             logger.warning("nnp4xx disable build")
-
+        self.build_span = time.time() - t_start
+        t_start = time.time()
         iss_fixed_outputs = self.iss_fixed_inference(in_datas, to_file=True)
+        self.iss_simu_span = time.time() - t_start
+        t_start = time.time()
         self.iss_dump_output(in_datas)
+        self.iss_layerwise_dump_span = time.time() - t_start
         return iss_fixed_outputs
 
     def infer(self):

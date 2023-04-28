@@ -72,6 +72,12 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
 
         self.backend = "chip"
 
+        self.quantization_span = 0
+        self.build_span = 0
+        self.iss_simu_span = 0
+        self.tvm_layerwise_dump_span = 0
+        self.iss_layerwise_dump_span = 0
+
     @staticmethod
     def set_env():
         raise NotImplementedError
