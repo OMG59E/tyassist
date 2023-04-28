@@ -230,11 +230,10 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             mean_total_exec_cycles = int(total_exec_cycles / num_iter)
             mean_total_gap_cycles = int(total_gap_cycles / num_iter)
             mean_total_time = int(total_time / num_iter)  # ns
-            logger.info("NumIter: {}, Exec Span: {:.3f}ms, Gap Span: {:.3f}ms, Task Span: {:.3f}ms".format(
+            logger.info("NumIter: {}, Exec Span: {:.3f}ms, Gap Span: {:.3f}ms".format(
                 num_iter,
                 mean_total_exec_cycles * 10**-3 / self.targets[self.target],
                 mean_total_gap_cycles * 10**-3 / self.targets[self.target],
-                mean_total_time * 10**-6
             ))
             # logger.info("[{}] average cost: {:.3f}ms".format(self.target, ave_latency_ms))
 
