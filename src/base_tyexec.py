@@ -48,6 +48,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.relay = None
         self.params = None
         self.model_name = "net_combine"  # default
+        self.opt_level = cfg["build"].get("opt_level", 0)
 
         self.model_dir = os.path.join(self.cfg["model"]["save_dir"], self.target)
         self.result_dir = os.path.join(self.model_dir, "result")
@@ -70,6 +71,12 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.set_custom_preprocess()
 
         self.backend = "chip"
+
+        self.quantization_span = 0
+        self.build_span = 0
+        self.iss_simu_span = 0
+        self.tvm_layerwise_dump_span = 0
+        self.iss_layerwise_dump_span = 0
 
     @staticmethod
     def set_env():

@@ -6,6 +6,7 @@
 @Author  : xingwg
 @software: PyCharm 
 """
+import time
 import os
 import json
 import pickle
@@ -36,6 +37,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
 
             from tvm.relay.quantization import quantize
             logger.info("################   quantization start  ######################")
+            t_start = time.time()
             # 保存路径设置
             self.relay_quant = quantize(
                 self.relay,
@@ -69,6 +71,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 # 默认为True，量化后模型输出tensor的dtype与原始模型保持同步。若指定为false，则不做dtype同步
                 sync_outdtype=True,
             )
+            self.quantization_span = time.time() - t_start
             logger.info("################   quantization end  ######################")
 
             self.save_relay_to_json(self.quant_json_path, self.relay_quant, self.params_quant)
@@ -76,7 +79,9 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         else:
             self.relay_quant = self.load_relay_from_json(self.quant_json_path)
 
+        t_start = time.time()
         self.save_compare_layer_outputs()
+        self.tvm_layerwise_dump_span = time.time() - t_start
 
     def save_compare_layer_outputs(self):
         if self.quant_cfg["debug_level"] == 1:
@@ -216,6 +221,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         @param in_datas:  iss infer data
         @return:
         """
+        t_start = time.time()
         if self.enable_build:
             input_info = self._set_input_info_for_build()
 
@@ -242,12 +248,17 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             self._rename()
         else:
             logger.warning("disable build")
+        self.build_span = time.time() - t_start
 
         # self.model_analysis()
         logger.info("ISS inference start")
+        t_start = time.time()
         iss_fixed_outputs = self.iss_fixed_inference(in_datas, to_file=True)
+        self.iss_simu_span = time.time() - t_start
         logger.info("ISS inference success")
+        t_start = time.time()
         self.iss_dump_output(in_datas)
+        self.iss_layerwise_dump_span = time.time() - t_start
         return iss_fixed_outputs
 
     @staticmethod
