@@ -131,7 +131,7 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
             return
 
         iss_fixed_dump_out = os.path.join(self.result_dir, "iss_fused_out.pickle")
-        if not os.path.join(iss_fixed_dump_out):
+        if not os.path.exists(iss_fixed_dump_out):
             logger.error("Not found iss_fixed_dump_out -> {}".format(iss_fixed_dump_out))
             exit(-1)
 
