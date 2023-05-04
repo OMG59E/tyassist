@@ -23,10 +23,10 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
         ARM_C_COMPILER = os.getenv("ARM_C_COMPILER")
         if ARM_C_COMPILER is None:
-            logger.error("Not found env {}".format(ARM_C_COMPILER))
+            logger.error("Not found ARM_C_COMPILER ENV")
             exit(-1)
         elif not os.path.exists(ARM_C_COMPILER):
-            logger.error("Not found {}".format(ARM_C_COMPILER))
+            logger.error("Not found ARM_C_COMPILER -> {}".format(ARM_C_COMPILER))
             exit(-1)
 
         # py_path = os.path.dirname(os.path.abspath(__file__))
