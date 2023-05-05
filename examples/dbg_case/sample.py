@@ -1,8 +1,8 @@
 import numpy as np
-import pydcl as dcl
-import dclOpDbg
-import dclMdl
-import dclNnpRtt
+import python.pydcl as dcl
+import python.dclOpDbg as dclOpDbg
+import python.dclMdl as dclMdl
+import python.dclNnpRtt as dclNnpRtt
 
 cfg = "/DEngine/tyhcp/config/sdk.cfg"
 model_file = "yolov5s_a55.so"
