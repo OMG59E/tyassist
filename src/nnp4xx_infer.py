@@ -67,12 +67,12 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
             exit(-1)
 
         try:
-            import python._sdk as _sdk
+            import python.pydcl as dcl
             logger.info("sdk config path: {}".format(self.sdk_cfg_file))
-            _sdk.init(self.sdk_cfg_file)
+            dcl.init(self.sdk_cfg_file)
             logger.info("tyhcp init succeed.")
 
-            self.engine = _sdk.CNetOperator()
+            self.engine = dcl.CNetOperator()
 
             if self.backend != "sdk_iss":
                 if not self.engine.profile(Nnp4xxProfileTypeEnum.DCL_PROF_DCL_API, self.profile_dir):  # profile
@@ -119,8 +119,8 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
             self.engine.unload()
             logger.info("unload model")
             self.engine = None
-            import python._sdk as _sdk
-            _sdk.finalize()
+            import python.pydcl as dcl
+            dcl.finalize()
 
     def __del__(self):
         self.unload()
@@ -131,7 +131,7 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
             return
 
         iss_fixed_dump_out = os.path.join(self.result_dir, "iss_fused_out.pickle")
-        if not os.path.join(iss_fixed_dump_out):
+        if not os.path.exists(iss_fixed_dump_out):
             logger.error("Not found iss_fixed_dump_out -> {}".format(iss_fixed_dump_out))
             exit(-1)
 
@@ -184,8 +184,8 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
             exit(-1)
 
         try:
-            import python._sdk as _sdk
-            profile_json = _sdk.parse_dcl_api(profile_file)
+            import python.pydcl as dcl
+            profile_json = dcl.parse_dcl_api(profile_file)
             profile = json.loads(profile_json)
             total_time = profile["dclmdlExecute"] / 10**6 / self.total
             return total_time

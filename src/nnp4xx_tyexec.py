@@ -21,6 +21,14 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         self.model_path_x86_64 = os.path.join(self.model_dir, "{}_x86_64.ty".format(self.model_name))
         self.model_path_aarch64 = os.path.join(self.model_dir, "{}_aarch64.ty".format(self.model_name))
 
+        ARM_C_COMPILER = os.getenv("ARM_C_COMPILER")
+        if ARM_C_COMPILER is None:
+            logger.error("Not found ARM_C_COMPILER ENV")
+            exit(-1)
+        elif not os.path.exists(ARM_C_COMPILER):
+            logger.error("Not found ARM_C_COMPILER -> {}".format(ARM_C_COMPILER))
+            exit(-1)
+
         # py_path = os.path.dirname(os.path.abspath(__file__))
         # client_lib_path = os.path.join(py_path, "../../tyhcp/client/x64-linux-gcc7.5/lib")
         # sdk_lib = os.path.join(py_path, "../python/_sdk.cpython-38-x86_64-linux-gnu.so")

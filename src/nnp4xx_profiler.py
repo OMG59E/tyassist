@@ -60,12 +60,12 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             exit(-1)
 
         try:
-            import python._sdk as _sdk
+            import python.pydcl as dcl
             logger.info("sdk config path: {}".format(self.sdk_cfg_file))
-            _sdk.init(self.sdk_cfg_file)
+            dcl.init(self.sdk_cfg_file)
             logger.info("tyhcp init succeed.")
 
-            self.engine = _sdk.CNetOperator()
+            self.engine = dcl.CNetOperator()
 
             if not self.engine.profile(Nnp4xxProfileTypeEnum.DCL_PROF_AICORE_METRICS | Nnp4xxProfileTypeEnum.DCL_PROF_DCL_API, self.profile_dir):  # profile
                 logger.error("Failed to set profile")
@@ -97,8 +97,8 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             self.engine.unload()
             logger.info("unload model")
             self.engine = None
-            import python._sdk as _sdk
-            _sdk.finalize()
+            import python.pydcl as dcl
+            dcl.finalize()
 
     def __del__(self):
         self.unload()
@@ -110,8 +110,8 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             exit(-1)
 
         try:
-            import python._sdk as _sdk
-            profile_json = _sdk.parse_dcl_api(model_profile)
+            import python.pydcl as dcl
+            profile_json = dcl.parse_dcl_api(model_profile)
             profile = json.loads(profile_json)
             total_time = profile["dclmdlExecute"] / 10**6 / 10
             return total_time
@@ -133,8 +133,8 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             logger.error("Not found profile file -> {}".format(model_profile))
             exit(-1)
         try:
-            import python._sdk as _sdk
-            profile_json = _sdk.parse_ai_core(model_profile)
+            import python.pydcl as dcl
+            profile_json = dcl.parse_ai_core(model_profile)
             profile = json.loads(profile_json)
             # dump
             profile_json = json.dumps(profile, indent=2)
