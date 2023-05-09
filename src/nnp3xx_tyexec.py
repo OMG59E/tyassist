@@ -153,9 +153,11 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             #      "crop_height": 224,  # 剪裁高度
             #      }
             # ]
+
+            t_start = time.time()
             aipp_info = None
-            iss_fixed_outputs = run_net_bin(netbin_file, in_datas, work_path=self.model_dir,
-                                            target=self.target, aipp_info=aipp_info)
+            iss_fixed_outputs = run_net_bin(netbin_file, in_datas, work_path=self.model_dir, target=self.target, aipp_info=aipp_info)
+            self.iss_simu_span = time.time() - t_start
             iss_fixed_outputs = [iss_fixed_outputs[name] for name in iss_fixed_outputs]  # dict to list
             if to_file and len(iss_fixed_outputs) > 0:
                 for idx, iss_fixed_output in enumerate(iss_fixed_outputs):
@@ -164,6 +166,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         return iss_fixed_outputs
 
     def iss_dump_output(self, in_datas):
+        t_start = time.time()
         if self.enable_dump == 1:
             # iss芯片软仿，生成每个融合算子在iss上的输出数据，用于和芯片硬仿做对比。
             from deepeye.relay_pass import dump_func_output
@@ -174,6 +177,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 pickle.dump(weight, fp)
             with open(os.path.join(self.result_dir, "cpu_fused_out.pickle"), "wb") as fp:
                 pickle.dump(cpu_dump, fp)
+        self.iss_layerwise_dump_span = time.time() - t_start
 
     @staticmethod
     def build_x86_64(relay_func, params, target, save_path=""):
@@ -249,17 +253,6 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         else:
             logger.warning("disable build")
         self.build_span = time.time() - t_start
-
-        # self.model_analysis()
-        logger.info("ISS inference start")
-        t_start = time.time()
-        iss_fixed_outputs = self.iss_fixed_inference(in_datas, to_file=True)
-        self.iss_simu_span = time.time() - t_start
-        logger.info("ISS inference success")
-        t_start = time.time()
-        self.iss_dump_output(in_datas)
-        self.iss_layerwise_dump_span = time.time() - t_start
-        return iss_fixed_outputs
 
     @staticmethod
     def save_relay_to_model(quant_model_path, relay_func, params):

@@ -6,8 +6,8 @@
 @Author  : xingwg
 @software: PyCharm 
 """
+import torch
 import time
-import json
 import os
 from abc import ABC
 from utils import logger
@@ -49,7 +49,33 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         for _, _input in enumerate(self.inputs):
             dtype_dict[_input["name"]] = "float32"
         kwargs = {"dtype": dtype_dict}
-        self.relay, self.params = load_model_from_file(self.weight, self.framework, self.shape_dict, **kwargs)
+        self.relay, self.params = load_model_from_file(self.weight, "onnx", self.shape_dict, **kwargs)
+
+    def pytorch2relay(self):
+        from tvm.contrib.edgex import load_model_from_file
+        self.relay, self.params = load_model_from_file(self.weight, "pytorch", self.shape_dict)
+
+    def tensorflow2relay(self):
+        from tvm.contrib.edgex import load_model_from_file
+        from tvm.driver.tvmc import transform
+        shape_dict = dict()
+        for _, _input in enumerate(self.inputs):
+            shape_dict[_input["name"]] = _input["shape"]
+        self.relay, self.params = load_model_from_file(self.weight, "pb", shape_dict, **kwargs)
+        self.relay = transform.convert_graph_layout(self.relay, "NCHW")
+
+    def tflite2relay(self):
+        from tvm.contrib.edgex import load_model_from_file
+        from tvm.driver.tvmc import transform
+        shape_dict = dict()
+        for _, _input in enumerate(self.inputs):
+            shape_dict[_input["name"]] = _input["shape"]
+
+        dtype_dict = dict()
+        for _, _input in enumerate(self.inputs):
+            dtype_dict[_input["name"]] = "float32"
+        self.relay, self.params = load_model_from_file(self.weight, "tflite", shape_dict)
+        self.relay = transform.convert_graph_layout(self.relay, "NCHW")
 
     def quantization(self, in_datas):
         """量化，将浮点relay函数转为成定点relay函数
@@ -93,19 +119,20 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             from tvm.relay import build
 
             # 将标量转换成张量
-            def rewrite_scalar(mod):
-                class ScalarRewriter(tvm.relay.ExprMutator):
-                    def visit_constant(self, const):
-                        if len(const.data.shape) == 0:
-                            return tvm.relay.const([const.data.asnumpy()], const.data.dtype)
-                        return super().visit_constant(const)
-
-                mod = tvm.IRModule.from_expr(ScalarRewriter().visit(mod["main"]))
-                return tvm.relay.transform.InferType()(mod)
+            # def rewrite_scalar(mod):
+            #     class ScalarRewriter(tvm.relay.ExprMutator):
+            #         def visit_constant(self, const):
+            #             if len(const.data.shape) == 0:
+            #                 return tvm.relay.const([const.data.asnumpy()], const.data.dtype)
+            #             return super().visit_constant(const)
+            #
+            #     mod = tvm.IRModule.from_expr(ScalarRewriter().visit(mod["main"]))
+            #     return tvm.relay.transform.InferType()(mod)
 
             cpu_target = tvm.target.Target("llvm")
             with tvm.transform.PassContext(opt_level=3):
-                cpu_lib = build(rewrite_scalar(relay_func), target=cpu_target, params=params)
+                # cpu_lib = build(rewrite_scalar(relay_func), target=cpu_target, params=params)
+                cpu_lib = build(relay_func, target=cpu_target, params=params)
                 if save_path:
                     cpu_lib.export_library(save_path)
             module = graph_executor.GraphModule(cpu_lib["default"](tvm.cpu()))
@@ -146,13 +173,6 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         else:
             logger.warning("nnp4xx disable build")
         self.build_span = time.time() - t_start
-        t_start = time.time()
-        iss_fixed_outputs = self.iss_fixed_inference(in_datas, to_file=True)
-        self.iss_simu_span = time.time() - t_start
-        t_start = time.time()
-        self.iss_dump_output(in_datas)
-        self.iss_layerwise_dump_span = time.time() - t_start
-        return iss_fixed_outputs
 
     def infer(self):
         from .nnp4xx_infer import Nnp4xxSdkInfer
@@ -168,6 +188,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         return outputs
 
     def iss_dump_output(self, in_datas):
+        t_start = time.time()
         if self.enable_dump == 1:
             import pickle
             from tvm.contrib.edgex import iss_layerwise_input_output
@@ -176,6 +197,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 pickle.dump(layerwise_outputs, fp)
             with open(os.path.join(self.result_dir, "iss_fused_in.pickle"), "wb") as fp:
                 pickle.dump(layerwise_inputs, fp)
+        self.iss_layerwise_dump_span = time.time() - t_start
 
     def tvm_float_inference(self, in_datas, to_file=False):
         tvm_float_outputs = self.tvm_inference(
@@ -200,12 +222,14 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         if not os.path.exists(self.model_path_x86_64):
             logger.error("Not found model path -> {}".format(self.model_path_x86_64))
             exit(-1)
+        t_start = time.time()
         import tvm
         from tvm.contrib import graph_executor
         logger.info("Executing model on edgex...")
         lib = tvm.runtime.load_module(self.model_path_x86_64)
         module = graph_executor.GraphModule(lib["default"](tvm.edgex(), tvm.cpu()))
         iss_fixed_outputs = self.tvm_inference(module, in_datas)
+        self.iss_simu_span = time.time() - t_start
         if to_file and len(iss_fixed_outputs) > 0:
             for idx, output in enumerate(iss_fixed_outputs):
                 output.tofile(os.path.join(self.result_dir, "iss_fixed_out_{}.bin".format(idx)))

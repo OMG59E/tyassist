@@ -60,17 +60,18 @@ def build(cfg):
         tyexec.get_version()
         tyexec.x2relay()  # model to relay_func
 
-        # in_datas = tyexec.get_datas(use_norm=False, force_cr=True, to_file=True)  # 量化后模型输入数据
-        in_datas = tyexec.get_datas(force_cr=True, to_file=True)   # 量化后模型输入数据
+        in_datas = tyexec.get_datas(force_cr=True, to_file=True)   # 量化后模型输入
         tyexec.quantization(in_datas)
+        tyexec.build(in_datas)
+        tyexec.iss_dump_output(in_datas)
+
+        iss_fixed_output = tyexec.iss_fixed_inference(in_datas, to_file=True)
         tvm_fixed_output = tyexec.tvm_fixed_inference(in_datas, to_file=True)
 
-        iss_fixed_output = tyexec.build(in_datas)
-
-        # in_datas = tyexec.get_datas(use_norm=True, force_cr=True, to_file=True)  # 原模型输入数据
-        in_datas = tyexec.get_datas(force_float=True, force_cr=True, to_file=True)  # 原模型输入数据
+        in_datas = tyexec.get_datas(force_float=True, force_cr=True, to_file=True)  # 浮点模型输入
         tvm_float_output = tyexec.tvm_float_inference(in_datas, to_file=True)
 
+        # tyexec.model_analysis()
         tyexec.compress_analysis()
         tyexec.get_profile_info()
         tyexec.get_relay_mac()  # print mac/flops/cycles info
@@ -87,7 +88,7 @@ def build(cfg):
         logger.info("\n{}".format(table))
 
         # 计算相似度
-        header = ["Idx", "Tensor-A", "Tensor-B", "Cosine similarity"]
+        header = ["Idx", "Tensor", "Tensor", "Cosine similarity"]
         table = PrettyTable(header)
         for idx in range(len(tvm_float_output)):
             dist = cosine_distance(tvm_float_output[idx], tvm_fixed_output[idx])
