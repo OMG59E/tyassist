@@ -88,7 +88,7 @@ def build(cfg):
         logger.info("\n{}".format(table))
 
         # 计算相似度
-        header = ["Idx", "Tensor", "Tensor", "Cosine similarity"]
+        header = ["Idx", "Tensor-A", "Tensor-B", "Cosine similarity"]
         table = PrettyTable(header)
         for idx in range(len(tvm_float_output)):
             dist = cosine_distance(tvm_float_output[idx], tvm_fixed_output[idx])
