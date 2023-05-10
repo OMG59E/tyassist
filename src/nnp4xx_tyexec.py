@@ -219,21 +219,23 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
     def iss_fixed_inference(self, in_datas, to_file=False):
         """x86_64 iss"""
-        if not os.path.exists(self.model_path_x86_64):
-            logger.error("Not found model path -> {}".format(self.model_path_x86_64))
-            exit(-1)
-        t_start = time.time()
-        import tvm
-        from tvm.contrib import graph_executor
-        logger.info("Executing model on edgex...")
-        lib = tvm.runtime.load_module(self.model_path_x86_64)
-        module = graph_executor.GraphModule(lib["default"](tvm.edgex(), tvm.cpu()))
-        iss_fixed_outputs = self.tvm_inference(module, in_datas)
-        self.iss_simu_span = time.time() - t_start
-        if to_file and len(iss_fixed_outputs) > 0:
-            for idx, output in enumerate(iss_fixed_outputs):
-                output.tofile(os.path.join(self.result_dir, "iss_fixed_out_{}.bin".format(idx)))
-                output.tofile(os.path.join(self.result_dir, "iss_fixed_out_{}.txt".format(idx)), sep="\n")
+        iss_fixed_outputs = 0
+        if self.enable_dump:
+            if not os.path.exists(self.model_path_x86_64):
+                logger.error("Not found model path -> {}".format(self.model_path_x86_64))
+                exit(-1)
+            t_start = time.time()
+            import tvm
+            from tvm.contrib import graph_executor
+            logger.info("Executing model on edgex...")
+            lib = tvm.runtime.load_module(self.model_path_x86_64)
+            module = graph_executor.GraphModule(lib["default"](tvm.edgex(), tvm.cpu()))
+            iss_fixed_outputs = self.tvm_inference(module, in_datas)
+            self.iss_simu_span = time.time() - t_start
+            if to_file and len(iss_fixed_outputs) > 0:
+                for idx, output in enumerate(iss_fixed_outputs):
+                    output.tofile(os.path.join(self.result_dir, "iss_fixed_out_{}.bin".format(idx)))
+                    output.tofile(os.path.join(self.result_dir, "iss_fixed_out_{}.txt".format(idx)), sep="\n")
         return iss_fixed_outputs
 
     def save_compare_layer_outputs(self):
