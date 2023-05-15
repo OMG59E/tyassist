@@ -75,7 +75,7 @@ class Nnp3xxSdkInfer(BaseInfer, ABC):
             self.sdk = dcl.DeSDKModule(remote)
             logger.info("tyhcp version: {}".format(self.sdk.version))
 
-            if self.enable_dump and self.backend != "sdk_iss":
+            if self.enable_dump == 1 and self.backend != "sdk_iss":
                 self.sdk.select_dump_profile(DumpProfileSel.Dump)
                 dump_server_ip = os.getenv("DUMP_SERVER_IP")
                 dump_server_port = os.getenv("DUMP_SERVER_PORT")
