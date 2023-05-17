@@ -6,6 +6,7 @@
 @Author  : xingwg
 @software: PyCharm 
 """
+import torch
 import time
 import json
 import os
@@ -49,7 +50,83 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         for _, _input in enumerate(self.inputs):
             dtype_dict[_input["name"]] = "float32"
         kwargs = {"dtype": dtype_dict}
-        self.relay, self.params = load_model_from_file(self.weight, self.framework, self.shape_dict, **kwargs)
+        self.relay, self.params = load_model_from_file(self.weight, "onnx", self.shape_dict, **kwargs)
+
+    def pytorch2relay(self):
+        from tvm.contrib.edgex import load_model_from_file
+        self.relay, self.params = load_model_from_file(self.weight, "pytorch", self.shape_dict)
+
+    @staticmethod
+    def _tf_convert_nhwc_to_nchw(mod, params):
+        import tvm
+        from tvm import relay
+        from tvm.relay.build_module import bind_params_by_name
+        mod["main"] = bind_params_by_name(mod["main"], params)
+
+        with tvm.transform.PassContext(opt_level=3):
+            seq = tvm.transform.Sequential(
+                [
+                    relay.transform.RemoveUnusedFunctions(),
+                    relay.transform.ConvertLayout({"nn.conv2d": ["NCHW", "default"]}),
+                    relay.transform.FoldConstant(),
+                ]
+            )
+            mod = seq(mod)
+
+        class RemoveLayoutTransform(tvm.relay.ExprMutator):
+            def __init__(self, mod):
+                super(self.__class__, self).__init__()
+                self.count = 0
+                mod["main"] = self.visit(mod["main"])
+                self.new_mod = relay.transform.InferType()(mod)
+
+            def visit_var(self, var):
+                if var.name_hint == "input_tensor":
+                    new_var = relay.Var(var.name_hint, relay.TensorType([1, 3, 224, 224], "float32"))
+                else:
+                    new_var = var
+                return new_var
+
+            def visit_call(self, call):
+                new_fn = self.visit(call.op)
+                new_args = [self.visit(arg) for arg in call.args]
+                self.count = self.count + 1
+                if self.count == 1:
+                    assert call.op.name == "nn.pad"
+                    new_call = relay.nn.pad(new_args[0], pad_width=((0, 0), (0, 0), (3, 3), (3, 3)))
+                elif self.count == 3:
+                    assert call.args[0].op.name == "layout_transform"
+                    new_args[0] = new_args[0].args[0]
+                    new_call = relay.Call(new_fn, new_args, call.attrs, call.type_args, call.span)
+                else:
+                    new_call = relay.Call(new_fn, new_args, call.attrs, call.type_args, call.span)
+                return new_call
+
+            def visit_function(self, fn):
+                new_params = []
+                for x in fn.params:
+                    new_params.append(self.visit(x))
+                new_body = self.visit(fn.body)
+                return relay.Function(new_params, new_body, fn.ret_type, fn.type_params, fn.attrs, fn.span)
+        return RemoveLayoutTransform(mod).new_mod
+
+    def tensorflow2relay(self):
+        from tvm.contrib.edgex import load_model_from_file
+        from tvm.contrib.edgex.relay.transform import extract_constants
+        shape_dict = dict()
+        for _, _input in enumerate(self.inputs):
+            shape_dict[_input["name"]] = _input["shape"]
+        mod, params = load_model_from_file(self.weight, "pb", shape_dict=shape_dict, layout="NHWC")
+        self.relay, self.params = extract_constants(self._tf_convert_nhwc_to_nchw(mod, params))
+
+    def tflite2relay(self):
+        from tvm.contrib.edgex import load_model_from_file
+        from tvm.contrib.edgex.relay.transform import extract_constants
+        shape_dict = dict()
+        for _, _input in enumerate(self.inputs):
+            shape_dict[_input["name"]] = _input["shape"]
+        mod, params = load_model_from_file(self.weight, "tflite", shape_dict, layout="NHWC")
+        self.relay, self.params = extract_constants(self._tf_convert_nhwc_to_nchw(mod, params))
 
     def quantization(self, in_datas):
         """量化，将浮点relay函数转为成定点relay函数
@@ -93,19 +170,20 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             from tvm.relay import build
 
             # 将标量转换成张量
-            def rewrite_scalar(mod):
-                class ScalarRewriter(tvm.relay.ExprMutator):
-                    def visit_constant(self, const):
-                        if len(const.data.shape) == 0:
-                            return tvm.relay.const([const.data.asnumpy()], const.data.dtype)
-                        return super().visit_constant(const)
-
-                mod = tvm.IRModule.from_expr(ScalarRewriter().visit(mod["main"]))
-                return tvm.relay.transform.InferType()(mod)
+            # def rewrite_scalar(mod):
+            #     class ScalarRewriter(tvm.relay.ExprMutator):
+            #         def visit_constant(self, const):
+            #             if len(const.data.shape) == 0:
+            #                 return tvm.relay.const([const.data.asnumpy()], const.data.dtype)
+            #             return super().visit_constant(const)
+            #
+            #     mod = tvm.IRModule.from_expr(ScalarRewriter().visit(mod["main"]))
+            #     return tvm.relay.transform.InferType()(mod)
 
             cpu_target = tvm.target.Target("llvm")
             with tvm.transform.PassContext(opt_level=3):
-                cpu_lib = build(rewrite_scalar(relay_func), target=cpu_target, params=params)
+                # cpu_lib = build(rewrite_scalar(relay_func), target=cpu_target, params=params)
+                cpu_lib = build(relay_func, target=cpu_target, params=params)
                 if save_path:
                     cpu_lib.export_library(save_path)
             module = graph_executor.GraphModule(cpu_lib["default"](tvm.cpu()))
@@ -146,13 +224,6 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         else:
             logger.warning("nnp4xx disable build")
         self.build_span = time.time() - t_start
-        t_start = time.time()
-        iss_fixed_outputs = self.iss_fixed_inference(in_datas, to_file=True)
-        self.iss_simu_span = time.time() - t_start
-        t_start = time.time()
-        self.iss_dump_output(in_datas)
-        self.iss_layerwise_dump_span = time.time() - t_start
-        return iss_fixed_outputs
 
     def infer(self):
         from .nnp4xx_infer import Nnp4xxSdkInfer
@@ -168,6 +239,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         return outputs
 
     def iss_dump_output(self, in_datas):
+        t_start = time.time()
         if self.enable_dump == 1:
             import pickle
             from tvm.contrib.edgex import iss_layerwise_input_output
@@ -176,6 +248,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 pickle.dump(layerwise_outputs, fp)
             with open(os.path.join(self.result_dir, "iss_fused_in.pickle"), "wb") as fp:
                 pickle.dump(layerwise_inputs, fp)
+        self.iss_layerwise_dump_span = time.time() - t_start
 
     def tvm_float_inference(self, in_datas, to_file=False):
         tvm_float_outputs = self.tvm_inference(
@@ -197,19 +270,23 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
     def iss_fixed_inference(self, in_datas, to_file=False):
         """x86_64 iss"""
-        if not os.path.exists(self.model_path_x86_64):
-            logger.error("Not found model path -> {}".format(self.model_path_x86_64))
-            exit(-1)
-        import tvm
-        from tvm.contrib import graph_executor
-        logger.info("Executing model on edgex...")
-        lib = tvm.runtime.load_module(self.model_path_x86_64)
-        module = graph_executor.GraphModule(lib["default"](tvm.edgex(), tvm.cpu()))
-        iss_fixed_outputs = self.tvm_inference(module, in_datas)
-        if to_file and len(iss_fixed_outputs) > 0:
-            for idx, output in enumerate(iss_fixed_outputs):
-                output.tofile(os.path.join(self.result_dir, "iss_fixed_out_{}.bin".format(idx)))
-                output.tofile(os.path.join(self.result_dir, "iss_fixed_out_{}.txt".format(idx)), sep="\n")
+        iss_fixed_outputs = 0
+        if self.enable_dump:
+            if not os.path.exists(self.model_path_x86_64):
+                logger.error("Not found model path -> {}".format(self.model_path_x86_64))
+                exit(-1)
+            t_start = time.time()
+            import tvm
+            from tvm.contrib import graph_executor
+            logger.info("Executing model on edgex...")
+            lib = tvm.runtime.load_module(self.model_path_x86_64)
+            module = graph_executor.GraphModule(lib["default"](tvm.edgex(), tvm.cpu()))
+            iss_fixed_outputs = self.tvm_inference(module, in_datas)
+            self.iss_simu_span = time.time() - t_start
+            if to_file and len(iss_fixed_outputs) > 0:
+                for idx, output in enumerate(iss_fixed_outputs):
+                    output.tofile(os.path.join(self.result_dir, "iss_fixed_out_{}.bin".format(idx)))
+                    output.tofile(os.path.join(self.result_dir, "iss_fixed_out_{}.txt".format(idx)), sep="\n")
         return iss_fixed_outputs
 
     def save_compare_layer_outputs(self):
@@ -240,14 +317,24 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         logger.warning("Nnp4xx not support compress analysis")
 
     def get_profile_info(self):
+        import tvm
         from tvm.contrib.edgex import estimate_FLOPs
         from tvm.contrib.edgex import estimate_cycles
-        # flops = estimate_FLOPs(self.relay_quant)
-        # cycles = estimate_cycles(self.relay_quant)
-        # with open(os.path.join(self.result_dir, "flops.json"), "w") as f:
-        #     f.write(json.dumps(flops, indent=2))
-        # with open(os.path.join(self.result_dir, "cycles.json"), "w") as f:
-        #     f.write(json.dumps(cycles, indent=2))
+        from tvm.contrib.edgex import build_config_nnp, optimize_nnp_model
+        flops = estimate_FLOPs(self.relay)
+        target_device = tvm.target.Target("edgex", host="edgex_virtual_host")
+        with build_config_nnp():
+            optimized_mod, optimized_params = optimize_nnp_model(
+                self.relay_quant,
+                self.params_quant,
+                target_device=target_device,
+                keep_params=True,
+            )
+        cycles = estimate_cycles(optimized_mod)
+        with open(os.path.join(self.result_dir, "flops.json"), "w") as f:
+            f.write(json.dumps(flops, indent=2))
+        with open(os.path.join(self.result_dir, "cycles.json"), "w") as f:
+            f.write(json.dumps(cycles, indent=2))
 
     @staticmethod
     def save_relay_to_model(quant_model_path, relay_func, params):
