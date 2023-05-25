@@ -72,8 +72,8 @@ build: {
   # 该参数仅对300系列芯片生效
   suppress_long_func: false,
 
-  # 编译优化等级, 缺省默认为0
-  opt_level: 0,
+  # 编译优化等级, 缺省默认为2
+  opt_level: 2,
 
   # 量化配置参数，仅在enable_quant为true生效
   quant: {
