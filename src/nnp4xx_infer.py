@@ -175,7 +175,7 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
 
     @property
     def ave_latency_ms(self):
-        if self.backend == "sdk_iss" or self.enable_dump:
+        if self.backend == "sdk_iss" or self.enable_dump or self.total == 0:
             return 0
 
         profile_file = os.path.join(self.profile_dir, "model_prof.bin")
