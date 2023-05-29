@@ -248,6 +248,8 @@ def demo(cfg, dtype, backend):
 
         data_dir = cfg["demo"]["data_dir"]
         num = cfg["demo"]["num"]
+        dataset_module = cfg["test"]["dataset_module"]
+        dataset_cls = cfg["test"]["dataset_cls"]
         model_impl_module = cfg["model"]["model_impl_module"]
         model_impl_cls = cfg["model"]["model_impl_cls"]
         enable_aipp = cfg["demo"].get("enable_aipp", False)
@@ -255,12 +257,20 @@ def demo(cfg, dtype, backend):
         file_list = os.listdir(data_dir)
         file_list = file_list if num > len(file_list) else file_list[0:num]
 
+        m = importlib.import_module(dataset_module)
+        if hasattr(m, dataset_cls):
+            # 实例化预处理对象
+            dataset = getattr(m, dataset_cls)(data_dir)
+        else:
+            logger.error("{}.py has no class named {}".format(dataset_module, dataset_cls))
+            exit(-1)
+
         m = importlib.import_module(model_impl_module)
         if hasattr(m, model_impl_cls):
             # 实例化预处理对象
             model = getattr(m, model_impl_cls)(
                 inputs=tyexec.inputs,
-                dataset=None,
+                dataset=dataset,
                 test_num=0,
                 enable_aipp=enable_aipp,
                 target=tyexec.target,  # nnp3xx/nnp4xx

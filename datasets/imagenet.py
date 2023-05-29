@@ -27,9 +27,20 @@ class ILSVRC2012(BaseDataset):
         self._batch_size = batch_size
         self._data_root_path = root_path
         self._val_file = os.path.join(self._data_root_path, "..", "val.txt")
+        self._label_file = os.path.join(self._data_root_path, "..", "synset_1000.txt")
         if not os.path.exists(self._val_file):
             logger.error("Not found val file -> {}".format(self._val_file))
             exit(-1)
+        if not os.path.exists(self._label_file):
+            logger.error("Not found val file -> {}".format(self._label_file))
+            exit(-1)
+
+        self._mapping = dict()
+        with open(self._label_file, "r") as f:
+            lines = f.readlines()
+            for idx, line in enumerate(lines):
+                self._mapping[idx] = line[10:]
+
         self._filepaths = list()
         self._labels = list()
         with open(self._val_file, "r") as f:
@@ -52,6 +63,9 @@ class ILSVRC2012(BaseDataset):
         filepath = self._filepaths[self._batch_idx]
         self._batch_idx += 1
         return filepath
+
+    def get_class_name(self, idx):
+        return self._mapping[idx]
 
     def get_datas(self, num=0):
         """

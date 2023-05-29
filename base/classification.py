@@ -120,6 +120,9 @@ class Classifier(BaseModel, ABC):
         if not os.path.exists(img_path):
             logger.error("The img path not exist -> {}".format(img_path))
             exit(-1)
+        save_results = "vis_{}_{}".format(self.backend, self.dtype)
+        if not os.path.exists(save_results):
+            os.makedirs(save_results)
         logger.info("process: {}".format(img_path))
         cv_image = cv2.imread(img_path)
         if cv_image is None:
@@ -129,4 +132,6 @@ class Classifier(BaseModel, ABC):
         chip_output = self.inference(cv_image)
         max_idx = np.argmax(chip_output, axis=1).flatten()[0]
         max_prob = chip_output[0][max_idx].flatten()[0]
-        logger.info("predict cls = {}, prob = {:.6f}".format(max_idx, max_prob))
+        logger.info("predict cls = {}, prob = {:.6f}, cls_name = {}".format(
+            max_idx, max_prob, self.dataset.get_class_name(max_idx)))
+        cv2.imwrite("{}/{}.jpg".format(save_results, self.dataset.get_class_name(max_idx)), cv_image)
