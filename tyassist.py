@@ -148,6 +148,66 @@ def compare(cfg, backend):
         logger.error("TyAssist failed to compare -> {}".format(e))
 
 
+def compare2(cfg, target, data_dir):
+    """
+    批量比较tvm-fp32、tvm-int8、iss、chip
+    @param cfg:
+    @param backend:
+    @param data_dir:
+    @return:
+    """
+    # TODO
+    try:
+        tyexec = get_tyexec(cfg)
+        if target.startswith("nnp4"):
+            from src.nnp4xx_infer import Nnp4xxSdkInfer, Nnp4xxTvmInfer
+            tvm_fp32_infer = Nnp4xxTvmInfer()
+            tvm_int8_infer = Nnp4xxTvmInfer()
+            tvm_fp32_infer.load(tyexec.cpu_model_float_path)
+            tvm_int8_infer.load(tyexec.cpu_model_fixed_path)
+        elif target.startswith("nnp3"):
+            from src.nnp3xx_infer import Nnp3xxSdkInfer, Nnp3xxTvmInfer
+            tvm_fp32_infer = Nnp3xxTvmInfer()
+            tvm_int8_infer = Nnp3xxTvmInfer()
+            tvm_fp32_infer.load(tyexec.original_json_path)
+            tvm_int8_infer.load(tyexec.quant_json_path)
+        else:
+            logger.error("Not support target -> {}".format(target))
+            exit(-1)
+
+        from prettytable import PrettyTable
+        table = None
+        first = True
+
+        file_list = os.listdir(data_dir)
+        for filename in file_list:
+            img_path = os.path.join(data_dir, filename)
+            if not os.path.exists(img_path) or not os.path.isfile(img_path):
+                continue
+            float_datas = tyexec.get_datas(img_path, force_float=True, force_cr=True, force_random=False, to_file=False)
+            fixed_datas = tyexec.get_datas(img_path, force_float=False, force_cr=True, force_random=False, to_file=False)
+
+            float_outputs = tvm_fp32_infer.run(float_datas, to_file=False)
+            fixed_outputs = tvm_int8_infer.run(fixed_datas, to_file=False)
+
+            if first:
+                out_list = ["Output{}".format(idx) for idx in range(len(float_outputs))]
+                header = ["Image"]
+                header.extend(out_list)
+                table = PrettyTable(header)
+                first = False
+            line = [filename]
+            for idx, (float_output, fixed_output) in enumerate(zip(float_outputs, fixed_outputs)):
+                dist = cosine_distance(float_output, fixed_output)
+                line.append("{:.6f}".format(dist))
+            logger.info(" ".join(line))
+            table.add_row(line)
+        logger.info("TVM-FP32 vs TVM-INT8:\n{}".format(table))
+    except Exception as e:
+        logger.error("Failed to compare\n{}".format(traceback.format_exc()))
+        exit(-1)
+
+
 def profile(cfg):
     try:
         logger.info("{}".format(cfg))
@@ -312,7 +372,7 @@ def demo(cfg, dtype, backend):
         logger.error("TyAssist failed to demo -> {}".format(e))
 
 
-def run(config_filepath, phase, dtype, target, backend):
+def run(config_filepath, phase, dtype, target, backend, data_dir):
     # 补充自定义预处理文件所在目录，必须与配置文件同目录
     config_abspath = os.path.abspath(config_filepath)
     config_dir = os.path.dirname(config_abspath)
@@ -333,7 +393,10 @@ def run(config_filepath, phase, dtype, target, backend):
     if phase == "build":
         build(config)
     elif phase == "compare":
-        compare(config, backend)
+        if data_dir:
+            compare2(config, target, data_dir)
+        else:
+            compare(config, backend)
     elif phase == "test":
         res = test(config, dtype, backend)
     elif phase == "demo":
@@ -406,7 +469,9 @@ if __name__ == "__main__":
                         help="Please specify a chip target")
     parser.add_argument("--dtype", "-t", type=str, default="int8", choices=("int8", "fp32"),
                         help="Please specify one of them， default is int8")
-    parser.add_argument("--backend", type=str, required=("demo" in sys.argv or "test" in sys.argv or "compare" in sys.argv),
+    parser.add_argument("--data_dir", type=str, help="Please specify a data dir for compare")
+    parser.add_argument("--backend", type=str, required="demo" in sys.argv or "test" in sys.argv or (
+            "--data_dir" not in sys.argv and "compare" in sys.argv),
                         choices=("chip", "iss", "tvm"), help="Please specify one of them")
     parser.add_argument("--log_dir", type=str, default="./logs",
                         help="Please specify a log dir, default is ./logs")
@@ -441,4 +506,4 @@ if __name__ == "__main__":
     if args.type == "benchmark":
         benchmark(args.config, args.dtype, args.target, args.backend, args.version)
     else:
-        _ = run(args.config, args.type, args.dtype, args.target, args.backend)
+        _ = run(args.config, args.type, args.dtype, args.target, args.backend, args.data_dir)
