@@ -345,32 +345,17 @@ def run(config_filepath, phase, dtype, target, backend):
     return res
 
 
-def benchmark(mapping_file, dtype, target, backend):
+def benchmark(mapping_file, dtype, target, backend, version):
     import csv
-    from prettytable import PrettyTable
-
-    try:
-        if target.startswith("nnp3"):
-            import deepeye
-            version = deepeye.util.get_version()
-            version = "v{}".format(version)
-        elif target.startswith("nnp4"):
-            from tvm.contrib.edgex import get_version
-            version = get_version()
-            version = version["TYTVM_VERSION"].split("-")[-1]
-        else:
-            logger.error("Not support target -> {}".format(target))
-            exit(-1)
-    except Exception as e:
-        logger.error("Failed to get tytvm version -> {}\n{}".format(e, traceback.format_exc()))
-        exit(-1)
+    from prettytable import from_csv
 
     header = ["ModelName", "InputSize", "Dataset", "Num", "Acc./mAP.", "Latency(ms)"]
-    table = PrettyTable(header)
     csv_filepath = "benchmark_{}_{}_{}_{}.csv".format(backend, dtype, target, version)
-    f = open(csv_filepath, "w")
+    is_exist = os.path.exists(csv_filepath)
+    f = open(csv_filepath, "a+")
     f_csv = csv.writer(f)
-    f_csv.writerow(header)
+    if not is_exist:
+        f_csv.writerow(header)
 
     check_file_exist(mapping_file)
     models_dict = read_yaml_to_dict(mapping_file)["models"]
@@ -383,7 +368,8 @@ def benchmark(mapping_file, dtype, target, backend):
         # 判断是否已存在模型
         model_cfg = read_yaml_to_dict(config_abspath)
         save_path = os.path.abspath(model_cfg["model"]["save_dir"])
-        if not os.path.join(save_path, model_cfg["model"].get("name", "net_combine.ty")):
+        if not os.path.join(save_path, model_cfg["model"].get(
+                "name", "net_combine.ty" if target.startswith("nnp3") else "net_combine_aarch64.ty")):
             logger.warning("Model not found -> {}".format(save_path))
             continue
 
@@ -399,10 +385,12 @@ def benchmark(mapping_file, dtype, target, backend):
             row = [model_name, res["input_size"], res["dataset"], res["num"], "{}/{}".format(res["map"], res["map50"]), res["latency"]]
         elif "easy" in res:
             row = [model_name, res["input_size"], res["dataset"], res["num"], "{}/{}/{}".format(res["easy"], res["medium"], res["hard"]), res["latency"]]
-        table.add_row(row)
         f_csv.writerow(row)
         logger.info("Finish {}".format(model_name))
     f.close()
+    fp = open(csv_filepath, "r")
+    table = from_csv(fp)
+    fp.close()
     logger.info("\n{}".format(table))
     logger.info("success")
 
@@ -422,6 +410,7 @@ if __name__ == "__main__":
                         choices=("chip", "iss", "tvm"), help="Please specify one of them")
     parser.add_argument("--log_dir", type=str, default="./logs",
                         help="Please specify a log dir, default is ./logs")
+    parser.add_argument("--version", type=str, required=("benchmark" in sys.argv), help="Please specify a tytvm version")
 
     args = parser.parse_args()
 
@@ -450,6 +439,6 @@ if __name__ == "__main__":
             exit(-1)
 
     if args.type == "benchmark":
-        benchmark(args.config, args.dtype, args.target, args.backend)
+        benchmark(args.config, args.dtype, args.target, args.backend, args.version)
     else:
         _ = run(args.config, args.type, args.dtype, args.target, args.backend)
