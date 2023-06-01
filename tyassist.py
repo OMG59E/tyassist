@@ -265,10 +265,22 @@ def test(cfg, dtype, backend):
             exit(-1)
 
         if backend == "tvm":
-            if dtype == "fp32":
-                model.load_json(tyexec.original_json_path)
-            elif dtype == "int8":
-                model.load_json(tyexec.quant_json_path)
+            if tyexec.target.startswith("nnp4"):
+                if dtype == "fp32":
+                    model.load(tyexec.cpu_model_float_path)
+                elif dtype == "int8":
+                    model.load(tyexec.cpu_model_fixed_path)
+                else:
+                    logger.error("Not support dtype -> {}".format(dtype))
+                    exit(-1)
+            elif tyexec.target.startswith("nnp3"):
+                if dtype == "fp32":
+                    model.load_json(tyexec.original_json_path)
+                elif dtype == "int8":
+                    model.load_json(tyexec.quant_json_path)
+                else:
+                    logger.error("Not support dtype -> {}".format(dtype))
+                    exit(-1)
         elif backend == "onnx":
             model.load(tyexec.weight)
         else:  # chip/iss
@@ -344,10 +356,22 @@ def demo(cfg, dtype, backend):
             exit(-1)
 
         if backend == "tvm":
-            if dtype == "fp32":
-                model.load_json(tyexec.original_json_path)
-            elif dtype == "int8":
-                model.load_json(tyexec.quant_json_path)
+            if tyexec.target.startswith("nnp4"):
+                if dtype == "fp32":
+                    model.load(tyexec.cpu_model_float_path)
+                elif dtype == "int8":
+                    model.load(tyexec.cpu_model_fixed_path)
+                else:
+                    logger.error("Not support dtype -> {}".format(dtype))
+                    exit(-1)
+            elif tyexec.target.startswith("nnp3"):
+                if dtype == "fp32":
+                    model.load_json(tyexec.original_json_path)
+                elif dtype == "int8":
+                    model.load_json(tyexec.quant_json_path)
+                else:
+                    logger.error("Not support dtype -> {}".format(dtype))
+                    exit(-1)
         elif backend == "onnx":
             model.load(tyexec.weight)
         else:  # chip/iss
