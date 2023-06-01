@@ -15,6 +15,7 @@ import cv2
 import tqdm
 
 from .base_model import BaseModel
+from datasets.imagenet import ILSVRC2012_LABELS
 from utils import logger
 from utils.preprocess import default_preprocess
 
@@ -132,6 +133,7 @@ class Classifier(BaseModel, ABC):
         chip_output = self.inference(cv_image)
         max_idx = np.argmax(chip_output, axis=1).flatten()[0]
         max_prob = chip_output[0][max_idx].flatten()[0]
+        max_idx = str(max_idx)
         logger.info("predict cls = {}, prob = {:.6f}, cls_name = {}".format(
-            max_idx, max_prob, self.dataset.get_class_name(max_idx)))
-        cv2.imwrite("{}/{}.jpg".format(save_results, self.dataset.get_class_name(max_idx)), cv_image)
+            max_idx, max_prob, ILSVRC2012_LABELS[max_idx][0]))
+        cv2.imwrite("{}/{}.jpg".format(save_results, ILSVRC2012_LABELS[max_idx][0]), cv_image)
