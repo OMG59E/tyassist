@@ -269,6 +269,8 @@ def test(cfg, dtype, backend):
                 model.load_json(tyexec.original_json_path)
             elif dtype == "int8":
                 model.load_json(tyexec.quant_json_path)
+        elif backend == "onnx":
+            model.load(tyexec.weight)
         else:  # chip/iss
             if tyexec.target.startswith("nnp4"):
                 model_path = tyexec.model_path_x86_64 if backend == "sdk_iss" else tyexec.model_path_aarch64
@@ -346,6 +348,8 @@ def demo(cfg, dtype, backend):
                 model.load_json(tyexec.original_json_path)
             elif dtype == "int8":
                 model.load_json(tyexec.quant_json_path)
+        elif backend == "onnx":
+            model.load(tyexec.weight)
         else:  # chip/iss
             if tyexec.target.startswith("nnp4"):
                 model_path = tyexec.model_path_x86_64 if backend == "sdk_iss" else tyexec.model_path_aarch64
@@ -472,7 +476,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_dir", type=str, help="Please specify a data dir for compare")
     parser.add_argument("--backend", type=str, required="demo" in sys.argv or "test" in sys.argv or (
             "--data_dir" not in sys.argv and "compare" in sys.argv),
-                        choices=("chip", "iss", "tvm"), help="Please specify one of them")
+                        choices=("chip", "iss", "tvm", "onnx"), help="Please specify one of them")
     parser.add_argument("--log_dir", type=str, default="./logs",
                         help="Please specify a log dir, default is ./logs")
     parser.add_argument("--version", type=str, required=("benchmark" in sys.argv), help="Please specify a tytvm version")
@@ -494,6 +498,10 @@ if __name__ == "__main__":
     # check
     if args.backend == "tvm":
         pass
+    elif args.backend == "onnx":
+        if args.dtype != "fp32":
+            logger.warning("Onnx only support fp32")
+        args.dtype = "fp32"
     elif args.backend == "iss":
         if args.dtype not in ["int8"]:
             logger.error("iss not support dtype({})".format(args.dtype))

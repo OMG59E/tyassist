@@ -8,6 +8,7 @@
 """
 import abc
 from utils import logger
+from src.onnx_infer import OnnxInfer
 from src.nnp3xx_infer import Nnp3xxSdkInfer, Nnp3xxTvmInfer
 from src.nnp4xx_infer import Nnp4xxSdkInfer, Nnp4xxTvmInfer
 
@@ -36,6 +37,9 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                 self.infer = Nnp3xxTvmInfer()
                 self.infer.set_input_names([_input["name"] for _input in self.inputs])
                 self.enable_aipp = False
+            elif self.backend == "onnx":
+                self.infer = OnnxInfer()
+                self.infer.set_input_names([_input["name"] for _input in self.inputs])
             else:
                 self.infer = Nnp3xxSdkInfer(enable_dump=0, enable_aipp=self.enable_aipp)
                 self.infer.set_input_enable_aipps([_input["support"] for _input in self.inputs])
@@ -44,6 +48,9 @@ class BaseModel(object, metaclass=abc.ABCMeta):
             self.enable_aipp = False
             if self.backend == "tvm":
                 self.infer = Nnp4xxTvmInfer()
+                self.infer.set_input_names([_input["name"] for _input in self.inputs])
+            elif self.backend == "onnx":
+                self.infer = OnnxInfer()
                 self.infer.set_input_names([_input["name"] for _input in self.inputs])
             else:
                 self.infer = Nnp4xxSdkInfer(enable_dump=0, enable_aipp=self.enable_aipp)
