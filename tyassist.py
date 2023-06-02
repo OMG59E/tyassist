@@ -496,16 +496,17 @@ if __name__ == "__main__":
                         choices=("nnp300", "nnp3020", "nnp310", "nnp320", "nnp400"),
                         help="Please specify a chip target")
     parser.add_argument("--dtype", "-t", type=str, default="int8", choices=("int8", "fp32"),
-                        help="Please specify one of them， default is int8")
-    parser.add_argument("--data_dir", type=str, help="Please specify a data dir for compare")
+                        help="Please specify one of them, default int8")
+    parser.add_argument("--data_dir", type=str, help="Please specify a data dir, required only comapre specify images")
     parser.add_argument("--backend", type=str, required="demo" in sys.argv or "test" in sys.argv or (
             "--data_dir" not in sys.argv and "compare" in sys.argv),
                         choices=("chip", "iss", "tvm", "onnx"), help="Please specify one of them")
     parser.add_argument("--log_dir", type=str, default="./logs",
                         help="Please specify a log dir, default is ./logs")
-    parser.add_argument("--log_level", type=int, required=False, default=2,
-                        help="Please specify a log level, 1:DEBUG, 2:INFO, 3:WARNING, 4:ERROR, 5:FATAL")
-    parser.add_argument("--version", type=str, required=("benchmark" in sys.argv), help="Please specify a tytvm version")
+    parser.add_argument("--log_level", type=int, required=False, default=2, choices=(1, 2, 3, 4, 5),
+                        help="Please specify a log level, default 2, 1:DEBUG, 2:INFO, 3:WARNING, 4:ERROR, 5:FATAL")
+    parser.add_argument("--version", type=str, required=("benchmark" in sys.argv),
+                        help="Please specify a tytvm version, required only onnx backend")
 
     args = parser.parse_args()
     logger.setLevel(args.log_level*10)
