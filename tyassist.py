@@ -503,9 +503,12 @@ if __name__ == "__main__":
                         choices=("chip", "iss", "tvm", "onnx"), help="Please specify one of them")
     parser.add_argument("--log_dir", type=str, default="./logs",
                         help="Please specify a log dir, default is ./logs")
+    parser.add_argument("--log_level", type=int, required=False, default=2,
+                        help="Please specify a log level, 1:DEBUG, 2:INFO, 3:WARNING, 4:ERROR, 5:FATAL")
     parser.add_argument("--version", type=str, required=("benchmark" in sys.argv), help="Please specify a tytvm version")
 
     args = parser.parse_args()
+    logger.setLevel(args.log_level*10)
 
     check_file_exist(args.config)
     basename, _ = os.path.splitext(os.path.basename(args.config))
