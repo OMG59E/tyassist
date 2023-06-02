@@ -104,8 +104,8 @@ def build(cfg):
         logger.info("\n{}".format(table))
         logger.info("success")
     except Exception as e:
-        logger.error("{}".format(traceback.format_exc()))
-        logger.error("TyAssist failed to build -> {}".format(e))
+        logger.error("Failed to build \n{}".format(traceback.format_exc()))
+        exit(-1)
 
 
 def compare(cfg, backend):
@@ -303,8 +303,8 @@ def test(cfg, dtype, backend):
         logger.info("success")
         return res
     except Exception as e:
-        logger.error("{}".format(traceback.format_exc()))
-        logger.error("TyAssist failed to test -> {}".format(e))
+        logger.error("Failed to test \n{}".format(traceback.format_exc()))
+        exit(-1)
 
 
 def demo(cfg, dtype, backend):
@@ -396,8 +396,8 @@ def demo(cfg, dtype, backend):
         logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
         logger.info("success")
     except Exception as e:
-        logger.error("{}".format(traceback.format_exc()))
-        logger.error("TyAssist failed to demo -> {}".format(e))
+        logger.error("Failed to demo\n{}".format(traceback.format_exc()))
+        exit(-1)
 
 
 def run(config_filepath, phase, dtype, target, backend, data_dir):
