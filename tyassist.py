@@ -465,7 +465,7 @@ def benchmark(mapping_file, dtype, target, backend, version):
             continue
 
         os.chdir(config_dir)  # 切换至模型目录
-        res = run(config_abspath, "test", dtype, target, backend)
+        res = run(config_abspath, "test", dtype, target, backend, None)
         # logger.info("{}".format(res))
         os.chdir(root)  # 切换根目录
 
