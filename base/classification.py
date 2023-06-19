@@ -23,11 +23,6 @@ from utils.preprocess import default_preprocess
 class Classifier(BaseModel, ABC):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        n, c, h, w = self.inputs[0]["shape"]
-        if self.inputs[0]["layout"] == "NHWC":
-            n, h, w, c = self.inputs[0]["shape"]
-        self._input_size = (w, h)
-        self._end2end_latency_ms = 0
 
     def load(self, model_path):
         self.infer.load(model_path)
@@ -47,15 +42,14 @@ class Classifier(BaseModel, ABC):
             padding_mode=self.inputs[0]["padding_mode"]
         )
 
-    def _postprocess(self, outputs, cv_image=None):
+    def _postprocess(self, outputs, cv_images=None):
         if len(outputs) != 1:
             logger.error("only support signal output, please check")
             exit(-1)
-        outputs = outputs[0]  # [bs, num_cls] or [num_cls] for 4xx iss
-        bs = outputs.shape[0]
-        if bs != 1:
-            logger.error("only support bs=1, please check")
-            exit(-1)
+
+        bs = len(cv_images)
+        outputs = outputs[0]
+        outputs = outputs[:bs, ...]
         return outputs
 
     @property
@@ -70,15 +64,32 @@ class Classifier(BaseModel, ABC):
             return 0
         return self._end2end_latency_ms / self.total
 
-    def inference(self, cv_image):
+    def inference(self, cv_images: list):
         t_start = time.time()
-        data = self._preprocess(cv_image)
-        outputs = self.infer.run([data])
-        output = self._postprocess(outputs, cv_image)
+        datas = np.zeros((self.bs, self.channels, self._input_size[1], self._input_size[0]),
+                         dtype=np.uint8 if not self.use_norm else np.float32)
+        for idx, cv_image in enumerate(cv_images):
+            data = self._preprocess(cv_image)
+            datas[idx, ...] = data
+        outputs = self.infer.run([datas])
+        outputs = self._postprocess(outputs, cv_images)
         end2end_cost = time.time() - t_start
         self._end2end_latency_ms += (end2end_cost * 1000)
         self.total += 1
-        return output
+        return outputs
+
+    @staticmethod
+    def top_k(k, labels, offset, outputs, top1, top5):
+        idxes = np.argsort(-outputs, axis=1, kind="quicksort")[:, 0:k]  # 降序W
+        for b, max_idxes in enumerate(idxes):
+            label = labels[offset + b]
+            if label == max_idxes[0]:
+                top1 += 1
+                top5 += 1
+                continue
+            if label in max_idxes:
+                top5 += 1
+        return top1, top5
 
     def evaluate(self):
         """ top-k
@@ -92,21 +103,28 @@ class Classifier(BaseModel, ABC):
         k = 5
         top1, top5 = 0, 0
         total_num = len(img_paths)
+        offset = 0
+        cv_images = list()
         for idx, img_path in enumerate(tqdm.tqdm(img_paths)):
             cv_image = cv2.imread(img_path)
             if cv_image is None:
                 logger.warning("Failed to decode img by opencv -> {}".format(img_path))
                 continue
+            cv_images.append(cv_image)
 
-            chip_output = self.inference(cv_image)
-            idxes = np.argsort(-chip_output, axis=1, kind="quicksort").flatten()[0:k]  # 降序
-            # logger.info("pred = {}, gt = {}".format(idxes, labels[idx]))
-            if labels[idx] == idxes[0]:
-                top1 += 1
-                top5 += 1
+            if (idx + 1) % self.bs != 0:
                 continue
-            if labels[idx] in idxes:
-                top5 += 1
+
+            outputs = self.inference(cv_images)
+            top1, top5 = self.top_k(k, labels, offset, outputs, top1, top5)
+            cv_images.clear()
+            offset += self.bs
+
+        if len(cv_images) > 0:
+            offset = total_num - total_num % self.bs
+            outputs = self.inference(cv_images)
+            top1, top5 = self.top_k(k, labels, offset, outputs, top1, top5)
+
         top1, top5 = float(top1)/total_num, float(top5)/total_num
         return {
             "input_size": "{}x{}x{}x{}".format(1, 3, self._input_size[1], self._input_size[0]),
@@ -117,23 +135,34 @@ class Classifier(BaseModel, ABC):
             "latency": "{:.6f}".format(self.ave_latency_ms)
         }
 
-    def demo(self, img_path):
-        if not os.path.exists(img_path):
-            logger.error("The img path not exist -> {}".format(img_path))
-            exit(-1)
-        save_results = "vis_{}_{}".format(self.backend, self.dtype)
-        if not os.path.exists(save_results):
-            os.makedirs(save_results)
-        logger.info("process: {}".format(img_path))
-        cv_image = cv2.imread(img_path)
-        if cv_image is None:
-            logger.error("Failed to decode img by opencv -> {}".format(img_path))
-            exit(-1)
+    @staticmethod
+    def show_info(outputs):
+        max_idxes = np.argmax(outputs, axis=1)
+        for idx, max_idx in enumerate(max_idxes):
+            max_prob = outputs[idx, max_idx]
+            max_idx = str(max_idx)
+            logger.info("predict cls: {}, prob: {:.6f}, cls_name: {}".format(
+                max_idx, max_prob, ILSVRC2012_LABELS[max_idx][0]))
 
-        chip_output = self.inference(cv_image)
-        max_idx = np.argmax(chip_output, axis=1).flatten()[0]
-        max_prob = chip_output[0][max_idx].flatten()[0]
-        max_idx = str(max_idx)
-        logger.info("predict cls = {}, prob = {:.6f}, cls_name = {}".format(
-            max_idx, max_prob, ILSVRC2012_LABELS[max_idx][0]))
-        cv2.imwrite("{}/{}.jpg".format(save_results, ILSVRC2012_LABELS[max_idx][0]), cv_image)
+    def demo(self, img_paths: list):
+        if len(img_paths) != self.bs:
+            logger.warning("img_num({}) != batch_size({})".format(len(img_paths), self.bs))
+
+        # save_results = "vis_{}_{}".format(self.backend, self.dtype)
+        # if not os.path.exists(save_results):
+        #     os.makedirs(save_results)
+
+        cv_images = list()
+        for img_path in img_paths:
+            if not os.path.exists(img_path):
+                logger.error("The img path not exist -> {}".format(img_path))
+                exit(-1)
+            logger.info("process: {}".format(img_path))
+            cv_image = cv2.imread(img_path)
+            if cv_image is None:
+                logger.error("Failed to decode img by opencv -> {}".format(img_path))
+                exit(-1)
+            cv_images.append(cv_image)
+
+        outputs = self.inference(cv_images)
+        self.show_info(outputs)

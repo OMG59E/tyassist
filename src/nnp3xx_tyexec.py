@@ -22,12 +22,23 @@ from .base_tyexec import BaseTyExec
 class Nnp3xxTyExec(BaseTyExec, ABC):
     def __init__(self, cfg: dict):
         super(Nnp3xxTyExec, self).__init__(cfg)
-
+        self.set_suppress_long_func()  # 限制每个融合的最大算子个数
         self.model_path = os.path.join(self.model_dir, "{}.ty".format(self.model_name))
 
     @staticmethod
     def set_env():
         pass
+
+    def set_suppress_long_func(self):
+        if self.target.startswith("nnp4"):
+            logger.warning("Nnp4xx not support set_suppress_long_func")
+            return
+
+        if "suppress_long_func" not in self.cfg["build"]:
+            self.cfg["build"]["suppress_long_func"] = False
+        else:
+            if self.cfg["build"]["suppress_long_func"] is None:
+                self.cfg["build"]["suppress_long_func"] = False
 
     def quantization(self, in_datas):
         """量化，将浮点relay函数转为成定点relay函数
@@ -47,7 +58,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 # 的图片集路径，支持图片格式为 jpg，jpeg，png，bmp。也可配置为用户自定义的预处理。类型str/generator
                 dataset=self.get_dataset(),
                 # 使用校准数据数量
-                prof_img_num=self.quant_cfg["prof_img_num"],
+                prof_img_num=self.prof_num,
                 # 此配置仅在 dataset 配置为图片集路径（即使用云天自带的预处理），且输入为3通道时有效，对生成芯片模型无效
                 rgb_en=1 if (self.num_inputs == 1 and self.inputs[0]["pixel_format"] == "RGB") else 0,
                 # 均值方差，对生成芯片模型生效
@@ -271,12 +282,14 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
 
     @property
     def targets(self):
-        return {"nnp320": 768, "nnp310": 792, "nnp300": 792, "nnp3020": 792, "nnp200": 750}
+        return {"nnp320": 768, "nnp310": 792, "nnp315m": 792, "nnp300": 792, "nnp3020": 792, "nnp200": 750}
 
     def get_relay_mac(self):
         from deepeye.util import count_mac
-        logger.info("float relay MAC: {}".format(count_mac(self.relay)))
-        logger.info("fixed relay MAC: {}".format(count_mac(self.relay_quant)))
+        relay_mac_num = count_mac(self.relay)
+        relay_quant_mac_num = count_mac(self.relay_quant)
+        logger.info("float relay MAC: {}".format(relay_mac_num))
+        logger.info("fixed relay MAC: {}".format(relay_quant_mac_num))
 
     def get_profile_info(self):
         filepath = os.path.join(self.model_dir, "model_profile.json")

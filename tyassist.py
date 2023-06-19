@@ -43,6 +43,10 @@ def set_logger(op, log_dir, filename):
 def get_tyexec(cfg):
     target = cfg["build"]["target"]
     if target.startswith("nnp3"):
+        m = Nnp3xxTyExec(cfg)
+        if m.bs > 1:
+            logger.error("Nnp3xx not support batch-size > 1")
+            exit(-1)
         return Nnp3xxTyExec(cfg)
     elif target.startswith("nnp4"):
         tyexec = Nnp4xxTyExec(cfg)
@@ -72,7 +76,7 @@ def build(cfg):
         tvm_float_output = tyexec.tvm_float_inference(in_datas, to_file=True)
 
         # tyexec.model_analysis()
-        tyexec.compress_analysis()
+        # tyexec.compress_analysis()
         tyexec.get_profile_info()
         tyexec.get_relay_mac()  # print mac/flops/cycles info
         # tyexec.get_device_type()  # print op backend info
@@ -144,8 +148,7 @@ def compare(cfg, backend):
                 logger.info("[Compare] fixed({}) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(tyexec.backend, idx, dist2))
         logger.info("success")
     except Exception as e:
-        logger.error("{}".format(traceback.format_exc()))
-        logger.error("TyAssist failed to compare -> {}".format(e))
+        logger.error("Failed to compare {}".format(traceback.format_exc()))
 
 
 def compare2(cfg, target, data_dir):
@@ -327,6 +330,7 @@ def demo(cfg, dtype, backend):
         model_impl_module = cfg["model"]["model_impl_module"]
         model_impl_cls = cfg["model"]["model_impl_cls"]
         enable_aipp = cfg["demo"].get("enable_aipp", False)
+        bs = cfg["model"]["inputs"][0]["shape"][0]
 
         file_list = os.listdir(data_dir)
         file_list = file_list if num > len(file_list) else file_list[0:num]
@@ -384,14 +388,24 @@ def demo(cfg, dtype, backend):
                 exit(-1)
             model.load(model_path)
 
-        for filename in file_list:
-            _, ext = os.path.splitext(filename)
+        filepaths = list()
+        for idx, img_name in enumerate(file_list):
+            _, ext = os.path.splitext(img_name)
             if ext not in [".jpg", ".JPEG", ".bmp", ".png", ".jpeg", ".BMP"]:
-                logger.warning("file ext invalid -> {}".format(filename))
+                logger.warning("file ext invalid -> {}".format(img_name))
                 continue
 
-            filepath = os.path.join(data_dir, filename)
-            model.demo(filepath)
+            filepath = os.path.join(data_dir, img_name)
+            if not os.path.exists(filepath):
+                continue
+
+            filepaths.append(filepath)
+
+            if (idx + 1) % bs == 0:
+                model.demo(filepaths)
+                filepaths.clear()
+        if len(filepaths) > 0:
+            model.demo(filepaths)
         logger.info("average cost {:.6f}ms".format(model.ave_latency_ms))
         logger.info("[end2end] average cost: {:.6f}ms".format(model.end2end_latency_ms))
         logger.info("success")
@@ -493,7 +507,7 @@ if __name__ == "__main__":
     parser.add_argument("--config", "-c", type=str, required=True,
                         help="Please specify a configuration file")
     parser.add_argument("--target", type=str, required=False,
-                        choices=("nnp300", "nnp3020", "nnp310", "nnp320", "nnp400"),
+                        choices=("nnp300", "nnp3020", "nnp310", "nnp315m", "nnp320", "nnp400"),
                         help="Please specify a chip target")
     parser.add_argument("--dtype", "-t", type=str, default="int8", choices=("int8", "fp32"),
                         help="Please specify one of them, default int8")

@@ -38,7 +38,7 @@ class Detector(Classifier):
     def set_conf_threshold(self, conf_threshold=0.25):
         self._conf_threshold = conf_threshold
 
-    def _postprocess(self, outputs, cv_image=None):
+    def _postprocess(self, outputs, cv_images=None):
         if len(outputs) == 4 or len(outputs) == 1:
             outputs = outputs[0]
         elif len(outputs) == 3:
@@ -47,11 +47,13 @@ class Detector(Classifier):
         else:
             logger.error("Output num error -> {}".format(len(outputs)))
             exit(-1)
+        bs = len(cv_images)
         outputs = torch.from_numpy(outputs)
         outputs = non_max_suppression(outputs, self._conf_threshold, self._iou_threshold)
-        outputs = outputs[0]  # bs=1
-        outputs[:, :4] = scale_coords(self._input_size, outputs[:, :4], cv_image.shape).round()
-        return outputs.numpy()
+        for idx, cv_image in enumerate(cv_images):
+            outputs[idx][:, :4] = scale_coords(self._input_size, outputs[idx][:, :4], cv_image.shape).round()
+            outputs[idx] = outputs[idx].numpy()
+        return outputs
 
     def evaluate(self):
         if not self.dataset:
@@ -67,6 +69,8 @@ class Detector(Classifier):
         if not os.path.exists(save_results):
             os.makedirs(save_results)
 
+        cv_images = list()
+        label_paths = list()
         for idx, img_path in enumerate(tqdm.tqdm(img_paths)):
             basename = os.path.basename(img_path)
             filename, ext = os.path.splitext(basename)
@@ -77,13 +81,27 @@ class Detector(Classifier):
             if cv_image is None:
                 logger.warning("Failed to decode img by opencv -> {}".format(img_path))
                 continue
-            detections = self.inference(cv_image)
-            detections2txt(detections, label_path)
+            cv_images.append(cv_image)
+            label_paths.append(label_path)
+
+            if (idx + 1) % self.bs != 0:
+                continue
+
+            detections = self.inference(cv_images)
+            for b in range(len(cv_images)):
+                detections2txt(detections[b], label_paths[b])
+            cv_images.clear()
+            label_paths.clear()
+        if len(cv_images) > 1:
+            detections = self.inference(cv_images)
+            for b in range(len(cv_images)):
+                detections2txt(detections[b], label_paths[b])
+
         pred_json = "pred.json"
         detection_txt2json(save_results, pred_json)
         _map, map50 = coco_eval(pred_json, self.dataset.annotations_file, self.dataset.image_ids)
         return {
-            "input_size": "{}x{}x{}x{}".format(1, 3, self._input_size[1], self._input_size[0]),
+            "input_size": "{}x{}x{}x{}".format(self.bs, 3, self._input_size[1], self._input_size[0]),
             "dataset": self.dataset.dataset_name,
             "num": len(img_paths),
             "map": "{:.6f}".format(_map),
@@ -91,26 +109,31 @@ class Detector(Classifier):
             "latency": "{:.6f}".format(self.ave_latency_ms)
         }
 
-    def demo(self, img_path):
-        if not os.path.exists(img_path):
-            logger.error("The img path not exist -> {}".format(img_path))
-            exit(-1)
-        filename = os.path.basename(img_path)
-        logger.info("process: {}".format(img_path))
-
+    def demo(self, img_paths: list):
         save_results = "vis_{}_{}".format(self.backend, self.dtype)
         if not os.path.exists(save_results):
             os.makedirs(save_results)
 
-        cv_image = cv2.imread(img_path)
-        if cv_image is None:
-            logger.error("Failed to decode img by opencv -> {}".format(img_path))
-            exit(-1)
+        filenames = list()
+        cv_images = list()
+        for img_path in img_paths:
+            if not os.path.exists(img_path):
+                logger.error("The img path not exist -> {}".format(img_path))
+                exit(-1)
+            filename = os.path.basename(img_path)
+            logger.info("process: {}".format(img_path))
+            cv_image = cv2.imread(img_path)
+            if cv_image is None:
+                logger.error("Failed to decode img by opencv -> {}".format(img_path))
+                exit(-1)
+            cv_images.append(cv_image)
+            filenames.append(filename)
 
-        detections = self.inference(cv_image)
+        detections = self.inference(cv_images)
 
-        for det in detections:
-            (x1, y1, x2, y2), conf, cls = list(map(int, det[0:4])), det[4], int(det[5])
-            cv2.rectangle(cv_image, (x1, y1), (x2, y2), (0, 0, 255), 2, 8)
-            logger.info("x1:{}, y1:{}, x2:{}, y2:{}, conf:{:.6f}, cls:{}".format(x1, y1, x2, y2, conf, int(cls)))
-        cv2.imwrite(os.path.join(save_results, filename), cv_image)
+        for idx, cv_image in enumerate(cv_images):
+            for det in detections[idx]:
+                (x1, y1, x2, y2), conf, cls = list(map(int, det[0:4])), det[4], int(det[5])
+                cv2.rectangle(cv_image, (x1, y1), (x2, y2), (0, 0, 255), 2, 8)
+                logger.info("x1:{}, y1:{}, x2:{}, y2:{}, conf:{:.6f}, cls:{}".format(x1, y1, x2, y2, conf, int(cls)))
+            cv2.imwrite(os.path.join(save_results, filenames[idx]), cv_image)

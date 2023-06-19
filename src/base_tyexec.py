@@ -39,6 +39,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.graph = cfg["model"]["graph"]
         self.weight = cfg["model"]["weight"]
         self.inputs = cfg["model"]["inputs"]
+        self.quant_data_dir = self.quant_cfg["data_dir"]
+        self.prof_num = self.quant_cfg["prof_img_num"]
         # self.inputs_ = list()
         self.outputs = cfg["model"]["outputs"]
         self.num_inputs = len(self.inputs)
@@ -64,8 +66,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
 
         self.shape_dict = dict()
         self.dtype_dict = dict()
-
-        self.set_suppress_long_func()  # 限制每个融合的最大算子个数
+        self.bs = 1  # batch size
         self.set_model_name()
         self.set_input_infos()
         self.set_custom_preprocess()
@@ -82,26 +83,29 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
     def set_env():
         raise NotImplementedError
 
+    def _batch_preprocess(self):
+        # multi-batch preprocess and input_num must be = 1
+        assert len(self.inputs) == 1, "input_num must be = 1"
+        data_dir = self.quant_data_dir
+        img_lists = os.listdir(data_dir)
+        prof_num = len(img_lists) // self.bs
+        if prof_num < self.prof_num:
+            logger.warning("Quant data not enough")
+            self.prof_num = prof_num
+
+        for idx in range(self.prof_num):
+            batch_img_lists = [os.path.join(data_dir, img_lists[i]) for i in range(idx*self.bs, (idx+1)*self.bs)]
+            yield self.get_datas(batch_img_lists, force_float=False, force_cr=True, force_random=False, to_file=False)
+
     def get_dataset(self):
-        quant_data_dir = self.quant_cfg["data_dir"]
-        dataset = quant_data_dir
-        if not quant_data_dir:  # 未配置量化路径使用随机数据情况
+        if not self.quant_data_dir:  # 未配置量化路径使用随机数据情况
             dataset = self.gen_random_quant_data
         else:
             if self.has_custom_preprocess:  # 配置量化数据目录情况下存在自定义预处理
                 dataset = self.custom_preprocess_cls.get_data
+            else:
+                dataset = self._batch_preprocess
         return dataset
-
-    def set_suppress_long_func(self):
-        if self.target.startswith("nnp4"):
-            logger.warning("Nnp4xx not support set_suppress_long_func")
-            return
-
-        if "suppress_long_func" not in self.cfg["build"]:
-            self.cfg["build"]["suppress_long_func"] = False
-        else:
-            if self.cfg["build"]["suppress_long_func"] is None:
-                self.cfg["build"]["suppress_long_func"] = False
 
     def set_model_name(self):
         if "name" in self.cfg["model"]:
@@ -116,6 +120,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             n, c, h, w = shape
             if _input["layout"] == "NHWC":
                 n, h, w, c = shape
+
+            self.bs = n
 
             if "dtype" not in _input:
                 if _input["pixel_format"] == "None":
@@ -197,7 +203,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             logger.error("input({}) dtype mismatch {} vs {}".format(name, data.dtype, target_dtype))
             exit(-1)
 
-    def get_datas(self, filepath="", force_float=False, force_cr=True, force_random=False, to_file=False):
+    def get_datas(self, filepath: str or list = "",
+                  force_float=False, force_cr=True, force_random=False, to_file=False):
         """ 生成模型输入数据
         @param filepath:  外部指定数据
         @param force_float:  强制输出float数据
@@ -215,61 +222,82 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 dtype = "uint8"
             if force_float:
                 dtype = "float32"
-            data_path = _input["data_path"] if not filepath else filepath
-            data_npy_path = os.path.join(self.result_dir, "{}_{}_{}.npy".format(idx, name, dtype))
-            data_bin_path = os.path.join(self.result_dir, "{}_{}_{}.bin".format(idx, name, dtype))
-            data_txt_path = os.path.join(self.result_dir, "{}_{}_{}.txt".format(idx, name, dtype))
+            data_paths = _input["data_path"] if not filepath else filepath
+            if isinstance(data_paths, list):
+                assert len(data_paths) == self.bs
+            else:
+                assert isinstance(data_paths, str)
+                logger.warning("data_path will be reused")
+                data_paths = [data_paths for _ in range(self.bs)]
+
             n, c, h, w = self.shape_dict[name]
+            data_npy_path = os.path.join(self.result_dir, "{}_{}_{}_{}x{}x{}x{}.npy".format(idx, name, dtype, n, c, h, w))
+            data_bin_path = os.path.join(self.result_dir, "{}_{}_{}_{}x{}x{}x{}.bin".format(idx, name, dtype, n, c, h, w))
+            data_txt_path = os.path.join(self.result_dir, "{}_{}_{}_{}x{}x{}x{}.txt".format(idx, name, dtype, n, c, h, w))
+
             if _input["support"]:   # 图像数据，工具内部处理
-                if data_path:   # 指定输入数据
-                    im = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE if pixel_format == "GRAY" else cv2.IMREAD_COLOR)
-                else:   # 未指定输入数据，生成随机图像
+                ims = list()
+                for data_path in data_paths:
+                    if data_path:   # 指定输入数据
+                        im = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE if pixel_format == "GRAY" else cv2.IMREAD_COLOR)
+                        ims.append(im)
+                        continue
+
+                    # 未指定输入数据，生成随机图像
                     logger.warning("input[{}] will use random image".format(name))
                     if force_random:  # 用于量化和统计含零情况
                         im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
-                    else:
-                        random_im_path = os.path.join(self.result_dir, "{}_{}_random.jpg".format(idx, name))
-                        random_npy_path = os.path.join(self.result_dir, "{}_{}_random.npy".format(idx, name))
+                        ims.append(im)
+                        continue
+
+                    for b in range(self.bs):
+                        random_im_path = os.path.join(self.result_dir, "{}_{}_random{}.jpg".format(idx, name, b))
+                        random_npy_path = os.path.join(self.result_dir, "{}_{}_random{}.npy".format(idx, name, b))
                         if os.path.exists(random_npy_path):
                             im = np.load(random_npy_path)
                         else:
                             im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
                             np.save(random_npy_path, im)
                             cv2.imwrite(random_im_path, im)
-                if not _input["enable_aipp"] or force_cr:  # 兼容芯片orISS使能AIPP情况
-                    _input["padding_size"], _ = calc_padding_size(im, (w, h), _input["padding_mode"])
-                    in_data = default_preprocess(
-                        im,
-                        (w, h),
-                        mean=_input["mean"],
-                        std=_input["std"],
-                        use_norm=False if not force_float else True,  # 量化前relay_func需要norm
-                        use_rgb=True if pixel_format == "RGB" else False,
-                        use_resize=True,
-                        resize_type=_input["resize_type"],
-                        padding_value=_input["padding_value"],
-                        padding_mode=_input["padding_mode"]
-                    ).astype(dtype=dtype if not force_float else "float32")  # 量化前relay_func需要float输入，也可不强转由tvm自定转换
-                    in_datas[name] = np.ascontiguousarray(in_data)
-                else:
-                    if pixel_format == "RGB":
-                        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)  # AIPP不支持BGR -> RGB，提前转换
-                    if len(im.shape) not in [2, 3]:
-                        logger.error("Not support image shape -> {}".format(im.shape))
-                        exit(-1)
-                    if len(im.shape) == 2:  # gray
-                        im = np.expand_dims(im, axis=2)
-                        im = np.expand_dims(im, axis=0)
+                        ims.append(im)
+                        
+                datas = list()
+                for im in ims:
+                    if not _input["enable_aipp"] or force_cr:  # 兼容芯片orISS使能AIPP情况
+                        _input["padding_size"], _ = calc_padding_size(im, (w, h), _input["padding_mode"])
+                        in_data = default_preprocess(
+                            im,
+                            (w, h),
+                            mean=_input["mean"],
+                            std=_input["std"],
+                            use_norm=False if not force_float else True,  # 量化前relay_func需要norm
+                            use_rgb=True if pixel_format == "RGB" else False,
+                            use_resize=True,
+                            resize_type=_input["resize_type"],
+                            padding_value=_input["padding_value"],
+                            padding_mode=_input["padding_mode"]
+                        ).astype(dtype=dtype if not force_float else "float32")  # 量化前relay_func需要float输入，也可不强转由tvm自定转换
+                        datas.append(np.ascontiguousarray(in_data))
                     else:
-                        im = np.expand_dims(im, axis=0)
-                    in_datas[name] = np.ascontiguousarray(im.transpose((0, 3, 1, 2)))  # nhwc -> nchw, BGR888  uint8
+                        if pixel_format == "RGB":
+                            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)  # AIPP不支持BGR -> RGB，提前转换
+                        if len(im.shape) not in [2, 3]:
+                            logger.error("Not support image shape -> {}".format(im.shape))
+                            exit(-1)
+                        if len(im.shape) == 2:  # gray
+                            im = np.expand_dims(im, axis=2)
+                            im = np.expand_dims(im, axis=0)
+                        else:
+                            im = np.expand_dims(im, axis=0)
+                        datas.append(np.ascontiguousarray(im.transpose((0, 3, 1, 2))))  # nhwc -> nchw, BGR888  uint8
+                in_datas[name] = np.concatenate(datas, axis=0)
             else:  # 非图像数据，由自定义模块处理或随机生成
                 assert not _input["enable_aipp"], "non-image cannot enable AIPP"
-                if data_path:   # 指定输入数据
+                if data_paths:   # 指定输入数据
                     if not self.has_custom_preprocess:
                         logger.error("Not set custom preprocess")
                         exit(-1)
-                    in_datas[name] = self.custom_preprocess_cls.get_single_data(data_path, idx)
+                    in_datas[name] = self.custom_preprocess_cls.get_single_data(data_paths, idx)
                     self.check_dtype(name, in_datas[name], dtype)
                 else:   # 未指定输入数据
                     logger.warning("input[{}] will use random data".format(name))

@@ -27,8 +27,15 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         self.dtype = kwargs["dtype"]
         self.backend = kwargs["backend"]
 
-        self.use_norm = True if self.dtype == "fp32" else False
+        n, c, h, w = self.inputs[0]["shape"]
+        if self.inputs[0]["layout"] == "NHWC":
+            n, h, w, c = self.inputs[0]["shape"]
+        self.bs = n
+        self.channels = c
+        self._input_size = (w, h)
+        self._end2end_latency_ms = 0
 
+        self.use_norm = True if self.dtype == "fp32" else False
         self.total = 0
         self.time_span = 0
 
@@ -83,10 +90,10 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def _postprocess(self, outputs, cv_image=None):
+    def _postprocess(self, outputs, cv_images=None):
         """内部后处理调用
         :param outputs: 模型推理输出
-        :param cv_image: 原图像
+        :param cv_images: a list of opencv images
         :return:
         """
         pass

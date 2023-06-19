@@ -70,7 +70,7 @@ def check_config(cfg, phase="build"):
         return False
 
     target = cfg["build"]["target"]
-    target_lists = ["nnp300", "nnp3020", "nnp310", "nnp320", "nnp400"]
+    target_lists = ["nnp300", "nnp3020", "nnp310", "nnp315m", "nnp320", "nnp400"]
     if target not in target_lists:
         logger.error("target({}) not in {}".format(target, target_lists))
         return False
