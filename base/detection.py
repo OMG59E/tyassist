@@ -31,6 +31,7 @@ class Detector(Classifier):
 
         self._iou_threshold = 0.45
         self._conf_threshold = 0.25
+        self.to_coco91 = True
 
     def set_iou_threshold(self, iou_threshold=0.45):
         self._iou_threshold = iou_threshold
@@ -98,7 +99,7 @@ class Detector(Classifier):
                 detections2txt(detections[b], label_paths[b])
 
         pred_json = "pred.json"
-        detection_txt2json(save_results, pred_json)
+        detection_txt2json(save_results, pred_json, to_coco91=self.to_coco91)
         _map, map50 = coco_eval(pred_json, self.dataset.annotations_file, self.dataset.image_ids)
         return {
             "input_size": "{}x{}x{}x{}".format(self.bs, 3, self._input_size[1], self._input_size[0]),
