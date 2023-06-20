@@ -195,32 +195,45 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
     def build(self, in_datas):
         t_start = time.time()
         if self.enable_build:
-            from tvm.contrib.edgex import compile_nnp_model, optimize_nnp_model
+            import tvm
+            from tvm.contrib.edgex import compile_nnp_model, optimize_nnp_model, \
+                optimize_and_compile, estimate_compiled_mod_Cycles, estimate_compiled_mod_MACs
             # TODO support c920
             export_lib_path = [self.model_path_x86_64]
             target_host = ["llvm -mtriple=x86_64"]
             target_host_cc = [None]
             ARM_C_COMPILER = os.getenv("ARM_C_COMPILER")
-            if ARM_C_COMPILER is None:
-                logger.warning("Not found env {}".format(ARM_C_COMPILER))
-            elif not os.path.exists(ARM_C_COMPILER):
-                logger.warning("Not found {}".format(ARM_C_COMPILER))
-            else:
-                export_lib_path.append(self.model_path_aarch64)
-                target_host.append("llvm -mtriple=aarch64")
-                target_host_cc.append(ARM_C_COMPILER)
+            assert os.path.exists(ARM_C_COMPILER), "Not found ARM_C_COMPILER env"
+            export_lib_path.append(self.model_path_aarch64)
+            target_host.append("llvm -mtriple=aarch64")
+            target_host_cc.append(ARM_C_COMPILER)
+
+            config = {
+                "tir.edgex.EstimateCost.enable": True,  #
+                "tir.edgex.CalculateMac.enable": True,  #
+            }
+            target_device = tvm.target.Target("edgex", host="edgex_virtual_host")
 
             # compile edgex lib
-            _ = compile_nnp_model(
+            edgex_x86_lib, edgex_a55_lib= optimize_and_compile(
                 self.relay_quant,
                 self.params_quant,
                 working_dir=self.model_dir,
                 export_lib_path=export_lib_path,
                 opt_level=self.opt_level,
                 target_host=target_host,
-                target_host_cc=target_host_cc
+                target_host_cc=target_host_cc,
+                target_device=target_device,
+                extra_config=config
             )
             logger.info("Executing model on edgex...")
+
+            cycles = estimate_compiled_mod_Cycles(edgex_x86_lib)  #
+            macs = estimate_compiled_mod_MACs(edgex_x86_lib)  #
+            with open(os.path.join(self.result_dir, "macs.json"), "w") as f:
+                f.write(json.dumps(macs, indent=2))
+            with open(os.path.join(self.result_dir, "cycles.json"), "w") as f:
+                f.write(json.dumps(cycles, indent=2))
         else:
             logger.warning("nnp4xx disable build")
         self.build_span = time.time() - t_start
@@ -317,24 +330,25 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         logger.warning("Nnp4xx not support compress analysis")
 
     def get_profile_info(self):
-        import tvm
-        from tvm.contrib.edgex import estimate_FLOPs
-        from tvm.contrib.edgex import estimate_cycles
-        from tvm.contrib.edgex import build_config_nnp, optimize_nnp_model
-        flops = estimate_FLOPs(self.relay)
-        target_device = tvm.target.Target("edgex", host="edgex_virtual_host")
-        with build_config_nnp():
-            optimized_mod, optimized_params = optimize_nnp_model(
-                self.relay_quant,
-                self.params_quant,
-                target_device=target_device,
-                keep_params=True,
-            )
-        cycles = estimate_cycles(optimized_mod)
-        with open(os.path.join(self.result_dir, "flops.json"), "w") as f:
-            f.write(json.dumps(flops, indent=2))
-        with open(os.path.join(self.result_dir, "cycles.json"), "w") as f:
-            f.write(json.dumps(cycles, indent=2))
+        # import tvm
+        # from tvm.contrib.edgex import estimate_FLOPs
+        # from tvm.contrib.edgex import estimate_cycles
+        # from tvm.contrib.edgex import build_config_nnp, optimize_nnp_model
+        # flops = estimate_FLOPs(self.relay)
+        # target_device = tvm.target.Target("edgex", host="edgex_virtual_host")
+        # with build_config_nnp():
+        #     optimized_mod, optimized_params = optimize_nnp_model(
+        #         self.relay_quant,
+        #         self.params_quant,
+        #         target_device=target_device,
+        #         keep_params=True,
+        #     )
+        # cycles = estimate_cycles(optimized_mod)
+        # with open(os.path.join(self.result_dir, "flops.json"), "w") as f:
+        #     f.write(json.dumps(flops, indent=2))
+        # with open(os.path.join(self.result_dir, "cycles.json"), "w") as f:
+        #     f.write(json.dumps(cycles, indent=2))
+        pass
 
     @staticmethod
     def save_relay_to_model(quant_model_path, relay_func, params):
