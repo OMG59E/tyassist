@@ -120,7 +120,7 @@ def compare(cfg, backend):
         logger.info("{}".format(cfg))
         tyexec = get_tyexec(cfg)
         tyexec.backend = backend
-        fixed_outputs = tyexec.infer()  # defalut disable aipp
+        fixed_outputs = tyexec.infer()  # default disable aipp
 
         # compare
         for idx, fixed_output in enumerate(fixed_outputs):
