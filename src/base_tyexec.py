@@ -260,7 +260,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                             np.save(random_npy_path, im)
                             cv2.imwrite(random_im_path, im)
                         ims.append(im)
-                        
+
                 datas = list()
                 for im in ims:
                     if not _input["enable_aipp"] or force_cr:  # 兼容芯片orISS使能AIPP情况
@@ -361,7 +361,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         from tvm import relay
         quantize_config = tvm.relay.quantization.get_quantize_config(self.target, in_dtypes)
         quantize_config["calib_method"] = self.quant_cfg["calib_method"]
-
+        # quantize_config["disable_pass"] = list()
         quantize_config["float_list"] = list()
         skip_layer_idxes = self.quant_cfg.get("skip_layer_idxes", list())
         skip_layer_types = self.quant_cfg.get("skip_layer_types", list())
