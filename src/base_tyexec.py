@@ -50,7 +50,9 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.relay = None
         self.params = None
         self.model_name = "net_combine"  # default
-        self.opt_level = cfg["build"].get("opt_level", 2)
+        self.build_opt_level = cfg["build"].get("opt_level", 2)
+        self.quant_opt_level = cfg["build"]["quant"].get("opt_level", 0)
+        self.disable_pass = cfg["build"]["quant"].get("disable_pass")
 
         self.model_dir = os.path.join(self.cfg["model"]["save_dir"], self.target)
         self.result_dir = os.path.join(self.model_dir, "result")
@@ -361,7 +363,9 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         from tvm import relay
         quantize_config = tvm.relay.quantization.get_quantize_config(self.target, in_dtypes)
         quantize_config["calib_method"] = self.quant_cfg["calib_method"]
-        # quantize_config["disable_pass"] = list()
+        quantize_config["level"] = self.quant_opt_level
+        if self.disable_pass is not None:
+            quantize_config["disable_pass"] = self.disable_pass
         quantize_config["float_list"] = list()
         skip_layer_idxes = self.quant_cfg.get("skip_layer_idxes", list())
         skip_layer_types = self.quant_cfg.get("skip_layer_types", list())

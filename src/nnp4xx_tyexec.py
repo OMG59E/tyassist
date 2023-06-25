@@ -220,7 +220,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 self.params_quant,
                 working_dir=self.model_dir,
                 export_lib_path=export_lib_path,
-                opt_level=self.opt_level,
+                opt_level=self.build_opt_level,
                 target_host=target_host,
                 target_host_cc=target_host_cc,
                 target_device=target_device,

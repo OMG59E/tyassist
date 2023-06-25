@@ -107,6 +107,12 @@ build: {
     #-1 - 不输出debug信息
     debug_level: 0,
 
+    # 量化优化等级, 缺省默认为0
+    opt_level: 0,
+
+    # 量化winograd配置
+    disable_pass: [],
+
     # 校准方法 "kld", "min_max", "percentile_0.99..", "l2norm"
     calib_method: "kld",
 

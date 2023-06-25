@@ -39,6 +39,8 @@ build: {
     custom_preprocess_module: ,
     custom_preprocess_cls: ,
     debug_level: 0,
+    opt_level: 2,
+    disable_pass: [ ],
     calib_method: "l2norm",
   },
   enable_dump: 2,
