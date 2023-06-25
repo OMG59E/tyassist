@@ -110,15 +110,17 @@ def scale_coords_kpt(img1_shape, coords, img0_shape, ratio_pad=None):
         gain = ratio_pad[0][0]
         pad = ratio_pad[1]
 
+    coords[:, 0] -= pad[0]  # x padding
+    coords[:, 1] -= pad[1]  # y padding
     coords[:, 2] -= pad[0]  # x padding
     coords[:, 3] -= pad[1]  # y padding
-    coords[:, 7::3] -= pad[0]
-    coords[:, 8::3] -= pad[1]
-    coords[:, 2:6] /= gain
+    coords[:, 6::3] -= pad[0]
+    coords[:, 7::3] -= pad[1]
+    coords[:, 0:4] /= gain
+    coords[:, 6::3] /= gain
     coords[:, 7::3] /= gain
-    coords[:, 8::3] /= gain
     # clip_coords(coords, img0_shape)
-    return coords
+    return coords.numpy()
 
 
 def scale_coords_mask(img1_shape, contours, img0_shape, ratio_pad=None):
@@ -411,8 +413,18 @@ def non_max_suppression(
     return output
 
 
+def output_to_keypoint2(outputs: list) -> list:
+    # Convert model output to target format [batch_id, class_id, x, y, w, h, kpt]
+    results = list()
+    for idx, output in enumerate(outputs):
+        kpts = output[:, 6:]
+        boxes = output[:, :6]
+
+    return results
+
+
 def output_to_keypoint(output):
-    # Convert model output to target format [batch_id, class_id, x, y, w, h, conf]
+    # Convert model output to target format [batch_id, class_id, x, y, w, h, conf, kpt]
     targets = []
     for i, o in enumerate(output):
         kpts = o[:, 6:]
