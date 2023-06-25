@@ -178,17 +178,13 @@ def detections_kpt2json(outputs, filepath):
         name, ext = os.path.splitext(filename)
         image_id = int(name)
         pred_lists = list()
-        for idx in range(outputs.shape[0]):
-            cls = int(outputs[idx, 1])
-            box = outputs[idx, 2:6]
-            x1 = float(box[0] - box[2] * 0.5)
-            y1 = float(box[1] - box[3] * 0.5)
-            x2 = float(box[0] + box[2] * 0.5)
-            y2 = float(box[1] + box[3] * 0.5)
-            conf = float(outputs[idx, 6])
+        for output in outputs:
+            cls = int(output[5])
+            conf = float(output[4])
+            x1, y1, x2, y2 = output[0:4].tolist()
             w = x2 - x1 + 1
             h = y2 - y1 + 1
-            kpts = outputs[idx, 7:].tolist()
+            kpts = output[6:].tolist()
             for k in range(len(kpts)):
                 if (k + 1) % 3 == 0:
                     kpts[k] = 1
