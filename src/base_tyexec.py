@@ -295,7 +295,13 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 in_datas[name] = np.concatenate(datas, axis=0)
             else:  # 非图像数据，由自定义模块处理或随机生成
                 assert not _input["enable_aipp"], "non-image cannot enable AIPP"
-                if data_paths:   # 指定输入数据
+                exist = True
+                for data_path in data_paths:
+                    if not os.path.exists(data_path):
+                        logger.warning("data_path not exist -> {}, and will use random data".format(data_path))
+                        exist = False
+
+                if exist:   # 指定输入数据
                     if not self.has_custom_preprocess:
                         logger.error("Not set custom preprocess")
                         exit(-1)
