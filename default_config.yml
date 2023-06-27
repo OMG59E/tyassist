@@ -120,7 +120,7 @@ build: {
     skip_layer_idxes: [ ],
 
     # 可配置为op的类型，可单个配置也可组成list
-    skip_layer_types: [ ],   # 例子 ["nn.conv2d", "nn.conv2d"]
+    skip_layer_types: [ ],   # 例子 ["nn.conv2d", "nn.relu"]
 
     # 可配置为原模型op_name, 推荐此方式，忽略其他方式
     skip_layer_names: [ ],
