@@ -1,11 +1,22 @@
+import os
 import numpy as np
 import python.pydcl as dcl
-import python.dclOpDbg as dclOpDbg
 import python.dclMdl as dclMdl
 import python.dclNnpRtt as dclNnpRtt
+import python.dclOpDbg as dclOpDbg
+from python.dclOpDbg import dclNnpBp
+from python.dclOpDbg import dclNnpDbgInfo
+
 
 cfg = "/DEngine/tyhcp/config/sdk.cfg"
 model_file = "yolov5s_a55.so"
+if not os.path.exists(model_file):
+    print("Not found model file: {}".format(model_file))
+    exit(-1)
+
+if not os.path.exists(cfg):
+    print("Not found config file: {}".format(cfg))
+    exit(-1)
 
 breakpoint_lists = ["f8_sigmoid", "f341_concatenate"]
 
@@ -29,6 +40,11 @@ state = dclOpDbg.GetState()  # 检查状态
 if not state or state != "INIT":
     print("Failed to get state")
     exit(-1)
+
+output = "oplst"
+if not os.path.exists(output):
+    os.makedirs(output)
+dclNnpDbgInfo.GetOplst(output)
 
 for opname in breakpoint_lists:
     breakpoint_idx = dclOpDbg.Continue()
