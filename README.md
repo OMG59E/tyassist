@@ -58,7 +58,7 @@ python3 tyassist.py build -c config.yml --target nnp300 --log_dir ./logs
 从TyHCP开发包进入对应docker环境，在开启了dump功能的情况下，需要首先进入/DEngine/tyhcp目录，启动dump服务, 执行命令:
 
 ```shell
-sh dump_server.sh
+sh dump_server.sh   # only for nnp300
 ```
 
 然后切换至/DEngine/tyassist/examples/caffe_squeezenet_v1_1目录, 执行命令：
