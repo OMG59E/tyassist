@@ -39,7 +39,7 @@ build: {
     custom_preprocess_cls: ,
     debug_level: 0,
     calib_method: "l2norm",
-    skip_layer_names: [ "Conv_540", "Conv_577", "Conv_614" ],
+    skip_layer_names: [ "final" ],
   },
   enable_dump: 1,
 }
