@@ -1,0 +1,45 @@
+# config
+
+model: {
+  framework: "onnx",
+  save_dir: "./outputs",
+  weight: "multi_dims.onnx",
+  graph: "",
+  inputs: [
+    {
+      name: "data",
+      shape: [ 1, 8, 3, 32, 32 ],
+      layout: "None",
+      pixel_format: "None",
+      mean: ,
+      std: ,
+      resize_type: 0,
+      padding_value: 128,
+      padding_mode: 1,
+      data_path: "",
+    }
+  ],
+
+  outputs: [],
+
+  model_impl_module: ,
+  model_impl_cls:
+}
+
+build: {
+  target: "nnp400",
+  enable_quant: true,
+  enable_build: true,
+  quant: {
+    data_dir: "",
+    prof_img_num: 50,
+    similarity_img_num: 1,
+    similarity_dataset: ,
+    custom_preprocess_module: "custom_preprocess",
+    custom_preprocess_cls: "CustomPreprocessMultiDims",
+    debug_level: 0,
+    calib_method: "kld",
+    skip_layer_names: [ ],
+  },
+  enable_dump: 1,
+}
