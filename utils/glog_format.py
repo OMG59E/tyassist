@@ -72,7 +72,7 @@ class GLogFormatterWithColor(logging.Formatter):
         logging.DEBUG: grey,
         logging.INFO: green,
         logging.WARNING: yellow,
-        logging.ERROR: bold_red,  # red,
+        logging.ERROR: red,  # red,
         logging.CRITICAL: bold_red
     }
 
