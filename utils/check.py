@@ -149,10 +149,26 @@ def check_config(cfg, phase="build"):
 
     for _input in input_lists:
         layout = _input["layout"]
-        layout_lists = ["NCHW", "NHWC"]
+        layout_lists = ["NCHW", "NHWC", "None"]
         if layout not in layout_lists:
             logger.error("layout({}) must be in {}".format(layout, layout_lists))
             return False
+
+        if "pixel_format" not in _input:
+            logger.error("pixel_format must be in cfg[model][inputs]")
+            return False
+
+        pixel_format = _input["pixel_format"]
+        pixel_format_lists = ["None", "RGB", "BGR", "GRAY"]
+        if pixel_format not in pixel_format_lists:
+            logger.error("pixel_format({}) must be in {}".format(pixel_format, pixel_format_lists))
+            return False
+
+        if layout == "None":
+            if pixel_format != "None":
+                logger.error("If layout is None, the pixel format must be None")
+                return False
+            return True
 
         if "shape" not in _input:
             logger.error("shape must be in cfg[model][inputs]")
@@ -175,10 +191,6 @@ def check_config(cfg, phase="build"):
 
         if "resize_type" not in _input:
             logger.error("resize_type must be in cfg[model][inputs]")
-            return False
-
-        if "pixel_format" not in _input:
-            logger.error("pixel_format must be in cfg[model][inputs]")
             return False
 
         if "layout" not in _input:
@@ -222,12 +234,6 @@ def check_config(cfg, phase="build"):
 
         if c != len(mean) or c != len(std) or len(mean) != len(std):
             logger.error("input channel must be equal len(mean/std)")
-            return False
-
-        pixel_format = _input["pixel_format"]
-        pixel_format_lists = ["None", "RGB", "BGR", "GRAY"]
-        if pixel_format not in pixel_format_lists:
-            logger.error("pixel_format({}) must be in {}".format(pixel_format, pixel_format_lists))
             return False
 
         padding_mode = _input["padding_mode"]

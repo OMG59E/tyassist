@@ -94,7 +94,7 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
         outputs = self.engine.inference(in_datas)
         self.total += 1
 
-        if self.enable_dump == 1:
+        if self.enable_dump:
             if self.backend == "chip":
                 self.compare_layer_out()
             elif self.backend == "sdk_iss":
@@ -148,10 +148,10 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
         for op_idx, opname in enumerate(iss_fixed_dump_out):
             iss_fixed_outs = iss_fixed_dump_out[opname]
             for out_idx in range(len(iss_fixed_outs)):
+                shape = iss_fixed_outs[out_idx].shape
                 iss_fixed_out = iss_fixed_outs[out_idx].flatten()
                 chip_out_path = os.path.join(self.dump_root_path, "{}_out{}.bin".format(opname, out_idx))
                 assert os.path.isfile(chip_out_path), "chip_out_path -> {}".format(chip_out_path)
-                shape = iss_fixed_out.shape
                 dtype = iss_fixed_out.dtype
                 chip_fixed_out = np.fromfile(chip_out_path, dtype=iss_fixed_out.dtype)
                 chip_fixed_vs_iss_fixed_dist = "{:.6f}".format(cosine_distance(iss_fixed_out, chip_fixed_out))

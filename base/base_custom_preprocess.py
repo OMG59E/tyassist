@@ -20,9 +20,9 @@ class BaseCustomPreprocess(object, metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_single_data(self, filepath, idx):
+    def get_single_data(self, filepaths, idx):
         """预处理指定路径图片
-        :param filepath:  图片路径
+        :param filepaths:  batch图片路径
         :param idx:  不支持输入的索引
         :return:
         """

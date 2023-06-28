@@ -14,10 +14,7 @@ import numpy as np
 from utils import logger
 from utils.enum_type import PaddingMode
 from utils.preprocess import calc_padding_size, default_preprocess
-from collections import namedtuple, OrderedDict
-
-# Input = namedtuple("Input", ["idx", "name", "shape", "mean", "std", "layout", "pixel_format", "resize_type",
-#                              "padding_mode", "padding_value", "enable_aipp", "support"])
+from collections import OrderedDict
 
 
 class BaseTyExec(object, metaclass=abc.ABCMeta):
@@ -96,7 +93,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             self.prof_num = prof_num
 
         for idx in range(self.prof_num):
-            batch_img_lists = [os.path.join(data_dir, img_lists[i]) for i in range(idx*self.bs, (idx+1)*self.bs)]
+            batch_img_lists = [os.path.join(data_dir, img_lists[i]) for i in range(idx * self.bs, (idx + 1) * self.bs)]
             yield self.get_datas(batch_img_lists, force_float=False, force_cr=True, force_random=False, to_file=False)
 
     def get_dataset(self):
@@ -118,23 +115,32 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
 
     def set_input_infos(self):
         for idx, _input in enumerate(self.inputs):
-            shape = _input["shape"]
-            n, c, h, w = shape
-            if _input["layout"] == "NHWC":
-                n, h, w, c = shape
 
-            self.bs = n
+            if _input["layout"] != "None":
+                assert _input["layout"] in ["NCHW", "NHWC"]
+                shape = _input["shape"]
+                n, c, h, w = shape
+                if _input["layout"] == "NHWC":
+                    n, h, w, c = shape
+                self.shape_dict[_input["name"]] = (n, c, h, w)
+                if not _input["mean"]:
+                    _input["mean"] = [0.0 for _ in range(c)]
+                if not _input["std"]:
+                    _input["std"] = [1.0 for _ in range(c)]
+            else:
+                self.shape_dict[_input["name"]] = _input["shape"]
+
+            self.bs = _input["shape"][0]
 
             if "dtype" not in _input:
-                if _input["pixel_format"] == "None":
+                if _input["pixel_format"] == "None" or _input["layout"] == "None":
                     _input["dtype"] = "float32"
                 else:
                     _input["dtype"] = "uint8"
 
-            self.shape_dict[_input["name"]] = (n, c, h, w)
             self.dtype_dict[_input["name"]] = _input["dtype"]
 
-            _input["support"] = False if "None" == _input["pixel_format"] else True
+            _input["support"] = False if "None" == _input["pixel_format"] or "None" == _input["layout"] else True
             if _input["support"]:
                 if "enable_aipp" not in _input:
                     _input["enable_aipp"] = True
@@ -145,25 +151,21 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                     logger.warning("input[{}] cannot enable aipp -> pixel_format: {}, dtype: {}".format(
                         _input["name"], _input["pixel_format"], _input["dtype"]))
                     _input["enable_aipp"] = False
+
+                _input["padding_mode"] = PaddingMode.LEFT_TOP if _input["padding_mode"] == 0 else PaddingMode.CENTER
             else:
                 _input["enable_aipp"] = False
 
             if self.target.startswith("nnp4"):  # 4xx不支持aipp
+                logger.info("Nnp4xx not support aipp")
                 _input["enable_aipp"] = False
-
-            if not _input["mean"]:
-                _input["mean"] = [0.0 for _ in range(c)]
-            if not _input["std"]:
-                _input["std"] = [1.0 for _ in range(c)]
-
-            _input["padding_mode"] = PaddingMode.LEFT_TOP if _input["padding_mode"] == 0 else PaddingMode.CENTER
 
         # 检查多输入配置是否正确，uint8图像必须排列在最前面
         if len(self.inputs) >= 2:
             for idx, _input in enumerate(self.inputs):
                 if _input["enable_aipp"] and idx > 0:
                     # 检查之前的输入是否存在非图像数据
-                    if not self.inputs[idx-1]["enable_aipp"]:
+                    if not self.inputs[idx - 1]["enable_aipp"]:
                         logger.error("Not support input(disable_aipp) in front of input(enable_aipp)")
                         exit(-1)
 
@@ -219,7 +221,9 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         for idx, _input in enumerate(self.inputs):
             name = _input["name"]
             pixel_format = _input["pixel_format"]
+            layout = _input["layout"]
             dtype = _input["dtype"]
+            shape = _input["shape"]
             if _input["enable_aipp"]:
                 dtype = "uint8"
             if force_float:
@@ -232,15 +236,16 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 logger.warning("data_path will be reused")
                 data_paths = [data_paths for _ in range(self.bs)]
 
-            n, c, h, w = self.shape_dict[name]
-            data_npy_path = os.path.join(self.result_dir, "{}_{}_{}_{}x{}x{}x{}.npy".format(idx, name, dtype, n, c, h, w))
-            data_bin_path = os.path.join(self.result_dir, "{}_{}_{}_{}x{}x{}x{}.bin".format(idx, name, dtype, n, c, h, w))
-            data_txt_path = os.path.join(self.result_dir, "{}_{}_{}_{}x{}x{}x{}.txt".format(idx, name, dtype, n, c, h, w))
+            shape_s = "x".join(list(map(str, shape)))
+            data_npy_path = os.path.join(self.result_dir, "{}_{}_{}_{}.npy".format(idx, name, dtype, shape_s))
+            data_bin_path = os.path.join(self.result_dir, "{}_{}_{}_{}.bin".format(idx, name, dtype, shape_s))
+            data_txt_path = os.path.join(self.result_dir, "{}_{}_{}_{}.txt".format(idx, name, dtype, shape_s))
 
-            if _input["support"]:   # 图像数据，工具内部处理
+            if _input["support"]:  # 图像数据，工具内部处理
+                n, c, h, w = shape
                 ims = list()
                 for data_path in data_paths:
-                    if data_path:   # 指定输入数据
+                    if data_path:  # 指定输入数据
                         im = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE if pixel_format == "GRAY" else cv2.IMREAD_COLOR)
                         ims.append(im)
                         continue
@@ -300,25 +305,24 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                     if not os.path.exists(data_path):
                         logger.warning("data_path not exist -> {}, and will use random data".format(data_path))
                         exist = False
-
-                if exist:   # 指定输入数据
+                if exist:  # 指定输入数据
                     if not self.has_custom_preprocess:
                         logger.error("Not set custom preprocess")
                         exit(-1)
                     in_datas[name] = self.custom_preprocess_cls.get_single_data(data_paths, idx)
                     self.check_dtype(name, in_datas[name], dtype)
-                else:   # 未指定输入数据
+                else:  # 未指定输入数据
                     logger.warning("input[{}] will use random data".format(name))
 
                     def gen_data(_dtype):
                         if _dtype == "float32":
-                            _data = np.random.rand(n, c, h, w).astype(dtype=_dtype)   # 数值范围[0, 1)
+                            _data = np.random.random(shape).astype(dtype=_dtype)  # 数值范围[0, 1)
                         elif _dtype == "float16":
-                            _data = np.random.rand(n, c, h, w).astype(dtype=_dtype)   # 数值范围[0, 1)
+                            _data = np.random.random(shape).astype(dtype=_dtype)  # 数值范围[0, 1)
                         elif _dtype == "int16":
-                            _data = np.random.randint(low=-(2**15), high=2**15-1, size=(n, c, h, w), dtype=_dtype)
+                            _data = np.random.randint(low=-(2 ** 15), high=2 ** 15 - 1, size=shape, dtype=_dtype)
                         elif _dtype == "uint8":
-                            _data = np.random.randint(low=0, high=255, size=(n, c, h, w), dtype=_dtype)
+                            _data = np.random.randint(low=0, high=255, size=shape, dtype=_dtype)
                         else:
                             logger.error("Not support dtype -> {}".format(_dtype))
                             exit(-1)
@@ -361,9 +365,10 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 exit(-1)
             # 与最终量化后的模型输入数据类型相对应
             in_dtypes[name] = data_type
-            norm[name] = {"mean": _input["mean"], "std": _input["std"], "axis": 1}
-            logger.info("Input({}) dtype -> {}".format(name, in_dtypes[name]))
-            logger.info("Input({}) mean/std -> {}".format(name, norm[name]))
+            if _input["layout"] in ["NCHW", "NHWC"]:
+                norm[name] = {"mean": _input["mean"], "std": _input["std"], "axis": 1}
+                logger.info("The input({}) dtype -> {}".format(name, in_dtypes[name]))
+                logger.info("The input({}) mean/std -> {}".format(name, norm[name]))
 
         import tvm
         from tvm import relay

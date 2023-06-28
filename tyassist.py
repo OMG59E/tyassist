@@ -64,14 +64,22 @@ def build(cfg):
         tyexec.get_version()
         tyexec.x2relay()  # model to relay_func
 
-        in_datas = tyexec.get_datas(force_cr=True, to_file=True)   # 量化后模型输入
+        in_datas = tyexec.get_datas(force_cr=True, to_file=True)  # 量化后模型输入
+
+        # step1 quantization
         tyexec.quantization(in_datas)
+
+        # step2 build
         tyexec.build(in_datas)
+
+        # step3 dump output layer by layer
         tyexec.iss_dump_output(in_datas)
 
+        # step4 iss/tvm fixed simu
         iss_fixed_output = tyexec.iss_fixed_inference(in_datas, to_file=True)
         tvm_fixed_output = tyexec.tvm_fixed_inference(in_datas, to_file=True)
 
+        # step5 tvm float simu
         in_datas = tyexec.get_datas(force_float=True, force_cr=True, to_file=True)  # 浮点模型输入
         tvm_float_output = tyexec.tvm_float_inference(in_datas, to_file=True)
 
@@ -96,11 +104,11 @@ def build(cfg):
         table = PrettyTable(header)
         for idx in range(len(tvm_float_output)):
             dist = cosine_distance(tvm_float_output[idx], tvm_fixed_output[idx])
-            logger.info("[Build] float(tvm) output tensor[{}] shape:{} dtype:{}".format(idx, tvm_float_output[idx].shape, tvm_float_output[idx].dtype))
-            logger.info("[Build] fixed(tvm) output tensor[{}] shape:{} dtype:{}".format(idx, tvm_fixed_output[idx].shape, tvm_fixed_output[idx].dtype))
+            logger.info("[Build] float(tvm) output tensor[{}] shape: {}, dtype: {}".format(idx, tvm_float_output[idx].shape, tvm_float_output[idx].dtype))
+            logger.info("[Build] fixed(tvm) output tensor[{}] shape: {}, dtype: {}".format(idx, tvm_fixed_output[idx].shape, tvm_fixed_output[idx].dtype))
             table.add_row([idx, "float(tvm)", "fixed(tvm)", "{:.6f}".format(dist)])
             if iss_fixed_output:
-                logger.info("[Build] fixed(iss) output tensor[{}] shape:{} dtype:{}".format(idx, iss_fixed_output[idx].shape, iss_fixed_output[idx].dtype))
+                logger.info("[Build] fixed(iss) output tensor[{}] shape: {}, dtype: {}".format(idx, iss_fixed_output[idx].shape, iss_fixed_output[idx].dtype))
                 dist = cosine_distance(tvm_float_output[idx], iss_fixed_output[idx])
                 table.add_row([idx, "float(tvm)", "fixed(iss)", "{:.6f}".format(dist)])
                 dist = cosine_distance(tvm_fixed_output[idx], iss_fixed_output[idx])
