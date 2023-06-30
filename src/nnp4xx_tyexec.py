@@ -313,7 +313,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
     def profile(self):
         from .nnp4xx_profiler import Nnp4xxSdkProfiler
-        profiler = Nnp4xxSdkProfiler(sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg")
+        profiler = Nnp4xxSdkProfiler()
         in_datas = self.get_datas(force_cr=True, to_file=False)
         profiler.load(self.model_path_aarch64)
         profiler.run(in_datas)
