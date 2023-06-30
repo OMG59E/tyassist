@@ -8,7 +8,7 @@ from python.dclOpDbg import dclNnpBp
 from python.dclOpDbg import dclNnpDbgInfo
 
 
-cfg = "/DEngine/tyhcp/config/sdk.cfg"
+cfg = "/DEngine/tyhcp/client/config/sdk.cfg"
 model_file = "yolov5s_a55.so"
 if not os.path.exists(model_file):
     print("Not found model file: {}".format(model_file))
