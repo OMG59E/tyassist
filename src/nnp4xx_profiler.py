@@ -30,7 +30,7 @@ class Nnp4xxProfileTypeEnum(object):
 class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
     def __init__(
             self,
-            sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg"
+            sdk_cfg_file="/DEngine/tyhcp/client/config/sdk.cfg"
     ):
         super(Nnp4xxSdkProfiler, self).__init__(sdk_cfg_file, "nnp400")
 

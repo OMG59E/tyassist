@@ -27,7 +27,7 @@ from utils.compare import compare_dump_out2
 class Nnp4xxSdkInfer(BaseInfer, ABC):
     def __init__(
             self,
-            sdk_cfg_file="/DEngine/tyhcp/config/sdk.cfg",
+            sdk_cfg_file="/DEngine/tyhcp/client/config/sdk.cfg",
             enable_dump=0,
             enable_aipp=False
     ):
