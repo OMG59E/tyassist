@@ -215,7 +215,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             target_device = tvm.target.Target("edgex", host="edgex_virtual_host")
 
             # compile edgex lib
-            edgex_x86_lib, edgex_a55_lib= optimize_and_compile(
+            edgex_x86_lib, edgex_a55_lib = optimize_and_compile(
                 self.relay_quant,
                 self.params_quant,
                 working_dir=self.model_dir,
