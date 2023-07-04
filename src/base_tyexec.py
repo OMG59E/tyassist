@@ -157,7 +157,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 _input["enable_aipp"] = False
 
             if self.target.startswith("nnp4"):  # 4xx不支持aipp
-                logger.info("Nnp4xx not support aipp")
+                # logger.info("Nnp4xx not support aipp")
                 _input["enable_aipp"] = False
 
         # 检查多输入配置是否正确，uint8图像必须排列在最前面
