@@ -47,7 +47,7 @@ def get_tyexec(cfg):
         if m.bs > 1:
             logger.error("Nnp3xx not support batch-size > 1")
             exit(-1)
-        return Nnp3xxTyExec(cfg)
+        return m
     elif target.startswith("nnp4"):
         tyexec = Nnp4xxTyExec(cfg)
         return tyexec
