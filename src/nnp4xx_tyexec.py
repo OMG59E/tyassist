@@ -6,6 +6,7 @@
 @Author  : xingwg
 @software: PyCharm 
 """
+import importlib
 import torch
 import time
 import json
@@ -30,22 +31,17 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             logger.error("Not found ARM_C_COMPILER -> {}".format(ARM_C_COMPILER))
             exit(-1)
 
-        # py_path = os.path.dirname(os.path.abspath(__file__))
-        # client_lib_path = os.path.join(py_path, "../../tyhcp/client/x64-linux-gcc7.5/lib")
-        # sdk_lib = os.path.join(py_path, "../python/_sdk.cpython-38-x86_64-linux-gnu.so")
-        # os.system("patchelf --set-rpath {} {}".format(client_lib_path, sdk_lib))
-
     @staticmethod
     def set_env():
-        # os.environ["EDGEX_DEBUG_ISS"] = "on"
         os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
     def get_version(self):
-        from tvm.contrib.edgex import get_version
+        # m = importlib.import_module("tvm.contrib.{}".format("fuxiao"))
+        from tvm.contrib.fuxiao import get_version
         logger.info("TyTVM Version: {}".format(get_version()))
 
     def onnx2relay(self):
-        from tvm.contrib.edgex import load_model_from_file
+        from tvm.contrib.fuxiao import load_model_from_file
         dtype_dict = dict()
         for _, _input in enumerate(self.inputs):
             dtype_dict[_input["name"]] = "float32"
@@ -53,7 +49,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         self.relay, self.params = load_model_from_file(self.weight, "onnx", self.shape_dict, **kwargs)
 
     def pytorch2relay(self):
-        from tvm.contrib.edgex import load_model_from_file
+        from tvm.contrib.fuxiao import load_model_from_file
         self.relay, self.params = load_model_from_file(self.weight, "pytorch", self.shape_dict)
 
     @staticmethod
@@ -111,8 +107,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         return RemoveLayoutTransform(mod).new_mod
 
     def tensorflow2relay(self):
-        from tvm.contrib.edgex import load_model_from_file
-        from tvm.contrib.edgex.relay.transform import extract_constants
+        from tvm.contrib.fuxiao import load_model_from_file
+        from tvm.contrib.fuxiao.relay.transform import extract_constants
         shape_dict = dict()
         for _, _input in enumerate(self.inputs):
             shape_dict[_input["name"]] = _input["shape"]
@@ -120,8 +116,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         self.relay, self.params = extract_constants(self._tf_convert_nhwc_to_nchw(mod, params))
 
     def tflite2relay(self):
-        from tvm.contrib.edgex import load_model_from_file
-        from tvm.contrib.edgex.relay.transform import extract_constants
+        from tvm.contrib.fuxiao import load_model_from_file
+        from tvm.contrib.fuxiao.relay.transform import extract_constants
         shape_dict = dict()
         for _, _input in enumerate(self.inputs):
             shape_dict[_input["name"]] = _input["shape"]
@@ -196,7 +192,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         t_start = time.time()
         if self.enable_build:
             import tvm
-            from tvm.contrib.edgex import compile_nnp_model, optimize_nnp_model, \
+            from tvm.contrib.fuxiao import compile_nnp_model, optimize_nnp_model, \
                 optimize_and_compile, estimate_compiled_mod_Cycles, estimate_compiled_mod_MACs
             # TODO support c920
             export_lib_path = [self.model_path_x86_64]
@@ -209,13 +205,13 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             target_host_cc.append(ARM_C_COMPILER)
 
             config = {
-                "tir.edgex.EstimateCost.enable": True,  #
-                "tir.edgex.CalculateMac.enable": True,  #
+                "tir.fuxiao.EstimateCost.enable": True,  #
+                "tir.fuxiao.CalculateMac.enable": True,  #
             }
-            target_device = tvm.target.Target("edgex", host="edgex_virtual_host")
+            target_device = tvm.target.Target("fuxiao", host="fuxiao_virtual_host")
 
-            # compile edgex lib
-            edgex_x86_lib, edgex_a55_lib = optimize_and_compile(
+            # compile fuxiao lib
+            fuxiao_x86_lib, fuxiao_a55_lib = optimize_and_compile(
                 self.relay_quant,
                 self.params_quant,
                 working_dir=self.model_dir,
@@ -226,10 +222,10 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 target_device=target_device,
                 extra_config=config
             )
-            logger.info("Executing model on edgex...")
+            logger.info("Executing model on fuxiao...")
 
-            cycles = estimate_compiled_mod_Cycles(edgex_x86_lib)  #
-            macs = estimate_compiled_mod_MACs(edgex_x86_lib)  #
+            cycles = estimate_compiled_mod_Cycles(fuxiao_x86_lib)  #
+            macs = estimate_compiled_mod_MACs(fuxiao_x86_lib)  #
             with open(os.path.join(self.result_dir, "macs.json"), "w") as f:
                 f.write(json.dumps(macs, indent=2))
             with open(os.path.join(self.result_dir, "cycles.json"), "w") as f:
@@ -255,7 +251,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         t_start = time.time()
         if self.enable_dump == 1:
             import pickle
-            from tvm.contrib.edgex import iss_layerwise_input_output
+            from tvm.contrib.fuxiao import iss_layerwise_input_output
             layerwise_inputs, layerwise_outputs = iss_layerwise_input_output(in_datas, self.model_path_x86_64)
             with open(os.path.join(self.result_dir, "iss_fused_out.pickle"), "wb") as fp:
                 pickle.dump(layerwise_outputs, fp)
@@ -291,9 +287,9 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             t_start = time.time()
             import tvm
             from tvm.contrib import graph_executor
-            logger.info("Executing model on edgex...")
+            logger.info("Executing model on fuxiao...")
             lib = tvm.runtime.load_module(self.model_path_x86_64)
-            module = graph_executor.GraphModule(lib["default"](tvm.edgex(), tvm.cpu()))
+            module = graph_executor.GraphModule(lib["default"](tvm.fuxiao(), tvm.cpu()))
             iss_fixed_outputs = self.tvm_inference(module, in_datas)
             self.iss_simu_span = time.time() - t_start
             if to_file and len(iss_fixed_outputs) > 0:
@@ -331,11 +327,11 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
     def get_profile_info(self):
         # import tvm
-        # from tvm.contrib.edgex import estimate_FLOPs
-        # from tvm.contrib.edgex import estimate_cycles
-        # from tvm.contrib.edgex import build_config_nnp, optimize_nnp_model
+        # from tvm.contrib.fuxiao import estimate_FLOPs
+        # from tvm.contrib.fuxiao import estimate_cycles
+        # from tvm.contrib.fuxiao import build_config_nnp, optimize_nnp_model
         # flops = estimate_FLOPs(self.relay)
-        # target_device = tvm.target.Target("edgex", host="edgex_virtual_host")
+        # target_device = tvm.target.Target("fuxiao", host="fuxiao_virtual_host")
         # with build_config_nnp():
         #     optimized_mod, optimized_params = optimize_nnp_model(
         #         self.relay_quant,
