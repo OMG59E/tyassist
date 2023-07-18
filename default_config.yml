@@ -122,7 +122,7 @@ build: {
     # 可配置为op的类型，可单个配置也可组成list
     skip_layer_types: [ ],   # 例子 ["nn.conv2d", "nn.relu"]
 
-    # 可配置为原模型op_name, 推荐此方式，忽略其他方式
+    # 可配置为原模型op_name，注意原模型在量化前会进行优化融合，所以指定原模型opname有可能会失败
     skip_layer_names: [ ],
   },
 
