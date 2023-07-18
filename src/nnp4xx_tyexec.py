@@ -40,13 +40,17 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         from tvm.contrib.fuxiao import get_version
         logger.info("TyTVM Version: {}".format(get_version()))
 
-    def onnx2relay(self):
+    def onnx2relay(self, is_qnn=False):
         from tvm.contrib.fuxiao import load_model_from_file
         dtype_dict = dict()
         for _, _input in enumerate(self.inputs):
             dtype_dict[_input["name"]] = "float32"
         kwargs = {"dtype": dtype_dict}
-        self.relay, self.params = load_model_from_file(self.weight, "onnx", self.shape_dict, **kwargs)
+        self.relay, self.params = load_model_from_file(self.weight, "onnx", self.shape_dict, is_qnn=is_qnn, **kwargs)
+
+    def onnx_qnn2relay(self):
+        self.onnx2relay(is_qnn=True)
+        self.is_qnn = True
 
     def pytorch2relay(self):
         from tvm.contrib.fuxiao import load_model_from_file
@@ -127,6 +131,11 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
     def quantization(self, in_datas):
         """量化，将浮点relay函数转为成定点relay函数
         """
+        if self.is_qnn:
+            self.relay_quant, self.params_quant = self.relay, self.params
+            logger.warning("Qnn model don`t need quantization, will skip tvm dump by layer")
+            return
+
         t_start = time.time()
         if self.enable_quant:
             quantize_config, norm = self.set_quantization_cfg(in_datas)
@@ -224,12 +233,12 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             )
             logger.info("Executing model on fuxiao...")
 
-            cycles = estimate_compiled_mod_Cycles(fuxiao_x86_lib)  #
-            macs = estimate_compiled_mod_MACs(fuxiao_x86_lib)  #
-            with open(os.path.join(self.result_dir, "macs.json"), "w") as f:
-                f.write(json.dumps(macs, indent=2))
-            with open(os.path.join(self.result_dir, "cycles.json"), "w") as f:
-                f.write(json.dumps(cycles, indent=2))
+            # cycles = estimate_compiled_mod_Cycles(fuxiao_x86_lib)  #
+            # macs = estimate_compiled_mod_MACs(fuxiao_x86_lib)  #
+            # with open(os.path.join(self.result_dir, "macs.json"), "w") as f:
+            #     f.write(json.dumps(macs, indent=2))
+            # with open(os.path.join(self.result_dir, "cycles.json"), "w") as f:
+            #     f.write(json.dumps(cycles, indent=2))
         else:
             logger.warning("nnp4xx disable build")
         self.build_span = time.time() - t_start

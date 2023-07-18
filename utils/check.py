@@ -34,7 +34,7 @@ def check_config(cfg, phase="build"):
         return False
 
     framework = cfg["model"]["framework"]
-    framework_lists = ["caffe", "onnx", "pytorch", "mxnet", "tensorflow", "tflite", "tflite-qnn"]
+    framework_lists = ["caffe", "onnx", "pytorch", "mxnet", "tensorflow", "tflite", "tflite-qnn", "onnx-qnn"]
     if framework not in framework_lists:
         logger.error("framework({}) must be in {}".format(framework, framework_lists))
         return False
@@ -75,8 +75,8 @@ def check_config(cfg, phase="build"):
         logger.error("target({}) not in {}".format(target, target_lists))
         return False
 
-    if target.startswith("nnp4") and framework not in ["onnx"]:
-        logger.error("tytvm only support onnx framework")
+    if target.startswith("nnp4") and framework not in ["onnx", "onnx-qnn"]:
+        logger.error("tytvm only support [onnx, onnx-qnn] framework")
         return False
 
     if "quant" not in cfg["build"]:

@@ -78,6 +78,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.tvm_layerwise_dump_span = 0
         self.iss_layerwise_dump_span = 0
 
+        self.is_qnn = False
+
     @staticmethod
     def set_env():
         raise NotImplementedError
@@ -539,6 +541,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             self.tflite2relay()
         elif self.framework == "tflite-qnn":
             self.tflite_qnn2relay()
+        elif self.framework == "onnx-qnn":
+            self.onnx_qnn2relay()
         else:
             logger.error("Not support framework -> {}".format(self.framework))
             exit(-1)
@@ -566,4 +570,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     def tflite_qnn2relay(self):
+        raise NotImplementedError
+
+    def onnx_qnn2relay(self):
         raise NotImplementedError
