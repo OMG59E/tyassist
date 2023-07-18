@@ -1,7 +1,7 @@
 # 模型量化编译配置文件
 
 model: {
-  # 模型框架，必须设置, 支持caffe/onnx/pytorch/tensorflow/mxnet，400系列目前仅支持onnx
+  # 模型框架，必须设置, 支持caffe/onnx/pytorch/tensorflow/mxnet，400系列目前仅支持onnx, onnx-qnn
   framework: "",
 
   # 编译后模型名，缺省或不配置情况为net_combine
