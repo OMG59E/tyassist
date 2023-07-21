@@ -245,6 +245,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
 
             if _input["support"]:  # 图像数据，工具内部处理
                 n, c, h, w = shape
+                if layout == "NHWC":
+                    n, h, w, c = shape
                 ims = list()
                 for data_path in data_paths:
                     if data_path:  # 指定输入数据
@@ -337,7 +339,6 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                             in_datas[name] = np.load(data_npy_path)
                         else:
                             in_datas[name] = gen_data(dtype)
-
             if to_file:
                 data = in_datas[name].copy()
                 np.save(data_npy_path, data)
