@@ -234,6 +234,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             if isinstance(data_paths, list):
                 assert len(data_paths) == self.bs
             else:
+                if data_paths is None:
+                    data_paths = ""
                 assert isinstance(data_paths, str)
                 logger.warning("data_path will be reused")
                 data_paths = [data_paths for _ in range(self.bs)]
