@@ -8,6 +8,7 @@
 """
 import socket
 import hashlib
+import importlib
 
 
 def get_host_ip():
@@ -25,3 +26,9 @@ def get_md5(data):
     md5 = hashlib.md5()
     md5.update(data)
     return md5.hexdigest()
+
+
+def get_method(module, method):
+    m = importlib.import_module(module)
+    assert hasattr(m, method)
+    return getattr(m, method)

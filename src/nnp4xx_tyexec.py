@@ -13,6 +13,7 @@ import json
 import os
 from abc import ABC
 from utils import logger
+from utils.utils import get_method
 from .base_tyexec import BaseTyExec
 
 
@@ -31,17 +32,23 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             logger.error("Not found ARM_C_COMPILER -> {}".format(ARM_C_COMPILER))
             exit(-1)
 
+        self.logo_module = "edgex"
+        logo_setting_filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "setting.cfg")
+        if os.path.exists(logo_setting_filepath):
+            with open(logo_setting_filepath, "r") as f:
+                setting = json.load(f)
+                self.logo_module = setting["logo"]
+
     @staticmethod
     def set_env():
         os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
     def get_version(self):
-        # m = importlib.import_module("tvm.contrib.{}".format("fuxiao"))
-        from tvm.contrib.fuxiao import get_version
+        get_version = get_method("tvm.contrib.{}".format(self.logo_module), "get_version")
         logger.info("TyTVM Version: {}".format(get_version()))
 
     def onnx2relay(self, is_qnn=False):
-        from tvm.contrib.fuxiao import load_model_from_file
+        load_model_from_file = get_method("tvm.contrib.{}".format(self.logo_module), "load_model_from_file")
         dtype_dict = dict()
         for _, _input in enumerate(self.inputs):
             dtype_dict[_input["name"]] = "float32"
@@ -53,7 +60,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         self.is_qnn = True
 
     def pytorch2relay(self):
-        from tvm.contrib.fuxiao import load_model_from_file
+        load_model_from_file = get_method("tvm.contrib.{}".format(self.logo_module), "load_model_from_file")
         self.relay, self.params = load_model_from_file(self.weight, "pytorch", self.shape_dict)
 
     @staticmethod
@@ -111,8 +118,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         return RemoveLayoutTransform(mod).new_mod
 
     def tensorflow2relay(self):
-        from tvm.contrib.fuxiao import load_model_from_file
-        from tvm.contrib.fuxiao.relay.transform import extract_constants
+        load_model_from_file = get_method("tvm.contrib.{}".format(self.logo_module), "load_model_from_file")
+        extract_constants = get_method("tvm.contrib.{}.relay.transform".format(self.logo_module), "extract_constants")
         shape_dict = dict()
         for _, _input in enumerate(self.inputs):
             shape_dict[_input["name"]] = _input["shape"]
@@ -120,8 +127,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         self.relay, self.params = extract_constants(self._tf_convert_nhwc_to_nchw(mod, params))
 
     def tflite2relay(self):
-        from tvm.contrib.fuxiao import load_model_from_file
-        from tvm.contrib.fuxiao.relay.transform import extract_constants
+        load_model_from_file = get_method("tvm.contrib.{}".format(self.logo_module), "load_model_from_file")
+        extract_constants = get_method("tvm.contrib.{}.relay.transform".format(self.logo_module), "extract_constants")
         shape_dict = dict()
         for _, _input in enumerate(self.inputs):
             shape_dict[_input["name"]] = _input["shape"]
@@ -174,17 +181,6 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             from tvm.contrib import graph_executor
             from tvm.relay import build
 
-            # 将标量转换成张量
-            # def rewrite_scalar(mod):
-            #     class ScalarRewriter(tvm.relay.ExprMutator):
-            #         def visit_constant(self, const):
-            #             if len(const.data.shape) == 0:
-            #                 return tvm.relay.const([const.data.asnumpy()], const.data.dtype)
-            #             return super().visit_constant(const)
-            #
-            #     mod = tvm.IRModule.from_expr(ScalarRewriter().visit(mod["main"]))
-            #     return tvm.relay.transform.InferType()(mod)
-
             cpu_target = tvm.target.Target("llvm")
             with tvm.transform.PassContext(opt_level=3):
                 # cpu_lib = build(rewrite_scalar(relay_func), target=cpu_target, params=params)
@@ -201,8 +197,9 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         t_start = time.time()
         if self.enable_build:
             import tvm
-            from tvm.contrib.fuxiao import compile_nnp_model, optimize_nnp_model, \
-                optimize_and_compile, estimate_compiled_mod_Cycles, estimate_compiled_mod_MACs
+            optimize_and_compile = get_method("tvm.contrib.{}".format(self.logo_module), "optimize_and_compile")
+            estimate_compiled_mod_Cycles = get_method("tvm.contrib.{}".format(self.logo_module), "estimate_compiled_mod_Cycles")
+            estimate_compiled_mod_MACs = get_method("tvm.contrib.{}".format(self.logo_module), "estimate_compiled_mod_MACs")
             # TODO support c920
             export_lib_path = [self.model_path_x86_64]
             target_host = ["llvm -mtriple=x86_64"]
@@ -214,13 +211,12 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             target_host_cc.append(ARM_C_COMPILER)
 
             config = {
-                "tir.fuxiao.EstimateCost.enable": True,  #
-                "tir.fuxiao.CalculateMac.enable": True,  #
+                "tir.{}.EstimateCost.enable".format(self.logo_module): True,  #
+                "tir.{}.CalculateMac.enable".format(self.logo_module): True,  #
             }
-            target_device = tvm.target.Target("fuxiao", host="fuxiao_virtual_host")
+            target_device = tvm.target.Target(self.logo_module, host="{}_virtual_host".format(self.logo_module))
 
-            # compile fuxiao lib
-            fuxiao_x86_lib, fuxiao_a55_lib = optimize_and_compile(
+            x86_lib, a55_lib = optimize_and_compile(
                 self.relay_quant,
                 self.params_quant,
                 working_dir=self.model_dir,
@@ -231,10 +227,10 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 target_device=target_device,
                 extra_config=config
             )
-            logger.info("Executing model on fuxiao...")
+            logger.info("Executing model on {}...".format(self.logo_module))
 
-            # cycles = estimate_compiled_mod_Cycles(fuxiao_x86_lib)  #
-            # macs = estimate_compiled_mod_MACs(fuxiao_x86_lib)  #
+            # cycles = estimate_compiled_mod_Cycles(x86_lib)  #
+            # macs = estimate_compiled_mod_MACs(x86_lib)  #
             # with open(os.path.join(self.result_dir, "macs.json"), "w") as f:
             #     f.write(json.dumps(macs, indent=2))
             # with open(os.path.join(self.result_dir, "cycles.json"), "w") as f:
@@ -260,7 +256,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         t_start = time.time()
         if self.enable_dump == 1:
             import pickle
-            from tvm.contrib.fuxiao import iss_layerwise_input_output
+            iss_layerwise_input_output = get_method("tvm.contrib.{}".format(self.logo_module), "iss_layerwise_input_output")
             layerwise_inputs, layerwise_outputs = iss_layerwise_input_output(in_datas, self.model_path_x86_64)
             with open(os.path.join(self.result_dir, "iss_fused_out.pickle"), "wb") as fp:
                 pickle.dump(layerwise_outputs, fp)
@@ -296,9 +292,10 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             t_start = time.time()
             import tvm
             from tvm.contrib import graph_executor
-            logger.info("Executing model on fuxiao...")
+            logger.info("Executing model on {}...".format(self.logo_module))
             lib = tvm.runtime.load_module(self.model_path_x86_64)
-            module = graph_executor.GraphModule(lib["default"](tvm.fuxiao(), tvm.cpu()))
+            func = get_method("tvm", "{}".format(self.logo_module))
+            module = graph_executor.GraphModule(lib["default"](func(), tvm.cpu()))
             iss_fixed_outputs = self.tvm_inference(module, in_datas)
             self.iss_simu_span = time.time() - t_start
             if to_file and len(iss_fixed_outputs) > 0:
@@ -335,24 +332,6 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         logger.warning("Nnp4xx not support compress analysis")
 
     def get_profile_info(self):
-        # import tvm
-        # from tvm.contrib.fuxiao import estimate_FLOPs
-        # from tvm.contrib.fuxiao import estimate_cycles
-        # from tvm.contrib.fuxiao import build_config_nnp, optimize_nnp_model
-        # flops = estimate_FLOPs(self.relay)
-        # target_device = tvm.target.Target("fuxiao", host="fuxiao_virtual_host")
-        # with build_config_nnp():
-        #     optimized_mod, optimized_params = optimize_nnp_model(
-        #         self.relay_quant,
-        #         self.params_quant,
-        #         target_device=target_device,
-        #         keep_params=True,
-        #     )
-        # cycles = estimate_cycles(optimized_mod)
-        # with open(os.path.join(self.result_dir, "flops.json"), "w") as f:
-        #     f.write(json.dumps(flops, indent=2))
-        # with open(os.path.join(self.result_dir, "cycles.json"), "w") as f:
-        #     f.write(json.dumps(cycles, indent=2))
         pass
 
     @staticmethod
