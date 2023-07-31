@@ -32,7 +32,6 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             logger.error("Not found ARM_C_COMPILER -> {}".format(ARM_C_COMPILER))
             exit(-1)
 
-        self.logo_module = "edgex"
         logo_setting_filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "setting.cfg")
         if os.path.exists(logo_setting_filepath):
             with open(logo_setting_filepath, "r") as f:
@@ -47,16 +46,16 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         get_version = get_method("tvm.contrib.{}".format(self.logo_module), "get_version")
         logger.info("TyTVM Version: {}".format(get_version()))
 
-    def onnx2relay(self, is_qnn=False):
+    def onnx2relay(self):
         load_model_from_file = get_method("tvm.contrib.{}".format(self.logo_module), "load_model_from_file")
         dtype_dict = dict()
         for _, _input in enumerate(self.inputs):
             dtype_dict[_input["name"]] = "float32"
         kwargs = {"dtype": dtype_dict}
-        self.relay, self.params = load_model_from_file(self.weight, "onnx", self.shape_dict, is_qnn=is_qnn, **kwargs)
+        self.relay, self.params = load_model_from_file(self.weight, "onnx", self.shape_dict, **kwargs)
 
     def onnx_qnn2relay(self):
-        self.onnx2relay(is_qnn=True)
+        self.onnx2relay()
         self.is_qnn = True
 
     def pytorch2relay(self):
@@ -224,10 +223,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             target_device = tvm.target.Target(
                 self.logo_module, host="{}_virtual_host".format(self.logo_module) if self.enable_dump != 0 else None)
 
-            print(export_lib_path)
-            print(target_host)
-            print(target_host_cc)
-            _ = optimize_and_compile(
+            mods = optimize_and_compile(
                 self.relay_quant,
                 self.params_quant,
                 working_dir=self.model_dir,
@@ -236,16 +232,18 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 target_host=target_host,
                 target_host_cc=target_host_cc,
                 target_device=target_device,
-                extra_config=config
+                config=config
             )
             logger.info("Executing model on {}...".format(self.logo_module))
 
-            # cycles = estimate_compiled_mod_Cycles(x86_lib)  #
-            # macs = estimate_compiled_mod_MACs(x86_lib)  #
-            # with open(os.path.join(self.result_dir, "macs.json"), "w") as f:
-            #     f.write(json.dumps(macs, indent=2))
-            # with open(os.path.join(self.result_dir, "cycles.json"), "w") as f:
-            #     f.write(json.dumps(cycles, indent=2))
+            if isinstance(mods, list):
+                mod = mods[0]
+                cycles = estimate_compiled_mod_Cycles(mod)  #
+                macs = estimate_compiled_mod_MACs(mod)  #
+                with open(os.path.join(self.result_dir, "macs.json"), "w") as f:
+                    f.write(json.dumps(macs, indent=2))
+                with open(os.path.join(self.result_dir, "cycles.json"), "w") as f:
+                    f.write(json.dumps(cycles, indent=2))
         else:
             logger.warning("nnp4xx disable build")
         self.build_span = time.time() - t_start
