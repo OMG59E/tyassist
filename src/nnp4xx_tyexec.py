@@ -33,10 +33,10 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             exit(-1)
 
         logo_setting_filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "setting.cfg")
-        if os.path.exists(logo_setting_filepath):
-            with open(logo_setting_filepath, "r") as f:
-                setting = json.load(f)
-                self.logo_module = setting["logo"]
+        assert os.path.exists(logo_setting_filepath)
+        with open(logo_setting_filepath, "r") as f:
+            setting = json.load(f)
+            self.logo_module = setting["logo"]
 
     @staticmethod
     def set_env():
