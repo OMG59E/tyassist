@@ -10,7 +10,7 @@ import os
 import abc
 import json
 import time
-import shutil
+import glob
 import uuid
 import traceback
 from .base_profiler import BaseSdkProfiler
@@ -103,8 +103,14 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
     def __del__(self):
         self.unload()
 
+    def find_model_prof_bin(self):
+        filenames = glob.glob(os.path.join(self.profile_dir, "model_prof_*.bin"))
+        assert len(filenames) > 0;
+        model_profile = filenames[0]
+        return model_profile
+
     def parse_dcl_api(self):
-        model_profile = os.path.join(self.profile_dir, "model_prof.bin")
+        model_profile = self.find_model_prof_bin()
         if not os.path.exists(model_profile):
             logger.error("Not found profile file -> {}".format(model_profile))
             exit(-1)
@@ -128,7 +134,7 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             logger.error("Not found {}".format(graph_json))
             exit(-1)
 
-        model_profile = os.path.join(self.profile_dir, "model_prof.bin")
+        model_profile = self.find_model_prof_bin()
         if not os.path.exists(model_profile):
             logger.error("Not found profile file -> {}".format(model_profile))
             exit(-1)

@@ -10,6 +10,7 @@ import os
 import pickle
 import uuid
 import json
+import glob
 import traceback
 import csv
 import numpy as np
@@ -125,6 +126,12 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
     def __del__(self):
         self.unload()
 
+    def find_model_prof_bin(self):
+        filenames = glob.glob(os.path.join(self.profile_dir, "model_prof_*.bin"))
+        assert len(filenames) > 0;
+        model_profile = filenames[0]
+        return model_profile
+
     def compare_layer_out(self):
         if not os.path.exists(self.dump_root_path):
             logger.error("Not found model dump path -> {}".format(self.dump_root_path))
@@ -178,7 +185,7 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
         if self.backend == "sdk_iss" or self.enable_dump or self.total == 0:
             return 0
 
-        profile_file = os.path.join(self.profile_dir, "model_prof.bin")
+        profile_file = self.find_model_prof_bin()
         if not os.path.exists(profile_file):
             logger.error("Not found profile file -> {}".format(profile_file))
             exit(-1)
