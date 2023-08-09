@@ -40,6 +40,8 @@ class Segmentation(Detector):
                 h, w, c = cv_image.shape
                 for _, mask in enumerate(masks):
                     contours, _ = cv2.findContours(mask.astype("uint8"), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                    if isinstance(contours, tuple):
+                        contours = list(contours)
                     contours = scale_coords_mask(self._input_size, contours, cv_image.shape)
                     tmp_mask = np.zeros((h, w), dtype=np.uint8)
                     cv2.fillPoly(tmp_mask, contours, 255)
