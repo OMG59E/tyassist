@@ -80,8 +80,9 @@ def build(cfg):
         tvm_fixed_output = tyexec.tvm_fixed_inference(in_datas, to_file=True)
 
         # step5 tvm float simu
-        in_datas = tyexec.get_datas(force_float=True, force_cr=True, to_file=True)  # 浮点模型输入
-        tvm_float_output = tyexec.tvm_float_inference(in_datas, to_file=True)
+        if not tyexec.is_qnn:
+            in_datas = tyexec.get_datas(force_float=True, force_cr=True, to_file=True)  # 浮点模型输入
+            tvm_float_output = tyexec.tvm_float_inference(in_datas, to_file=True)
 
         # tyexec.model_analysis()
         # tyexec.compress_analysis()
@@ -102,15 +103,17 @@ def build(cfg):
         # 计算相似度
         header = ["Idx", "Tensor-A", "Tensor-B", "Cosine similarity"]
         table = PrettyTable(header)
-        for idx in range(len(tvm_float_output)):
-            dist = cosine_distance(tvm_float_output[idx], tvm_fixed_output[idx])
-            logger.info("[Build] float(tvm) output tensor[{}] shape: {}, dtype: {}".format(idx, tvm_float_output[idx].shape, tvm_float_output[idx].dtype))
+        for idx in range(len(tvm_fixed_output)):
+            if not tyexec.is_qnn:
+                dist = cosine_distance(tvm_float_output[idx], tvm_fixed_output[idx])
+                logger.info("[Build] float(tvm) output tensor[{}] shape: {}, dtype: {}".format(idx, tvm_float_output[idx].shape, tvm_float_output[idx].dtype))
+                table.add_row([idx, "float(tvm)", "fixed(tvm)", "{:.6f}".format(dist)])
             logger.info("[Build] fixed(tvm) output tensor[{}] shape: {}, dtype: {}".format(idx, tvm_fixed_output[idx].shape, tvm_fixed_output[idx].dtype))
-            table.add_row([idx, "float(tvm)", "fixed(tvm)", "{:.6f}".format(dist)])
             if iss_fixed_output:
                 logger.info("[Build] fixed(iss) output tensor[{}] shape: {}, dtype: {}".format(idx, iss_fixed_output[idx].shape, iss_fixed_output[idx].dtype))
-                dist = cosine_distance(tvm_float_output[idx], iss_fixed_output[idx])
-                table.add_row([idx, "float(tvm)", "fixed(iss)", "{:.6f}".format(dist)])
+                if not tyexec.is_qnn:
+                    dist = cosine_distance(tvm_float_output[idx], iss_fixed_output[idx])
+                    table.add_row([idx, "float(tvm)", "fixed(iss)", "{:.6f}".format(dist)])
                 dist = cosine_distance(tvm_fixed_output[idx], iss_fixed_output[idx])
                 table.add_row([idx, "fixed(tvm)", "fixed(iss)", "{:.6f}".format(dist)])
         logger.info("\n{}".format(table))
