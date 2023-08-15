@@ -47,7 +47,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.relay = None
         self.params = None
         self.model_name = "net_combine"  # default
-        self.build_opt_level = cfg["build"].get("opt_level", 2)
+        self.build_opt_level = cfg["build"].get("opt_level", 0)
         self.quant_opt_level = cfg["build"]["quant"].get("opt_level", 0)
         self.disable_pass = cfg["build"]["quant"].get("disable_pass")
 

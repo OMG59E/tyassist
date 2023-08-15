@@ -72,8 +72,8 @@ build: {
   # 该参数仅对300系列芯片生效
   suppress_long_func: false,
 
-  # 编译优化等级, 缺省默认为2
-  opt_level: 2,
+  # 编译优化等级, 缺省默认为0
+  opt_level: 0,
 
   # 多线程编译, 空表示默认使用cpu核心数, 0表示不使用多线程
   multi_thread: ,
