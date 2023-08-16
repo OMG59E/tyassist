@@ -135,28 +135,33 @@ def compare(cfg, backend):
 
         # compare
         for idx, fixed_output in enumerate(fixed_outputs):
-            tvm_float_out_path = os.path.join(tyexec.result_dir, "tvm_float_out_{}.bin".format(idx))
+            if not tyexec.is_qnn:
+                # tvm-float vs chip-fixed or iss-fixed
+                tvm_float_out_path = os.path.join(tyexec.result_dir, "tvm_float_out_{}.bin".format(idx))
+                if not os.path.exists(tvm_float_out_path):
+                    logger.error("Not found tvm_float_out_path -> {}".format(tvm_float_out_path))
+                    exit(-1)
+                tvm_float_out = np.fromfile(tvm_float_out_path, dtype=fixed_output.dtype)
+                dist = cosine_distance(fixed_output, tvm_float_out)
+                logger.info("[Compare] fixed({}) vs float(tvm) output tensor[{}] similarity={:.6f}".format(tyexec.backend, idx, dist))
+
+            # tvm-fixed vs chip-fixed or iss-fixed
             tvm_fixed_out_path = os.path.join(tyexec.result_dir, "tvm_fixed_out_{}.bin".format(idx))
             if not os.path.exists(tvm_fixed_out_path):
                 logger.error("Not found tvm_fixed_out_path -> {}".format(tvm_fixed_out_path))
                 exit(-1)
-            if not os.path.exists(tvm_float_out_path):
-                logger.error("Not found tvm_float_out_path -> {}".format(tvm_float_out_path))
-                exit(-1)
             tvm_fixed_out = np.fromfile(tvm_fixed_out_path, dtype=fixed_output.dtype)
-            tvm_float_out = np.fromfile(tvm_float_out_path, dtype=fixed_output.dtype)
-            dist0 = cosine_distance(fixed_output, tvm_fixed_out)
-            dist1 = cosine_distance(fixed_output, tvm_float_out)
-            logger.info("[Compare] fixed({}) vs fixed(tvm) output tensor[{}] similarity={:.6f}".format(tyexec.backend, idx, dist0))
-            logger.info("[Compare] fixed({}) vs float(tvm) output tensor[{}] similarity={:.6f}".format(tyexec.backend, idx, dist1))
+            dist = cosine_distance(fixed_output, tvm_fixed_out)
+            logger.info("[Compare] fixed({}) vs fixed(tvm) output tensor[{}] similarity={:.6f}".format(tyexec.backend, idx, dist))
+
             if tyexec.enable_dump:
                 iss_fixed_out_path = os.path.join(tyexec.result_dir, "iss_fixed_out_{}.bin".format(idx))
                 if not os.path.exists(iss_fixed_out_path):
                     logger.error("Not found iss_fixed_out_path -> {}".format(iss_fixed_out_path))
                     exit(-1)
                 iss_fixed_out = np.fromfile(iss_fixed_out_path, dtype=fixed_output.dtype)
-                dist2 = cosine_distance(fixed_output, iss_fixed_out)
-                logger.info("[Compare] fixed({}) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(tyexec.backend, idx, dist2))
+                dist = cosine_distance(fixed_output, iss_fixed_out)
+                logger.info("[Compare] fixed({}) vs fixed(iss) output tensor[{}] similarity={:.6f}".format(tyexec.backend, idx, dist))
         logger.info("success")
     except Exception as e:
         logger.error("Failed to compare {}".format(traceback.format_exc()))

@@ -78,7 +78,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.tvm_layerwise_dump_span = 0
         self.iss_layerwise_dump_span = 0
 
-        self.is_qnn = False
+        self.is_qnn = True if self.cfg["model"]["framework"] == "onnx-qnn" else False
 
     @staticmethod
     def set_env():
