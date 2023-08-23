@@ -37,7 +37,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.weight = cfg["model"]["weight"]
         self.inputs = cfg["model"]["inputs"]
         self.quant_data_dir = self.quant_cfg["data_dir"]
-        self.prof_num = self.quant_cfg["prof_img_num"]
+        self.prof_img_num = self.quant_cfg["prof_img_num"]
         # self.inputs_ = list()
         self.outputs = cfg["model"]["outputs"]
         self.num_inputs = len(self.inputs)
@@ -80,6 +80,19 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
 
         self.is_qnn = True if self.cfg["model"]["framework"] == "onnx-qnn" else False
 
+        if self.quant_data_dir is None:
+            assert self.prof_img_num > 0, "Random data mode, prof_img_num must be > 0"
+        else:
+            assert self.prof_img_num >= 0, "Custom/data_dir mode, prof_img_num must be >= 0"
+            if isinstance(self.quant_data_dir, str):
+                img_lists = os.listdir(self.quant_data_dir)
+                prof_img_num = len(img_lists) // self.bs
+                if self.prof_img_num == 0:
+                    self.prof_img_num = prof_img_num
+                elif prof_img_num < self.prof_img_num:
+                    logger.warning("Quant data not enough")
+                    self.prof_img_num = prof_img_num
+
     @staticmethod
     def set_env():
         raise NotImplementedError
@@ -89,12 +102,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         assert len(self.inputs) == 1, "input_num must be = 1"
         data_dir = self.quant_data_dir
         img_lists = os.listdir(data_dir)
-        prof_num = len(img_lists) // self.bs
-        if prof_num < self.prof_num:
-            logger.warning("Quant data not enough")
-            self.prof_num = prof_num
-
-        for idx in range(self.prof_num):
+        for idx in range(self.prof_img_num):
             batch_img_lists = [os.path.join(data_dir, img_lists[i]) for i in range(idx * self.bs, (idx + 1) * self.bs)]
             yield self.get_datas(batch_img_lists, force_float=False, force_cr=True, force_random=False, to_file=False)
 
@@ -186,15 +194,14 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             if hasattr(m, self.custom_preprocess_cls):
                 # 实例化预处理对象
                 self.custom_preprocess_cls = getattr(m, self.custom_preprocess_cls)(
-                    self.inputs, self.quant_cfg["prof_img_num"], self.quant_cfg["data_dir"])
+                    self.inputs, self.prof_img_num, self.quant_data_dir)
             else:
                 logger.error("{}.py has no class named {}".format(
                     self.custom_preprocess_module, self.custom_preprocess_cls))
                 exit(-1)
 
     def gen_random_quant_data(self):
-        prof_img_num = self.quant_cfg["prof_img_num"]
-        for _ in range(prof_img_num):
+        for _ in range(self.prof_img_num):
             yield self.get_datas(force_random=True)
 
     @staticmethod

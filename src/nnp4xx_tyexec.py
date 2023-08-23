@@ -23,6 +23,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
         self.model_path_x86_64 = os.path.join(self.model_dir, "{}_x86_64.ty".format(self.model_name))
         self.model_path_aarch64 = os.path.join(self.model_dir, "{}_aarch64.ty".format(self.model_name))
+        self.custom_op_module = self.cfg["model"].get("custom_op_module")
 
         ARM_C_COMPILER = os.getenv("ARM_C_COMPILER")
         if ARM_C_COMPILER is None:
@@ -47,11 +48,18 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         logger.info("TyTVM Version: {}".format(get_version()))
 
     def onnx2relay(self):
-        load_model_from_file = get_method("tvm.contrib.{}".format(self.logo_module), "load_model_from_file")
+        import onnx
         dtype_dict = dict()
         for _, _input in enumerate(self.inputs):
             dtype_dict[_input["name"]] = "float32"
         kwargs = {"dtype": dtype_dict}
+        if self.custom_op_module is not None:
+            print(self.custom_op_module)
+            custom_op_module = importlib.import_module(self.custom_op_module)
+            from_onnx = get_method("tvm.contrib.{}.relay.frontend.onnx".format(self.logo_module), "from_onnx")
+            self.relay, self.params = from_onnx(onnx.load(self.weight), shape=self.shape_dict, **kwargs)
+            return
+        load_model_from_file = get_method("tvm.contrib.{}".format(self.logo_module), "load_model_from_file")
         self.relay, self.params = load_model_from_file(self.weight, "onnx", self.shape_dict, **kwargs)
 
     def onnx_qnn2relay(self):
@@ -145,7 +153,6 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         t_start = time.time()
         if self.enable_quant:
             quantize_config, norm = self.set_quantization_cfg(in_datas)
-
             logger.info("################   quantization start  ######################")
             import tvm
             from tvm.relay.quantization import quantize
@@ -154,7 +161,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 self.params,
                 model_name="opt_ir",
                 dataset=self.get_dataset(),
-                prof_img_num=self.quant_cfg["prof_img_num"],
+                prof_img_num=self.prof_img_num,
                 rgb_en=1 if (self.num_inputs == 1 and self.inputs[0]["pixel_format"] == "RGB") else 0,
                 norm=norm,
                 quantize_config=quantize_config,
@@ -174,6 +181,37 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         self.tvm_layerwise_dump_span = time.time() - t_start
 
     @staticmethod
+    def compile_extern_lib(relay_func, lib, save_path):
+        """Compile extern lib for custom ops."""
+        import tvm
+        addons = []
+        for _, func in relay_func.functions.items():
+            if isinstance(func, tvm.tir.PrimFunc):
+                if "nnp_c_link_files" in func.attrs:
+                    link_files = func.attrs["nnp_c_link_files"]
+                    if link_files:
+                        addons.extend(link_files)
+
+        # prepare cc options
+        cc_options = []
+        if addons:
+            cc_options.extend(
+                ["-std=c++17", "-O2", "-DDMLC_USE_LOGGING_LIBRARY=<tvm/runtime/logging.h>"]
+            )
+            tvm_root_cands = [
+                tvm.__path__[0],
+                os.path.join(tvm.__path__[0], "..", ".."),
+                os.environ.get("TVM_HOME", "."),
+            ]
+            for cand in tvm_root_cands:
+                cc_options.append(f"-I{cand}/include")
+                cc_options.append(f"-I{cand}/3rdparty/dlpack/include")
+                cc_options.append(f"-I{cand}/3rdparty/dmlc-core/include")
+        if save_path:
+            lib.export_library(save_path, addons=addons, options=cc_options)
+        return lib
+
+    @staticmethod
     def build_x86_64(relay_func, params, target, save_path=""):
         try:
             import tvm
@@ -181,11 +219,12 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             from tvm.relay import build
 
             cpu_target = tvm.target.Target("llvm")
-            with tvm.transform.PassContext(opt_level=3):
-                # cpu_lib = build(rewrite_scalar(relay_func), target=cpu_target, params=params)
+            with tvm.transform.PassContext(opt_level=2):
                 cpu_lib = build(relay_func, target=cpu_target, params=params)
-                if save_path:
-                    cpu_lib.export_library(save_path)
+            cpu_lib = Nnp4xxTyExec.compile_extern_lib(relay_func, cpu_lib, save_path)
+            # if save_path:
+            #     cpu_lib.export_library(save_path)
+            cpu_lib = tvm.runtime.load_module(save_path)
             module = graph_executor.GraphModule(cpu_lib["default"](tvm.cpu()))
             return module
         except Exception as e:
@@ -274,27 +313,40 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         self.iss_layerwise_dump_span = time.time() - t_start
 
     def tvm_float_inference(self, in_datas, to_file=False):
+        logger.info("start tvm-float simu")
         tvm_float_outputs = self.tvm_inference(
             self.build_x86_64(self.relay, self.params, self.target, self.cpu_model_float_path), in_datas)
         if to_file and len(tvm_float_outputs) > 0:
             for idx, output in enumerate(tvm_float_outputs):
-                output.tofile(os.path.join(self.result_dir, "tvm_float_out_{}.bin".format(idx)))
-                output.tofile(os.path.join(self.result_dir, "tvm_float_out_{}.txt".format(idx)), sep="\n")
+                txt_path = os.path.join(self.result_dir, "tvm_float_out_{}.bin".format(idx))
+                bin_path = os.path.join(self.result_dir, "tvm_float_out_{}.txt".format(idx))
+                output.tofile(txt_path)
+                output.tofile(bin_path, sep="\n")
+                logger.info("save tvm-float output[{}]: {}".format(idx, txt_path))
+                logger.info("save tvm-float output[{}]: {}".format(idx, bin_path))
+        logger.info("tvm-float simu successfully")
         return tvm_float_outputs
 
     def tvm_fixed_inference(self, in_datas, to_file=False):
+        logger.info("start tvm-fixed simu")
         tvm_fixed_outputs = self.tvm_inference(
             self.build_x86_64(self.relay_quant, self.params_quant, self.target, self.cpu_model_fixed_path), in_datas)
         if to_file and len(tvm_fixed_outputs) > 0:
             for idx, output in enumerate(tvm_fixed_outputs):
-                output.tofile(os.path.join(self.result_dir, "tvm_fixed_out_{}.bin".format(idx)))
-                output.tofile(os.path.join(self.result_dir, "tvm_fixed_out_{}.txt".format(idx)), sep="\n")
+                txt_path = os.path.join(self.result_dir, "tvm_fixed_out_{}.bin".format(idx))
+                bin_path = os.path.join(self.result_dir, "tvm_fixed_out_{}.txt".format(idx))
+                output.tofile(txt_path)
+                output.tofile(bin_path, sep="\n")
+                logger.info("save tvm-fixed output[{}]: {}".format(idx, txt_path))
+                logger.info("save tvm-fixed output[{}]: {}".format(idx, bin_path))
+        logger.info("tvm-fixed simu successfully")
         return tvm_fixed_outputs
 
     def iss_fixed_inference(self, in_datas, to_file=False):
         """x86_64 iss"""
         iss_fixed_outputs = 0
         if self.enable_dump:
+            logger.info("start iss-fixed simu")
             if not os.path.exists(self.model_path_x86_64):
                 logger.error("Not found model path -> {}".format(self.model_path_x86_64))
                 exit(-1)
@@ -309,8 +361,13 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             self.iss_simu_span = time.time() - t_start
             if to_file and len(iss_fixed_outputs) > 0:
                 for idx, output in enumerate(iss_fixed_outputs):
-                    output.tofile(os.path.join(self.result_dir, "iss_fixed_out_{}.bin".format(idx)))
-                    output.tofile(os.path.join(self.result_dir, "iss_fixed_out_{}.txt".format(idx)), sep="\n")
+                    txt_path = os.path.join(self.result_dir, "iss_fixed_out_{}.bin".format(idx))
+                    bin_path = os.path.join(self.result_dir, "iss_fixed_out_{}.txt".format(idx))
+                    output.tofile(txt_path)
+                    output.tofile(bin_path, sep="\n")
+                    logger.info("save iss-fixed output[{}]: {}".format(idx, txt_path))
+                    logger.info("save iss-fixed output[{}]: {}".format(idx, bin_path))
+            logger.info("iss-fixed simu successfully")
         return iss_fixed_outputs
 
     def save_compare_layer_outputs(self):

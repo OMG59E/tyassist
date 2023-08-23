@@ -58,7 +58,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 # 的图片集路径，支持图片格式为 jpg，jpeg，png，bmp。也可配置为用户自定义的预处理。类型str/generator
                 dataset=self.get_dataset(),
                 # 使用校准数据数量
-                prof_img_num=self.prof_num,
+                prof_img_num=self.prof_img_num,
                 # 此配置仅在 dataset 配置为图片集路径（即使用云天自带的预处理），且输入为3通道时有效，对生成芯片模型无效
                 rgb_en=1 if (self.num_inputs == 1 and self.inputs[0]["pixel_format"] == "RGB") else 0,
                 # 均值方差，对生成芯片模型生效
@@ -125,6 +125,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         return input_info
 
     def tvm_float_inference(self, in_datas, to_file=False):
+        logger.info("start tvm-float simu")
         engine = self.build_x86_64(self.relay, self.params, self.target)
         tvm_float_outputs = self.tvm_inference(engine, in_datas)
         # tvm_float_outputs = tvm_float_outputs.values()  # dict to list
@@ -132,18 +133,22 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             for idx, output in enumerate(tvm_float_outputs):
                 output.tofile(os.path.join(self.result_dir, "tvm_float_out_{}.bin".format(idx)))
                 output.tofile(os.path.join(self.result_dir, "tvm_float_out_{}.txt".format(idx)), sep="\n")
+        logger.info("tvm-float simu successfully")
         return tvm_float_outputs
 
     def tvm_fixed_inference(self, in_datas, to_file=False):
+        logger.info("start tvm-fixed simu")
         engine = self.build_x86_64(self.relay_quant, self.params_quant, self.target)
         tvm_float_outputs = self.tvm_inference(engine, in_datas)
         if to_file and len(tvm_float_outputs) > 0:
             for idx, output in enumerate(tvm_float_outputs):
                 output.tofile(os.path.join(self.result_dir, "tvm_fixed_out_{}.bin".format(idx)))
                 output.tofile(os.path.join(self.result_dir, "tvm_fixed_out_{}.txt".format(idx)), sep="\n")
+        logger.info("tvm-fixed simu successfully")
         return tvm_float_outputs
 
     def iss_fixed_inference(self, in_datas, to_file=False):
+        logger.info("start iss-fixed simu")
         iss_fixed_outputs = None
         if self.enable_dump:
             from deepeye.run_net_bin.run_net_bin import run_net_bin
@@ -174,6 +179,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 for idx, iss_fixed_output in enumerate(iss_fixed_outputs):
                     iss_fixed_output.tofile(os.path.join(self.result_dir, "iss_fixed_out_{}.bin".format(idx)))
                     iss_fixed_output.tofile(os.path.join(self.result_dir, "iss_fixed_out_{}.txt".format(idx)), sep="\n")
+        logger.info("iss-fixed simu successfully")
         return iss_fixed_outputs
 
     def iss_dump_output(self, in_datas):
@@ -399,7 +405,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         module.set_input(**params)
 
         data_dir = self.quant_cfg["data_dir"]
-        prof_img_num = self.quant_cfg["prof_img_num"]
+        prof_img_num = self.prof_img_num
         if os.path.exists(data_dir):
             data_lists = os.listdir(data_dir)
             if prof_img_num <= len(data_lists):
