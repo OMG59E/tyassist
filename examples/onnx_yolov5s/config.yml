@@ -30,6 +30,7 @@ build: {
   target: "nnp300",
   enable_quant: true,
   enable_build: true,
+  opt_level: 2,
   quant: {
     data_dir: "../../data/datasets/ILSVRC2012/ILSVRC2012_img_val",
     prof_img_num: 100,
@@ -41,7 +42,7 @@ build: {
     calib_method: "l2norm",
     skip_layer_names: [ "final" ],
   },
-  enable_dump: 1,
+  enable_dump: 2,
 }
 
 test: {
