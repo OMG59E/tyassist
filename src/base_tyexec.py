@@ -80,7 +80,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
 
         self.is_qnn = True if self.cfg["model"]["framework"] == "onnx-qnn" else False
 
-        if self.quant_data_dir is None:
+        if not self.quant_data_dir:
             assert self.prof_img_num > 0, "Random data mode, prof_img_num must be > 0"
         else:
             assert self.prof_img_num >= 0, "Custom/data_dir mode, prof_img_num must be >= 0"
