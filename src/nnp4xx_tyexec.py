@@ -54,7 +54,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             dtype_dict[_input["name"]] = "float32"
         kwargs = {"dtype": dtype_dict}
         if self.custom_op_module is not None:
-            print(self.custom_op_module)
+            logger.info(self.custom_op_module)
             custom_op_module = importlib.import_module(self.custom_op_module)
             from_onnx = get_method("tvm.contrib.{}.relay.frontend.onnx".format(self.logo_module), "from_onnx")
             self.relay, self.params = from_onnx(onnx.load(self.weight), shape=self.shape_dict, **kwargs)
@@ -297,6 +297,10 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         outputs = infer.run(in_datas, to_file=True)
         infer.unload()
         ave_latency_ms = infer.ave_latency_ms
+        # 清理profile输出
+        if os.path.exists(infer.profile_dir):
+            import shutil
+            shutil.rmtree(infer.profile_dir, ignore_errors=True)
         logger.info("[{}] average cost: {:.3f}ms".format(self.target, ave_latency_ms))
         return outputs
 
@@ -387,6 +391,10 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         profiler.run(in_datas)
         profiler.unload()
         profiler.parse()
+        # 清理profile输出
+        if os.path.exists(profiler.profile_dir):
+            import shutil
+            shutil.rmtree(profiler.profile_dir, ignore_errors=True)
 
     def get_relay_mac(self):
         logger.warning("Nnp4xx not support get relay mac")
