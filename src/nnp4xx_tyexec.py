@@ -21,6 +21,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
     def __init__(self, cfg: dict):
         super(Nnp4xxTyExec, self).__init__(cfg)
 
+        self.fused_json_path = os.path.join(self.result_dir, "model_fused.json")
         self.model_path_x86_64 = os.path.join(self.model_dir, "{}_x86_64.ty".format(self.model_name))
         self.model_path_aarch64 = os.path.join(self.model_dir, "{}_aarch64.ty".format(self.model_name))
         self.custom_op_module = self.cfg["model"].get("custom_op_module")
@@ -50,9 +51,20 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
     def onnx2relay(self):
         import onnx
         dtype_dict = dict()
+        norm_dict = dict()
+        qnn_in_dtype = dict()
+        output_info = dict()
         for _, _input in enumerate(self.inputs):
             dtype_dict[_input["name"]] = "float32"
-        kwargs = {"dtype": dtype_dict}
+            norm_dict[_input["name"]] = {"mean": _input["mean"], "std": _input["std"]}
+            qnn_in_dtype[_input["name"]] = "uint8" if _input["pixel_format"] else _input["dtype"]
+
+        kwargs = {"dtype": dtype_dict, "qnn": self.is_qnn}
+        if self.is_qnn:
+            kwargs["norm"] = norm_dict
+            kwargs["net_in_dtype"] = qnn_in_dtype
+            # kwargs["output_info"] = {"output_name": {"dtype": "float32", "skip_dequant": False}}
+
         if self.custom_op_module is not None:
             logger.info(self.custom_op_module)
             custom_op_module = importlib.import_module(self.custom_op_module)
@@ -63,8 +75,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         self.relay, self.params = load_model_from_file(self.weight, "onnx", self.shape_dict, **kwargs)
 
     def onnx_qnn2relay(self):
-        self.onnx2relay()
         self.is_qnn = True
+        self.onnx2relay()
 
     def pytorch2relay(self):
         load_model_from_file = get_method("tvm.contrib.{}".format(self.logo_module), "load_model_from_file")
@@ -219,7 +231,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             from tvm.relay import build
 
             cpu_target = tvm.target.Target("llvm")
-            with tvm.transform.PassContext(opt_level=2):
+            with tvm.transform.PassContext(opt_level=3):
                 cpu_lib = build(relay_func, target=cpu_target, params=params)
             cpu_lib = Nnp4xxTyExec.compile_extern_lib(relay_func, cpu_lib, save_path)
             # if save_path:
@@ -259,6 +271,10 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             }
             if self.cfg["build"].get("multi_thread"):
                 config["edgex.relay_to_tir.compile_thread"] = self.cfg["build"].get("multi_thread")
+            num_cube = self.cfg["build"].get("num_cube")
+            if num_cube:
+                assert num_cube in [1, 2, 3]
+                config["hardware.pe_num"] = num_cube
             target_device = tvm.target.Target(
                 self.logo_module, host="{}_virtual_host".format(self.logo_module) if self.enable_dump != 0 else None)
 
@@ -411,3 +427,93 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
     @staticmethod
     def save_relay_to_model(quant_model_path, relay_func, params):
         logger.warning("Not support save relay to model, can be visualized by netron")
+
+    def compare_layerwise(self):
+        data_float = self.get_datas(force_float=True, force_cr=True, to_file=True)  # 浮点模型输入
+        data_fixed = self.get_datas(force_float=False, force_cr=True, to_file=True)  # 量化后模型输入
+
+        import tvm
+        layerwise_error = get_method("tvm.contrib.{}.relay.analysis".format(self.logo_module), "LayerwiseError")
+        compile_cpuref_model = get_method("tvm.contrib.{}".format(self.logo_module), "compile_cpuref_model")
+        get_available_graph_spans = get_method("tvm.contrib.{}".format(self.logo_module), "get_available_graph_spans")
+        get_cos_similarity_per_channel_average = get_method(
+            "tvm.contrib.{}.testing".format(self.logo_module), "get_cos_similarity_per_channel_average")
+
+        # 加载tvm浮点模型, 编译为包含span信息的cpu可执行模型
+        relay_float = self.load_relay_from_json(self.original_json_path)
+        tvm_float_lib = compile_cpuref_model(relay_float, params=None)
+        span_infos = get_available_graph_spans(tvm_float_lib)
+        for term in span_infos:
+            logger.info(term)
+
+        # 这些span名为示例要比对的中间层名字
+        span_keys = [_["name"] for _ in span_infos]
+
+        # onnx
+        import onnx
+        import onnxruntime
+        onnx_file = self.weight
+        onnx_model = onnx.load(onnx_file)
+        shape_info = onnx.shape_inference.infer_shapes(onnx_model)
+        output_names_dict = dict()
+        output_names = list()
+        for node in shape_info.graph.node:
+            print(node.name, node.output)
+            output_names_dict[node.name] = node.output
+            output_names.extend(node.output)
+        onnx_sess = onnxruntime.InferenceSession(onnx_model.SerializeToString())
+        res = onnx_sess.run(output_names, data_float)
+
+        # onnx字典 span name -> numpy
+        onnx_outputs = {name: res[i] for i, name in enumerate(span_keys)}
+
+        # 前端tvm float模型逐层结果
+        _, _, _, tvm_float_outputs = layerwise_error.run(tvm_float_lib, inputs=data_float)
+
+        # tvm量化模型逐层结果
+        relay_quant = self.load_relay_from_json(self.quant_json_path)
+        quant_lib = compile_cpuref_model(relay_float, params=None)
+        _, _, _, quant_outputs = layerwise_error.run(quant_lib, inputs=data_fixed)
+
+        # 图层融合和优化后模型CPU逐层结果
+        build_config_nnp = get_method("tvm.contrib.{}".format(self.logo_module), "build_config_nnp")
+        optimize_nnp_model = get_method("tvm.contrib.{}".format(self.logo_module), "optimize_nnp_model")
+        with build_config_nnp(opt_level=self.build_opt_level):
+            fuse_mod, fuse_params = optimize_nnp_model(relay_quant, None, tvm.target.edgex())
+        fuse_lib = compile_cpuref_model(fuse_mod, params=fuse_params)
+        _, _, _, fuse_outputs = layerwise_error.run(fuse_lib, inputs=data_fixed)
+
+        # 获取模拟器上的逐层结果
+        lib_x86 = tvm.runtime.load_module(self.model_path_x86_64)
+        _, _, _, simu_outputs = layerwise_error.run(lib_x86, inputs=data_fixed)
+
+        # 绘制比对表格
+        summary = []
+        for key in span_keys:
+            onnx_data = onnx_outputs[key]
+
+            def compare(key, expect, outputs):
+                if key not in outputs:
+                    return "Missing"
+                actual = outputs[key][0]
+                cosine = get_cos_similarity_per_channel_average(expect, actual, layout="NCHW")
+                if cosine is None:
+                    return f"Mismatch shape: {actual.shape}"
+                return "%.3f" % cosine
+
+            summary.append([
+                key,
+                str(onnx_data.shape),
+                compare(key, onnx_data, tvm_float_outputs),
+                compare(key, onnx_data, quant_outputs),
+                compare(key, onnx_data, fuse_outputs),
+                compare(key, onnx_data, simu_outputs),
+            ])
+
+        import prettytable
+        table = prettytable.PrettyTable()
+        table.field_names = [
+            "layer", "onnx_shape", "tvm-float vs onnx", "tvm-fixed vs onnx", "tvm-fused vs onnx", "tvm-iss vs onnx",]
+        table.add_rows(summary)
+        logger.info("\n{}".format(table))
+
