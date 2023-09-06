@@ -182,6 +182,8 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
                 ops = p["ops"]
                 for idx in op_names:
                     op_name = op_names[idx]
+                    if idx >= len(ops):
+                        continue
                     op = ops[idx]
                     exec_cycles = op["exec_cycles"]
                     gap_cycles = op["gap_cycles"]
@@ -206,6 +208,9 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
 
             for idx in op_names:
                 op_name = op_names[idx]
+                if op_name not in total_op_exec_cycles:
+                    logger.warning("idx: {}, op_name: {}, maybe it`s cpu op, will be skip".format(idx, op_name))
+                    continue
                 mean_op_exec_cycles = int(total_op_exec_cycles[op_name] / num_iter)
                 mean_op_gap_cycles = int(total_op_gap_cycles[op_name] / num_iter)
                 mean_op_ddr_read_cycles = int(total_op_ddr_read_cycles[op_name] / num_iter)
