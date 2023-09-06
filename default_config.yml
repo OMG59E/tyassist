@@ -116,6 +116,9 @@ build: {
     # 量化winograd配置
     disable_pass: [],
 
+    # 配置cube数量，不配默认为3，可选1/2/3
+    num_cube: 3,
+
     # 校准方法 "kld", "min_max", "percentile_0.99..", "l2norm"
     calib_method: "kld",
 
