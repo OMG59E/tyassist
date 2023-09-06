@@ -152,11 +152,11 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
                 graph = json.load(f)
             nodes = graph["nodes"]
             for node in nodes:
-                if "attrs" not in node:
-                    continue
-                if "func_name" not in node["attrs"]:
+                if node["op"] != "tvm_op":
                     continue
                 func_name = node["attrs"]["func_name"]
+                if func_name.startswith("__"):
+                    continue
                 key = func_name.split("_")[0]
                 idx = int(key.replace("f", ""))
                 op_names[idx] = func_name
