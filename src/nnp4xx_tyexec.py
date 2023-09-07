@@ -11,6 +11,9 @@ import torch
 import time
 import json
 import os
+import onnx
+import onnxruntime
+from collections import OrderedDict
 from abc import ABC
 from utils import logger
 from utils.utils import get_method
@@ -65,6 +68,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             kwargs["net_in_dtype"] = qnn_in_dtype
             # kwargs["output_info"] = {"output_name": {"dtype": "float32", "skip_dequant": False}}
 
+        kwargs["extras"] = self.cfg["model"].get("extras")
         if self.custom_op_module is not None:
             logger.info(self.custom_op_module)
             custom_op_module = importlib.import_module(self.custom_op_module)
@@ -433,6 +437,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         data_fixed = self.get_datas(force_float=False, force_cr=True, to_file=True)  # 量化后模型输入
 
         import tvm
+        from tvm.relay.transform import SimplifyInference
         layerwise_error = get_method("tvm.contrib.{}.relay.analysis".format(self.logo_module), "LayerwiseError")
         compile_cpuref_model = get_method("tvm.contrib.{}".format(self.logo_module), "compile_cpuref_model")
         get_available_graph_spans = get_method("tvm.contrib.{}".format(self.logo_module), "get_available_graph_spans")
@@ -441,31 +446,30 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
         # 加载tvm浮点模型, 编译为包含span信息的cpu可执行模型
         relay_float = self.load_relay_from_json(self.original_json_path)
+        callback = SimplifyInference()
+        relay_float = callback(relay_float)
         tvm_float_lib = compile_cpuref_model(relay_float, params=None)
         span_infos = get_available_graph_spans(tvm_float_lib)
         for term in span_infos:
             logger.info(term)
 
         # 这些span名为示例要比对的中间层名字
-        span_keys = [_["name"] for _ in span_infos]
+        span_keys = list()
+        for span_info in span_infos:
+            if span_info["name"] not in span_keys:
+                span_keys.append(span_info["name"])
 
         # onnx
-        import onnx
-        import onnxruntime
-        onnx_file = self.weight
-        onnx_model = onnx.load(onnx_file)
-        shape_info = onnx.shape_inference.infer_shapes(onnx_model)
-        output_names_dict = dict()
-        output_names = list()
-        for node in shape_info.graph.node:
-            print(node.name, node.output)
-            output_names_dict[node.name] = node.output
-            output_names.extend(node.output)
-        onnx_sess = onnxruntime.InferenceSession(onnx_model.SerializeToString())
-        res = onnx_sess.run(output_names, data_float)
+        model = onnx.shape_inference.infer_shapes(onnx.load(self.weight))
+        for node in model.graph.node:
+            logger.info("op_names: {}, output_names: {}".format(node.name, node.output))
+            for output in node.output:
+                model.graph.output.insert(-1, onnx.ValueInfoProto(name=output))
+        ort_session = onnxruntime.InferenceSession(model.SerializeToString())
 
-        # onnx字典 span name -> numpy
-        onnx_outputs = {name: res[i] for i, name in enumerate(span_keys)}
+        outputs = [x.name for x in ort_session.get_outputs()]
+        ort_outs = ort_session.run(outputs, data_float)
+        ort_outs = OrderedDict(zip(outputs, ort_outs))
 
         # 前端tvm float模型逐层结果
         _, _, _, tvm_float_outputs = layerwise_error.run(tvm_float_lib, inputs=data_float)
@@ -484,13 +488,14 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         _, _, _, fuse_outputs = layerwise_error.run(fuse_lib, inputs=data_fixed)
 
         # 获取模拟器上的逐层结果
-        lib_x86 = tvm.runtime.load_module(self.model_path_x86_64)
-        _, _, _, simu_outputs = layerwise_error.run(lib_x86, inputs=data_fixed)
+        simu_outputs = dict()
+        # lib_x86 = tvm.runtime.load_module(self.model_path_x86_64)
+        # _, _, _, simu_outputs = layerwise_error.run(lib_x86, inputs=data_fixed)
 
         # 绘制比对表格
         summary = []
-        for key in span_keys:
-            onnx_data = onnx_outputs[key]
+        for key in ort_outs:
+            onnx_data = ort_outs[key]
 
             def compare(key, expect, outputs):
                 if key not in outputs:

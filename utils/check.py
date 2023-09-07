@@ -223,12 +223,15 @@ def check_config(cfg, phase="build"):
         mean = _input["mean"]
         std = _input["std"]
         if mean is None:
-            mean = [0.0 for _ in range(c)]
+            # mean = [0.0 for _ in range(c)]
+            pass
         else:
             if len(mean) == 1:
                 mean = [mean[0] for _ in range(c)]
         if std is None:
-            std = [1.0 for _ in range(c)]
+            # std = [1.0 for _ in range(c)]
+            pass
+        else:
             if len(std) == 1:
                 std = [std[0] for _ in range(c)]
 
