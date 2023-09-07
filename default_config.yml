@@ -51,6 +51,19 @@ model: {
     }
   ],
 
+  "extras": {
+    "add_nms": true,
+    "out_names": [
+      "boxes",
+      "onnx::Transpose_1201"
+    ],
+    "nms_info_config": {
+      "op_name": "all_class_non_max_suppression_ty",
+      "output_format": "separated",
+      "score_index": 0
+    }
+  },
+
   # 模型的python模块(test和demo必须设置), 必须与yml配置文件同级目录
   model_impl_module: ,
   model_impl_cls: ,
