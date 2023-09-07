@@ -51,6 +51,7 @@ model: {
     }
   ],
 
+  # 额外模型信息，主要用于检测模型的nms处理，详见文档
   "extras": {
     "add_nms": true,
     "out_names": [
