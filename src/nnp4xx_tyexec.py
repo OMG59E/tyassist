@@ -68,7 +68,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             kwargs["net_in_dtype"] = qnn_in_dtype
             # kwargs["output_info"] = {"output_name": {"dtype": "float32", "skip_dequant": False}}
 
-        kwargs["extras"] = self.cfg["model"].get("extras")
+        if self.cfg["model"].get("extras"):
+            kwargs["extras"] = self.cfg["model"].get("extras")
         if self.custom_op_module is not None:
             logger.info(self.custom_op_module)
             custom_op_module = importlib.import_module(self.custom_op_module)
