@@ -62,8 +62,9 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             norm_dict[_input["name"]] = {"mean": _input["mean"], "std": _input["std"]}
             qnn_in_dtype[_input["name"]] = "uint8" if _input["pixel_format"] else _input["dtype"]
 
-        kwargs = {"dtype": dtype_dict, "qnn": self.is_qnn}
+        kwargs = {"dtype": dtype_dict}
         if self.is_qnn:
+            kwargs["qnn"] = self.is_qnn
             kwargs["norm"] = norm_dict
             kwargs["net_in_dtype"] = qnn_in_dtype
             # kwargs["output_info"] = {"output_name": {"dtype": "float32", "skip_dequant": False}}
@@ -183,6 +184,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 norm=norm,
                 quantize_config=quantize_config,
                 debug_level=self.quant_cfg["debug_level"],
+                similarity_img_num=self.quant_cfg["similarity_img_num"],
+                similarity_dataset=self.quant_cfg["similarity_dataset"],
                 save_dir=self.result_dir,
             )
             logger.info("################   quantization end  ######################")
