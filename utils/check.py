@@ -120,6 +120,14 @@ def check_config(cfg, phase="build"):
 
     if phase == "build":
         weight = cfg["model"]["weight"]
+        if cfg["model"]["framework"] == "mxnet":
+            graph = weight
+            weight += "-0000.params"
+            graph += "-symbol.json"
+            if not os.path.exists(graph):
+                logger.error("The model define not exist -> {}".format(graph))
+                return False
+
         if not os.path.exists(weight):
             logger.error("The model weight not exist -> {}".format(weight))
             return False
