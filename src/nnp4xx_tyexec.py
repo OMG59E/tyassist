@@ -84,6 +84,14 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         self.is_qnn = True
         self.onnx2relay()
 
+    def mxnet2relay(self):
+        dtype_dict = dict()
+        for _, _input in enumerate(self.inputs):
+            dtype_dict[_input["name"]] = "float32"
+        kwargs = {"dtype": dtype_dict}
+        load_model_from_file = get_method("tvm.contrib.{}".format(self.logo_module), "load_model_from_file")
+        self.relay, self.params = load_model_from_file(self.weight, "mxnet", self.shape_dict, **kwargs)
+
     def pytorch2relay(self):
         load_model_from_file = get_method("tvm.contrib.{}".format(self.logo_module), "load_model_from_file")
         self.relay, self.params = load_model_from_file(self.weight, "pytorch", self.shape_dict)
@@ -421,7 +429,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             shutil.rmtree(profiler.profile_dir, ignore_errors=True)
 
     def get_relay_mac(self):
-        logger.warning("Nnp4xx not support get relay mac")
+        pass
 
     def get_device_type(self):
         logger.warning("Nnp4xx not support get device type")
