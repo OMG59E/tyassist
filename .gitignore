@@ -65,3 +65,12 @@ outputs/
 # Python type checking
 .mypy_cache/
 .pyre/
+*.onnx
+*.ty
+*.lst
+*.txt
+*.bin
+*.npy
+*.json
+*.tflite
+*.pt
