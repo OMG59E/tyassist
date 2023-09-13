@@ -75,7 +75,7 @@ def check_config(cfg, phase="build"):
         logger.error("target({}) not in {}".format(target, target_lists))
         return False
 
-    if target.startswith("nnp4") and framework not in ["onnx", "onnx-qnn"]:
+    if target.startswith("nnp4") and framework not in ["onnx", "onnx-qnn", "mxmet"]:
         logger.error("tytvm only support [onnx, onnx-qnn] framework")
         return False
 
