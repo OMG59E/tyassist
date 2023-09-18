@@ -172,22 +172,14 @@ def check_config(cfg, phase="build"):
             logger.error("pixel_format({}) must be in {}".format(pixel_format, pixel_format_lists))
             return False
 
-        if layout == "None":
-            if pixel_format != "None":
-                logger.error("If layout is None, the pixel format must be None")
-                return False
-            return True
-
         if "shape" not in _input:
             logger.error("shape must be in cfg[model][inputs]")
             return False
 
-        if "dtype" in _input:
-            dtype = _input["dtype"]
-            dype_lists = ["uint8", "float32", "int16", "float16"]
-            if dtype not in dype_lists:
-                logger.error("dtype({}) must be in {}".format(dtype, dype_lists))
-                return False
+        shape = _input["shape"]
+        if layout in ["NCHW", "NHWC"] and len(shape) != 4:
+            logger.error("input shape error")
+            return False
 
         if "mean" not in _input:
             logger.error("mean must be in cfg[model][inputs]")
@@ -196,6 +188,43 @@ def check_config(cfg, phase="build"):
         if "std" not in _input:
             logger.error("std must be in cfg[model][inputs]")
             return False
+
+        norm_axis = 1
+        if "norm_axis" in _input:
+            if _input["norm_axis"] is None:
+                logger.error("norm_axis is None")
+                return False
+            norm_axis = 1
+
+        if norm_axis >= len(shape):
+            logger.error("norm_axis out of range")
+            return False
+
+        dim = shape[norm_axis]
+        mean = _input["mean"]
+        std = _input["std"]
+        if mean is not None:
+            if 1 < len(mean) != dim:
+                logger.error("num_mean > 1, input channel must be equal num_mean")
+                return False
+
+        if std is not None:
+            if 1 < len(std) != dim:
+                logger.error("num_std > 1, input channel must be equal num_std")
+                return False
+
+        if "dtype" in _input:
+            dtype = _input["dtype"]
+            dtype_lists = ["uint8", "float32", "int16", "float16"]
+            if dtype not in dtype_lists:
+                logger.error("dtype({}) must be in {}".format(dtype, dtype_lists))
+                return False
+
+        if layout == "None":
+            if pixel_format != "None":
+                logger.error("If layout is None, the pixel format must be None")
+                return False
+            return True
 
         if "resize_type" not in _input:
             logger.error("resize_type must be in cfg[model][inputs]")
@@ -217,34 +246,6 @@ def check_config(cfg, phase="build"):
         resize_type_lists = [0, 1]
         if resize_type not in resize_type_lists:
             logger.error("resize_type({}) must be in {}".format(resize_type, resize_type_lists))
-            return False
-
-        shape = _input["shape"]
-        if len(shape) != 4:
-            logger.error("input dim must be equal 4")
-            return False
-
-        n, c, h, w = shape
-        if _input["layout"] == "NHWC":
-            n, h, w, c = shape
-
-        mean = _input["mean"]
-        std = _input["std"]
-        if mean is None:
-            # mean = [0.0 for _ in range(c)]
-            pass
-        else:
-            if len(mean) == 1:
-                mean = [mean[0] for _ in range(c)]
-        if std is None:
-            # std = [1.0 for _ in range(c)]
-            pass
-        else:
-            if len(std) == 1:
-                std = [std[0] for _ in range(c)]
-
-        if c != len(mean) or c != len(std) or len(mean) != len(std):
-            logger.error("input channel must be equal len(mean/std)")
             return False
 
         padding_mode = _input["padding_mode"]

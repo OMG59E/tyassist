@@ -125,22 +125,29 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
 
     def set_input_infos(self):
         for idx, _input in enumerate(self.inputs):
+            shape = _input["shape"]
+            if "norm_axis" not in _input:
+                _input["norm_axis"] = 1
+            dim = shape[_input["norm_axis"]]
+            if not _input["mean"]:
+                _input["mean"] = None
+            elif len(_input["mean"]) == 1:
+                _input["mean"] = [0.0 for _ in range(dim)]
+            if not _input["std"]:
+                _input["std"] = None
+            elif len(_input["std"]) == 1:
+                _input["std"] = [1.0 for _ in range(dim)]
 
             if _input["layout"] != "None":
                 assert _input["layout"] in ["NCHW", "NHWC"]
-                shape = _input["shape"]
                 n, c, h, w = shape
                 if _input["layout"] == "NHWC":
                     n, h, w, c = shape
                 self.shape_dict[_input["name"]] = (n, c, h, w)
-                if not _input["mean"]:
-                    _input["mean"] = [0.0 for _ in range(c)]
-                if not _input["std"]:
-                    _input["std"] = [1.0 for _ in range(c)]
             else:
-                self.shape_dict[_input["name"]] = _input["shape"]
+                self.shape_dict[_input["name"]] = shape
 
-            self.bs = _input["shape"][0]
+            self.bs = shape[0]
 
             if "dtype" not in _input:
                 if _input["pixel_format"] == "None" or _input["layout"] == "None":
@@ -378,7 +385,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             # 与最终量化后的模型输入数据类型相对应
             in_dtypes[name] = data_type
             if _input["layout"] in ["NCHW", "NHWC"]:
-                norm[name] = {"mean": _input["mean"], "std": _input["std"], "axis": 1}
+                norm[name] = {"mean": _input["mean"], "std": _input["std"], "axis": _input["norm_axis"]}
                 logger.info("The input({}) dtype -> {}".format(name, in_dtypes[name]))
                 logger.info("The input({}) mean/std -> {}".format(name, norm[name]))
 

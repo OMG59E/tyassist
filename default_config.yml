@@ -20,26 +20,38 @@ model: {
   # 目前不能分别设置多个输入的NHWC->NCHW的转换, 必须相同
   inputs: [
     {
-      name: ,  # 输入名称
-      shape: , # 原模型输入形状
-      layout: ,  # 输入数据布局，支持NCHW/NHWC/None, None表示非4维情况, 默认NCHW, 当为None时pixel_format必须为None
+      # 输入名称
+      name: , 
+      # 原模型输入形状 
+      shape: , 
+      # 输入数据布局，支持NCHW/NHWC/None, None表示非4维情况, 默认NCHW, 当为None时pixel_format必须为None
+      layout: ,  
       # 输入数据像素格式，支持 None(未知)/RGB/BGR/GRAY, 设置为None时且不使用随机数据的情况下必须配置自定义处理模块
       # None表示非图片数据，RGB/BGR/GRAY表示图片数据
       pixel_format: ,
       # 模型原始输入数据类型(预处理之前)，支持数据类型uint8, float32, int16, float16
       # 可缺省, 缺省情况下，若输入为图片数据则为uint8, 否则为float32
       dtype: "",
-      mean: [ 0.0, 0.0, 0.0 ],   # 输入均值，留空表示为0，也可缺省，支持broadcast
-      std: [ 1.0, 1.0, 1.0 ],   # 输入方差，留空表示为1，也可缺省，支持broadcast
-      resize_type: 0,   # resize类型，0-长宽分别resize，1-长边等比例resize
-      padding_value: 128,  # resize图像不足部分将自动padding，仅等比例resize生效
-      padding_mode: 1,  # 目前仅支持：0-左上角(LEFT_TOP), 1-中心点(CENTER)，仅等比例resize生效
-      data_path: ,  # 用于比较各阶段输出的相似度，空表示采用随机数，默认随机数，可缺省
+      # 输入均值，可空，仅当num_mean=1时，支持broadcast
+      mean: [ 0.0, 0.0, 0.0 ],
+      # 输入方差，可空，仅当num_std=1时，支持broadcast
+      std: [ 1.0, 1.0, 1.0 ],
+      # 沿着axis进行norm, 缺省表示1
+      norm_axis: 1,
+      # resize类型，0-长宽分别resize，1-长边等比例resize，输入为图像数据生效
+      resize_type: 0,
+      # resize图像不足部分将自动padding，仅等比例resize，且输入为图像数据生效
+      padding_value: 128,
+      # 目前仅支持：0-左上角(LEFT_TOP), 1-中心点(CENTER)，仅等比例resize，且输入为图像数据生效
+      padding_mode: 1,
+      # 用于比较各阶段输出的相似度，空表示采用随机数，默认随机数，可缺省 
+      data_path: ,
       # 表示是否使能aipp，内置输入预处理，效率更高, 建议缺省或留空
       # 可缺省或留空，默认为true，true的情况下工具推断能否使能
-      # 以下两种情况true无效
-      # 1.非图像数据即pixel_format为None时，强制为false
-      # 2.非uint8图像时，强制为false
+      # 以下情况true无效
+      # 1. 非图像数据即pixel_format为None时，强制为false
+      # 2. 非uint8图像时，强制为false
+      # 3. 对于nnp400无效
       enable_aipp: true,
     }
   ],
