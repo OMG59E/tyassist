@@ -384,10 +384,9 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 exit(-1)
             # 与最终量化后的模型输入数据类型相对应
             in_dtypes[name] = data_type
-            if _input["layout"] in ["NCHW", "NHWC"]:
-                norm[name] = {"mean": _input["mean"], "std": _input["std"], "axis": _input["norm_axis"]}
-                logger.info("The input({}) dtype -> {}".format(name, in_dtypes[name]))
-                logger.info("The input({}) mean/std -> {}".format(name, norm[name]))
+            norm[name] = {"mean": _input["mean"], "std": _input["std"], "axis": _input["norm_axis"]}
+            logger.info("The input({}) dtype -> {}".format(name, in_dtypes[name]))
+            logger.info("The input({}) mean/std -> {}".format(name, norm[name]))
 
         import tvm
         from tvm import relay
