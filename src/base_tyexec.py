@@ -128,14 +128,15 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             shape = _input["shape"]
             if "norm_axis" not in _input:
                 _input["norm_axis"] = 1
-            dim = shape[_input["norm_axis"]]
             if not _input["mean"]:
                 _input["mean"] = None
             elif len(_input["mean"]) == 1:
+                dim = shape[_input["norm_axis"]]
                 _input["mean"] = [0.0 for _ in range(dim)]
             if not _input["std"]:
                 _input["std"] = None
             elif len(_input["std"]) == 1:
+                dim = shape[_input["norm_axis"]]
                 _input["std"] = [1.0 for _ in range(dim)]
 
             if _input["layout"] != "None":
