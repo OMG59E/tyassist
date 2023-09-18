@@ -62,7 +62,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 # 此配置仅在 dataset 配置为图片集路径（即使用云天自带的预处理），且输入为3通道时有效，对生成芯片模型无效
                 rgb_en=1 if (self.num_inputs == 1 and self.inputs[0]["pixel_format"] == "RGB") else 0,
                 # 均值方差，对生成芯片模型生效
-                norm=norm,
+                norm=norm if len(norm) > 0 else None,
                 # 量化配置
                 quantize_config=quantize_config,
                 # 用来进行相似度以及相关量化效果确认

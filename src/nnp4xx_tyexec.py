@@ -189,7 +189,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 dataset=self.get_dataset(),
                 prof_img_num=self.prof_img_num,
                 rgb_en=1 if (self.num_inputs == 1 and self.inputs[0]["pixel_format"] == "RGB") else 0,
-                norm=norm,
+                norm=norm if len(norm) > 0 else None,
                 quantize_config=quantize_config,
                 debug_level=self.quant_cfg["debug_level"],
                 similarity_img_num=self.quant_cfg["similarity_img_num"],
