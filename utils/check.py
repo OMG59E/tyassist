@@ -207,10 +207,18 @@ def check_config(cfg, phase="build"):
             if 1 < len(mean) != dim:
                 logger.error("num_mean > 1, input channel must be equal num_mean")
                 return False
+        else:
+            if std:
+                logger.error("mean is None, std must be = None")
+                return False
 
         if std is not None:
             if 1 < len(std) != dim:
                 logger.error("num_std > 1, input channel must be equal num_std")
+                return False
+        else:
+            if std:
+                logger.error("std is None, mean must be = None")
                 return False
 
         if "dtype" in _input:
