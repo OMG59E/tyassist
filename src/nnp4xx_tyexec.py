@@ -329,11 +329,11 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         outputs = infer.run(in_datas, to_file=True)
         infer.unload()
         ave_latency_ms = infer.ave_latency_ms
-        # 清理profile输出
-        if os.path.exists(infer.profile_dir):
-            import shutil
-            shutil.rmtree(infer.profile_dir, ignore_errors=True)
-        logger.info("[{}] average cost: {:.3f}ms".format(self.target, ave_latency_ms))
+        # # 清理profile输出
+        # if os.path.exists(infer.profile_dir):
+        #     import shutil
+        #     shutil.rmtree(infer.profile_dir, ignore_errors=True)
+        logger.info("[{}] python infer average cost: {:.3f}ms".format(self.target, ave_latency_ms))
         return outputs
 
     def iss_dump_output(self, in_datas):
@@ -445,6 +445,9 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         logger.warning("Not support save relay to model, can be visualized by netron")
 
     def compare_layerwise(self):
+        """
+        onnx-float vs tvm-float vs tvm-fixed vs iss-fixed
+        """
         data_float = self.get_datas(force_float=True, force_cr=True, to_file=True)  # 浮点模型输入
         data_fixed = self.get_datas(force_float=False, force_cr=True, to_file=True)  # 量化后模型输入
 
@@ -462,24 +465,28 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         relay_float = callback(relay_float)
         tvm_float_lib = compile_cpuref_model(relay_float, params=None)
         span_infos = get_available_graph_spans(tvm_float_lib)
-        for term in span_infos:
-            logger.info(term)
-
-        # 这些span名为示例要比对的中间层名字
-        span_keys = list()
-        for span_info in span_infos:
-            if span_info["name"] not in span_keys:
-                span_keys.append(span_info["name"])
 
         # onnx
         model = onnx.shape_inference.infer_shapes(onnx.load(self.weight))
+        ops_kv = dict()
         for node in model.graph.node:
             logger.info("op_names: {}, output_names: {}".format(node.name, node.output))
             for output in node.output:
+                ops_kv[node.name] = node.output
                 model.graph.output.insert(-1, onnx.ValueInfoProto(name=output))
         ort_session = onnxruntime.InferenceSession(model.SerializeToString())
 
-        outputs = [x.name for x in ort_session.get_outputs()]
+        spans_kv = dict()
+        for span_info in span_infos:
+            logger.info(span_info)
+            if span_info["name"] not in spans_kv:
+                assert span_info["name"] in ops_kv
+                spans_kv[span_info["name"]] = ops_kv[span_info["name"]]  # opname
+                
+        outputs = list()
+        for output in ort_session.get_outputs():
+            if output.name not in outputs:
+                outputs.append(output.name)
         ort_outs = ort_session.run(outputs, data_float)
         ort_outs = OrderedDict(zip(outputs, ort_outs))
 
@@ -495,7 +502,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         build_config_nnp = get_method("tvm.contrib.{}".format(self.logo_module), "build_config_nnp")
         optimize_nnp_model = get_method("tvm.contrib.{}".format(self.logo_module), "optimize_nnp_model")
         with build_config_nnp(opt_level=self.build_opt_level):
-            fuse_mod, fuse_params = optimize_nnp_model(relay_quant, None, tvm.target.edgex())
+            fuse_mod, fuse_params = optimize_nnp_model(relay_quant, None, tvm.target.fuxiao())
         fuse_lib = compile_cpuref_model(fuse_mod, params=fuse_params)
         _, _, _, fuse_outputs = layerwise_error.run(fuse_lib, inputs=data_fixed)
 
@@ -507,7 +514,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         # 绘制比对表格
         summary = []
         for key in ort_outs:
-            onnx_data = ort_outs[key]
+            onnx_data = ort_outs[key]  # output_name
 
             def compare(key, expect, outputs):
                 if key not in outputs:

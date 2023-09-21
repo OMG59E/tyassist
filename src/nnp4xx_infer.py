@@ -6,6 +6,7 @@
 @Author  : xingwg
 @software: PyCharm 
 """
+import time
 import os
 import pickle
 import uuid
@@ -54,6 +55,8 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
         if not os.path.exists(self.profile_dir):
             os.makedirs(self.profile_dir)
 
+        self.total_span_ms = 0
+
     def load(self, model_path):
         self.result_dir = os.path.join(os.path.dirname(model_path), "result")
         self.dump_root_path = os.path.join(self.result_dir, "chip_dump_out")
@@ -75,10 +78,10 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
 
             self.engine = dcl.CNetOperator()
 
-            if self.backend != "sdk_iss":
-                if not self.engine.profile(Nnp4xxProfileTypeEnum.DCL_PROF_DCL_API, self.profile_dir):  # profile
-                    logger.error("Failed to set profile")
-                    exit(-1)
+            # if self.backend != "sdk_iss":
+            #     if not self.engine.profile(Nnp4xxProfileTypeEnum.DCL_PROF_DCL_API, self.profile_dir):  # profile
+            #         logger.error("Failed to set profile")
+            #         exit(-1)
 
             logger.info("load model " + model_path)
             if not self.engine.load(model_path, self.enable_dump, self.dump_root_path):
@@ -92,7 +95,9 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
     def run(self, in_datas: dict or list, to_file=False):
         if isinstance(in_datas, dict):
             in_datas = [in_datas[key] for key in in_datas]  # to list
+        t_start = time.time()
         outputs = self.engine.inference(in_datas)
+        self.total_span_ms += (time.time() - t_start) * 1000
         self.total += 1
 
         if self.enable_dump:
@@ -182,24 +187,25 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
 
     @property
     def ave_latency_ms(self):
-        if self.backend == "sdk_iss" or self.enable_dump or self.total == 0:
-            return 0
-
-        profile_file = self.find_model_prof_bin()
-        if not os.path.exists(profile_file):
-            logger.error("Not found profile file -> {}".format(profile_file))
-            exit(-1)
-
-        try:
-            import python.pydcl as dcl
-            profile_json = dcl.parse_dcl_api(profile_file)
-            profile = json.loads(profile_json)
-            total_time = profile["dclmdlExecute"] / 10**6 / self.total
-            return total_time
-
-        except Exception as e:
-            logger.error("Failed to parse profile -> {}\n{}".format(e, traceback.format_exc()))
-            exit(-1)
+        return self.total_span_ms / self.total
+        # if self.backend == "sdk_iss" or self.enable_dump or self.total == 0:
+        #     return 0
+        #
+        # profile_file = self.find_model_prof_bin()
+        # if not os.path.exists(profile_file):
+        #     logger.error("Not found profile file -> {}".format(profile_file))
+        #     exit(-1)
+        #
+        # try:
+        #     import python.pydcl as dcl
+        #     profile_json = dcl.parse_dcl_api(profile_file)
+        #     profile = json.loads(profile_json)
+        #     total_time = profile["dclmdlExecute"] / 10**6 / self.total
+        #     return total_time
+        #
+        # except Exception as e:
+        #     logger.error("Failed to parse profile -> {}\n{}".format(e, traceback.format_exc()))
+        #     exit(-1)
 
 
 class Nnp4xxTvmInfer(Nnp3xxTvmInfer, ABC):
