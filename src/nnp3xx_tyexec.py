@@ -479,7 +479,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
 
     def _rename(self):
         import shutil
-        src = os.path.join(self.model_dir, "{}.bin".format(self.model_name))
+        src = os.path.join(self.model_dir, "net_combine.bin")
         if not os.path.exists(src):
             logger.error("Not found netbin_file -> {}".format(src))
             exit(-1)
