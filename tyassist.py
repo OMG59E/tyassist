@@ -188,8 +188,8 @@ def compare2(cfg, target, data_dir):
             from src.nnp3xx_infer import Nnp3xxSdkInfer, Nnp3xxTvmInfer
             tvm_fp32_infer = Nnp3xxTvmInfer()
             tvm_int8_infer = Nnp3xxTvmInfer()
-            tvm_fp32_infer.load(tyexec.original_json_path)
-            tvm_int8_infer.load(tyexec.quant_json_path)
+            tvm_fp32_infer.load_json(tyexec.original_json_path)
+            tvm_int8_infer.load_json(tyexec.quant_json_path)
         else:
             logger.error("Not support target -> {}".format(target))
             exit(-1)

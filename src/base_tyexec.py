@@ -252,7 +252,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 if data_paths is None:
                     data_paths = ""
                 assert isinstance(data_paths, str)
-                logger.warning("data_path will be reused")
+                if self.bs > 1:
+                    logger.warning("data_path will be reused")
                 data_paths = [data_paths for _ in range(self.bs)]
 
             shape_s = "x".join(list(map(str, shape)))
