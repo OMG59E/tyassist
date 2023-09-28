@@ -190,7 +190,6 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
                     op_type = op["type"]
                     assert op_type in [0, 1]
                     if op_type == 1:
-                        print(op_name, op["gap_time"])
                         if op_name not in cpu_ops:
                             cpu_ops[op_name] = op["gap_time"]
                         else:
