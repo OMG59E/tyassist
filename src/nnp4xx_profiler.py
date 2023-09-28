@@ -67,7 +67,7 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
 
             self.engine = dcl.CNetOperator()
 
-            if not self.engine.profile(Nnp4xxProfileTypeEnum.DCL_PROF_AICORE_METRICS | Nnp4xxProfileTypeEnum.DCL_PROF_DCL_API, self.profile_dir):  # profile
+            if not self.engine.profile(Nnp4xxProfileTypeEnum.DCL_PROF_AICORE_METRICS | Nnp4xxProfileTypeEnum.DCL_PROF_AICPU, self.profile_dir):  # profile
                 logger.error("Failed to set profile")
                 exit(-1)
 
@@ -156,6 +156,7 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
                     continue
                 func_name = node["attrs"]["func_name"]
                 if func_name.startswith("__"):
+                    logger.warning("{}".format(func_name))
                     continue
                 key = func_name.split("_")[0]
                 idx = int(key.replace("f", ""))
@@ -175,9 +176,10 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             total_exec_cycles = 0
             total_gap_cycles = 0
             total_time = 0  # ns
+            cpu_ops = dict()
             for p in profile:
-                total_exec_cycles += p["total_exec_time"]
-                total_gap_cycles += p["total_gap_time"]
+                total_exec_cycles += p["total_exec_cycles"]
+                total_gap_cycles += p["total_gap_cycles"]
                 total_time += p["total_time"]
                 ops = p["ops"]
                 for idx in op_names:
@@ -185,6 +187,14 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
                     if idx >= len(ops):
                         continue
                     op = ops[idx]
+                    op_type = op["type"]
+                    assert op_type in [0, 1]
+                    if op_type == 1:
+                        print(op_name, op["gap_time"])
+                        if op_name not in cpu_ops:
+                            cpu_ops[op_name] = op["gap_time"]
+                        else:
+                            cpu_ops[op_name] += op["gap_time"]
                     exec_cycles = op["exec_cycles"]
                     gap_cycles = op["gap_cycles"]
                     ddr_read_bytes = op["ddr_read_bytes"]
@@ -206,6 +216,7 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
                         total_op_ddr_read_cycles[op_name] = ddr_read_cycles
                         total_op_ddr_write_cycles[op_name] = ddr_write_cycles
 
+            mean_total_time = 0
             for idx in op_names:
                 op_name = op_names[idx]
                 if op_name not in total_op_exec_cycles:
@@ -220,10 +231,12 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
                 mac_num = 0
                 ddr_read_span = mean_op_ddr_read_cycles * 10**-3 / self.targets[self.target]
                 ddr_write_span = mean_op_ddr_write_cycles * 10**-3 / self.targets[self.target]
-                ddr_read_bw = mean_op_ddr_read_bytes * 1000 / ddr_read_span / 1024**3  # GB/s
-                ddr_write_bw = mean_op_ddr_write_bytes * 1000 / ddr_write_span / 1024**3  # GB/s
+                ddr_read_bw = 0 if ddr_read_span == 0 else mean_op_ddr_read_bytes * 1000 / ddr_read_span / 1024**3 # GB/s
+                ddr_write_bw = 0 if ddr_read_span == 0 else mean_op_ddr_write_bytes * 1000 / ddr_write_span / 1024**3  # GB/s
                 mean_op_exec_span = mean_op_exec_cycles * 10**-3 / self.targets[self.target]  # ms
-                mean_op_gap_span = mean_op_gap_cycles * 10**-3 / self.targets[self.target]  # ms
+                mean_op_gap_span = cpu_ops[op_name] / num_iter if op_name in cpu_ops \
+                    else mean_op_gap_cycles * 10**-3 / self.targets[self.target]  # ms
+                mean_total_time += mean_op_gap_span
                 table.add_row([
                     idx,
                     op_name,
@@ -240,11 +253,12 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
 
             mean_total_exec_cycles = int(total_exec_cycles / num_iter)
             mean_total_gap_cycles = int(total_gap_cycles / num_iter)
-            mean_total_time = int(total_time / num_iter)  # ns
-            logger.info("NumIter: {}, Exec Span: {:.3f}ms, Gap Span: {:.3f}ms".format(
+            # mean_total_time = int(total_time / num_iter)  # ns
+            logger.info("NumIter: {}, SW Exec Span: {:.3f}ms, SW Gap Span: {:.3f}ms, Total Span: {:.3f}ms".format(
                 num_iter,
                 mean_total_exec_cycles * 10**-3 / self.targets[self.target],
                 mean_total_gap_cycles * 10**-3 / self.targets[self.target],
+                mean_total_time,
             ))
             # logger.info("[{}] average cost: {:.3f}ms".format(self.target, ave_latency_ms))
 
