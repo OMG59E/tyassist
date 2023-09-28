@@ -147,24 +147,19 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             with open(os.path.join(self.result_dir, "profile.json"), "w") as f:
                 f.write(profile_json)
 
-            op_names = dict()
             with open(graph_json, "r") as f:
                 graph = json.load(f)
             nodes = graph["nodes"]
+
+            op_names = list()
             for node in nodes:
                 if node["op"] != "tvm_op":
                     continue
                 func_name = node["attrs"]["func_name"]
-                if func_name.startswith("__"):
-                    logger.warning("{}".format(func_name))
-                    continue
-                key = func_name.split("_")[0]
-                idx = int(key.replace("f", ""))
-                op_names[idx] = func_name
+                op_names.append(func_name)
 
             from prettytable import PrettyTable
-            header = ["Id", "OpName", "MAC.", "DDR/R(GB/s)", "DDR/W(GB/s)", "Exec Cycles", "Gap Cycles",
-                      "Exec Span/ms", "Gap Span/ms"]
+            header = ["Id", "OpName", "Device", "MAC.", "DDR/R(GB/s)", "DDR/W(GB/s)", "Exec Cycles", "Gap Cycles", "Exec Span/ms", "Gap Span/ms"]
             table = PrettyTable(header)
             num_iter = len(profile)
             total_op_exec_cycles = dict()
@@ -182,10 +177,8 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
                 total_gap_cycles += p["total_gap_cycles"]
                 total_time += p["total_time"]
                 ops = p["ops"]
-                for idx in op_names:
-                    op_name = op_names[idx]
-                    if idx >= len(ops):
-                        continue
+                assert len(ops) == len(op_names)
+                for idx, op_name in enumerate(op_names):
                     op = ops[idx]
                     op_type = op["type"]
                     assert op_type in [0, 1]
@@ -216,11 +209,7 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
                         total_op_ddr_write_cycles[op_name] = ddr_write_cycles
 
             mean_total_time = 0
-            for idx in op_names:
-                op_name = op_names[idx]
-                if op_name not in total_op_exec_cycles:
-                    logger.warning("idx: {}, op_name: {}, maybe it`s cpu op, will be skip".format(idx, op_name))
-                    continue
+            for idx, op_name in enumerate(op_names):
                 mean_op_exec_cycles = int(total_op_exec_cycles[op_name] / num_iter)
                 mean_op_gap_cycles = int(total_op_gap_cycles[op_name] / num_iter)
                 mean_op_ddr_read_cycles = int(total_op_ddr_read_cycles[op_name] / num_iter)
@@ -230,15 +219,15 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
                 mac_num = 0
                 ddr_read_span = mean_op_ddr_read_cycles * 10**-3 / self.targets[self.target]
                 ddr_write_span = mean_op_ddr_write_cycles * 10**-3 / self.targets[self.target]
-                ddr_read_bw = 0 if ddr_read_span == 0 else mean_op_ddr_read_bytes * 1000 / ddr_read_span / 1024**3 # GB/s
-                ddr_write_bw = 0 if ddr_read_span == 0 else mean_op_ddr_write_bytes * 1000 / ddr_write_span / 1024**3  # GB/s
+                ddr_read_bw = 0 if ddr_read_span == 0 else (mean_op_ddr_read_bytes * 1000 / ddr_read_span / 1024**3) # GB/s
+                ddr_write_bw = 0 if ddr_read_span == 0 else (mean_op_ddr_write_bytes * 1000 / ddr_write_span / 1024**3)  # GB/s
                 mean_op_exec_span = mean_op_exec_cycles * 10**-3 / self.targets[self.target]  # ms
-                mean_op_gap_span = cpu_ops[op_name] / num_iter if op_name in cpu_ops \
-                    else mean_op_gap_cycles * 10**-3 / self.targets[self.target]  # ms
+                mean_op_gap_span = (cpu_ops[op_name] / num_iter) if op_name in cpu_ops else (mean_op_gap_cycles * 10**-3 / self.targets[self.target])  # ms
                 mean_total_time += mean_op_gap_span
                 table.add_row([
                     idx,
                     op_name,
+                    "NPU" if op_name not in cpu_ops else "CPU",
                     mac_num,
                     "{:.3f}".format(ddr_read_bw),
                     "{:.3f}".format(ddr_write_bw),
