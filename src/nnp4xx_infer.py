@@ -39,8 +39,19 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
 
         with open(self.sdk_cfg_file) as f:
             cfg = json.load(f)
-        # self.profile_dir = cfg["profiler"]["host_output"]
-        self.ip = cfg["node_cfg"]["devices"][0]["nodes"][0]["clients"]["dcl"]["targetId"]
+
+        connect_type = cfg["node_cfg"]["connect"]
+        devices = cfg["node_cfg"]["devices"]
+        if connect_type in ["socket", "usb"]:
+            pass
+        elif connect_type == "pcie":
+            pass
+        else:
+            logger.error("Not support connect type")
+            exit(-1)
+
+        nodes = devices[0]["nodes"]
+        self.ip = nodes[0]["clients"]["dcl"]["targetId"]
         self.backend = "chip"
         if self.ip == "127.0.0.1":   # TODO 非127.0.0.1的地址也可能是ISS服务
             self.backend = "sdk_iss"
