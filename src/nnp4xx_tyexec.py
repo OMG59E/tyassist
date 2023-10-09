@@ -25,8 +25,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         super(Nnp4xxTyExec, self).__init__(cfg)
 
         self.fused_json_path = os.path.join(self.result_dir, "model_fused.json")
-        self.model_path_x86_64 = os.path.join(self.model_dir, "{}_x86_64.ty".format(self.model_name))
-        self.model_path_aarch64 = os.path.join(self.model_dir, "{}_aarch64.ty".format(self.model_name))
+        self.model_path_x86_64 = os.path.join(self.model_dir, "{}_O{}_x86_64.ty".format(self.model_name, self.build_opt_level))
+        self.model_path_aarch64 = os.path.join(self.model_dir, "{}_O{}_aarch64.ty".format(self.model_name, self.build_opt_level))
         self.custom_op_module = self.cfg["model"].get("custom_op_module")
 
         ARM_C_COMPILER = os.getenv("ARM_C_COMPILER")
@@ -284,6 +284,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             config = {
                 "tir.{}.EstimateCost.enable".format(self.logo_module): True,  #
                 "tir.{}.CalculateMac.enable".format(self.logo_module): True,  #
+                # "relay.{}.byoa".format(self.logo_module): False,
             }
             if self.cfg["build"].get("multi_thread"):
                 config["edgex.relay_to_tir.compile_thread"] = self.cfg["build"].get("multi_thread")
