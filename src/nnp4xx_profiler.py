@@ -152,11 +152,14 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             nodes = graph["nodes"]
 
             op_names = list()
+            op_macs = list()
             for node in nodes:
                 if node["op"] != "tvm_op":
                     continue
                 func_name = node["attrs"]["func_name"]
+                nnp_macs = node["attrs"].get("nnp_macs", "0")
                 op_names.append(func_name)
+                op_macs.append(nnp_macs)
 
             from prettytable import PrettyTable
             header = ["Id", "OpName", "Device", "MAC.", "DDR/R(GB/s)", "DDR/W(GB/s)", "Exec Cycles", "Gap Cycles", "Exec Span/ms", "Gap Span/ms"]
@@ -216,7 +219,7 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
                 mean_op_ddr_write_cycles = int(total_op_ddr_write_cycles[op_name] / num_iter)
                 mean_op_ddr_read_bytes = int(total_op_ddr_read_bytes[op_name] / num_iter)
                 mean_op_ddr_write_bytes = int(total_op_ddr_write_bytes[op_name] / num_iter)
-                mac_num = 0
+                mac_num = op_macs[idx]
                 ddr_read_span = mean_op_ddr_read_cycles * 10**-3 / self.targets[self.target]
                 ddr_write_span = mean_op_ddr_write_cycles * 10**-3 / self.targets[self.target]
                 ddr_read_bw = 0 if ddr_read_span == 0 else (mean_op_ddr_read_bytes * 1000 / ddr_read_span / 1024**3) # GB/s
