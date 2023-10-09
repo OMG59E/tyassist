@@ -1,5 +1,5 @@
 # encoding=utf-8
-from tvm.contrib.fuxiao.relay import CUSTOM_OP, CustomCpuExternOp
+from tvm.contrib.edgex.relay import CUSTOM_OP, CustomCpuExternOp
 
 
 # 继承 CustomCpuExternOp，实现到外部函数的绑定
