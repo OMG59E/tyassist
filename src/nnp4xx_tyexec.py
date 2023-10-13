@@ -247,7 +247,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             from tvm.relay import build
 
             cpu_target = tvm.target.Target("llvm")
-            with tvm.transform.PassContext(opt_level=3):
+            with tvm.transform.PassContext(opt_level=0):
                 cpu_lib = build(relay_func, target=cpu_target, params=params)
             cpu_lib = Nnp4xxTyExec.compile_extern_lib(relay_func, cpu_lib, save_path)
             # if save_path:
@@ -284,10 +284,11 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             config = {
                 "tir.{}.EstimateCost.enable".format(self.logo_module): True,  #
                 "tir.{}.CalculateMac.enable".format(self.logo_module): True,  #
+                "{}.relay_to_tir.collect_lower_errors".format(self.logo_module): False,
                 # "relay.{}.byoa".format(self.logo_module): False,
             }
             if self.cfg["build"].get("multi_thread"):
-                config["edgex.relay_to_tir.compile_thread"] = self.cfg["build"].get("multi_thread")
+                config["{}.relay_to_tir.compile_thread".format(self.logo_module)] = self.cfg["build"].get("multi_thread")
             num_cube = self.cfg["build"].get("num_cube")
             if num_cube:
                 assert num_cube in [1, 2, 3]
