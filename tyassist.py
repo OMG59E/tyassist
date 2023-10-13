@@ -58,6 +58,7 @@ def get_tyexec(cfg):
 
 def build(cfg):
     try:
+        t_start = time.time()
         logger.info("{}".format(cfg))
         tyexec = get_tyexec(cfg)
         tyexec.set_env()
@@ -98,6 +99,7 @@ def build(cfg):
         table.add_row(["iss_simu", "{:.3f}".format(tyexec.iss_simu_span)])
         table.add_row(["tvm_layerwise_dump", "{:.3f}".format(tyexec.tvm_layerwise_dump_span)])
         table.add_row(["iss_layerwise_dump", "{:.3f}".format(tyexec.iss_layerwise_dump_span)])
+        table.add_row(["total", "{:.3f}".format(time.time() - t_start)])
         logger.info("\n{}".format(table))
 
         # 计算相似度
