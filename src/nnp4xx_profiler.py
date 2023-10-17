@@ -165,12 +165,14 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             header = ["Id", "OpName", "Device", "MAC.", "DDR/R(GB/s)", "DDR/W(GB/s)", "Exec Cycles", "Gap Cycles", "Exec Span/ms", "Gap Span/ms"]
             table = PrettyTable(header)
             num_iter = len(profile)
-            total_op_exec_cycles = dict()
-            total_op_gap_cycles = dict()
-            total_op_ddr_read_bytes = dict()
-            total_op_ddr_write_bytes = dict()
-            total_op_ddr_read_cycles = dict()
-            total_op_ddr_write_cycles = dict()
+            total_op_exec_cycles = list()
+            total_op_gap_cycles = list()
+            total_op_ddr_read_bytes = list()
+            total_op_ddr_write_bytes = list()
+            total_op_ddr_read_cycles = list()
+            total_op_ddr_write_cycles = list()
+            total_op_gap_time = list()
+            op_types = list()
             total_exec_cycles = 0
             total_gap_cycles = 0
             total_time = 0  # ns
@@ -185,52 +187,52 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
                     op = ops[idx]
                     op_type = op["type"]
                     assert op_type in [0, 1]
-                    if op_type == 1:
-                        if op_name not in cpu_ops:
-                            cpu_ops[op_name] = op["gap_time"]
-                        else:
-                            cpu_ops[op_name] += op["gap_time"]
                     exec_cycles = op["exec_cycles"]
                     gap_cycles = op["gap_cycles"]
+                    gap_time = op["gap_time"]
                     ddr_read_bytes = op["ddr_read_bytes"]
                     ddr_write_bytes = op["ddr_write_bytes"]
                     ddr_read_cycles = op["ddr_read_cycles"]
                     ddr_write_cycles = op["ddr_write_cycles"]
-                    if op_name in total_op_exec_cycles:
-                        total_op_exec_cycles[op_name] += exec_cycles
-                        total_op_gap_cycles[op_name] += gap_cycles
-                        total_op_ddr_read_bytes[op_name] += ddr_read_bytes
-                        total_op_ddr_write_bytes[op_name] += ddr_write_bytes
-                        total_op_ddr_read_cycles[op_name] += ddr_read_cycles
-                        total_op_ddr_write_cycles[op_name] += ddr_write_cycles
+
+                    if len(total_op_exec_cycles) > idx:
+                        total_op_exec_cycles[idx] += exec_cycles
+                        total_op_gap_cycles[idx] += gap_cycles
+                        total_op_ddr_read_bytes[idx] += ddr_read_bytes
+                        total_op_ddr_write_bytes[idx] += ddr_write_bytes
+                        total_op_ddr_read_cycles[idx] += ddr_read_cycles
+                        total_op_ddr_write_cycles[idx] += ddr_write_cycles
+                        total_op_gap_time[idx] += gap_time
                     else:
-                        total_op_exec_cycles[op_name] = exec_cycles
-                        total_op_gap_cycles[op_name] = gap_cycles
-                        total_op_ddr_read_bytes[op_name] = ddr_read_bytes
-                        total_op_ddr_write_bytes[op_name] = ddr_write_bytes
-                        total_op_ddr_read_cycles[op_name] = ddr_read_cycles
-                        total_op_ddr_write_cycles[op_name] = ddr_write_cycles
+                        op_types.append(op_type)
+                        total_op_exec_cycles.append(exec_cycles)
+                        total_op_gap_cycles.append(gap_cycles)
+                        total_op_ddr_read_bytes.append(ddr_read_bytes)
+                        total_op_ddr_write_bytes.append(ddr_write_bytes)
+                        total_op_ddr_read_cycles.append(ddr_read_cycles)
+                        total_op_ddr_write_cycles.append(ddr_write_cycles)
+                        total_op_gap_time.append(gap_time)
 
             mean_total_time = 0
             for idx, op_name in enumerate(op_names):
-                mean_op_exec_cycles = int(total_op_exec_cycles[op_name] / num_iter)
-                mean_op_gap_cycles = int(total_op_gap_cycles[op_name] / num_iter)
-                mean_op_ddr_read_cycles = int(total_op_ddr_read_cycles[op_name] / num_iter)
-                mean_op_ddr_write_cycles = int(total_op_ddr_write_cycles[op_name] / num_iter)
-                mean_op_ddr_read_bytes = int(total_op_ddr_read_bytes[op_name] / num_iter)
-                mean_op_ddr_write_bytes = int(total_op_ddr_write_bytes[op_name] / num_iter)
+                mean_op_exec_cycles = int(total_op_exec_cycles[idx] / num_iter)
+                mean_op_gap_cycles = int(total_op_gap_cycles[idx] / num_iter)
+                mean_op_ddr_read_cycles = int(total_op_ddr_read_cycles[idx] / num_iter)
+                mean_op_ddr_write_cycles = int(total_op_ddr_write_cycles[idx] / num_iter)
+                mean_op_ddr_read_bytes = int(total_op_ddr_read_bytes[idx] / num_iter)
+                mean_op_ddr_write_bytes = int(total_op_ddr_write_bytes[idx] / num_iter)
                 mac_num = op_macs[idx]
                 ddr_read_span = mean_op_ddr_read_cycles * 10**-3 / self.targets[self.target]
                 ddr_write_span = mean_op_ddr_write_cycles * 10**-3 / self.targets[self.target]
-                ddr_read_bw = 0 if ddr_read_span == 0 else (mean_op_ddr_read_bytes * 1000 / ddr_read_span / 1024**3) # GB/s
+                ddr_read_bw = 0 if ddr_read_span == 0 else (mean_op_ddr_read_bytes * 1000 / ddr_read_span / 1024**3)  # GB/s
                 ddr_write_bw = 0 if ddr_read_span == 0 else (mean_op_ddr_write_bytes * 1000 / ddr_write_span / 1024**3)  # GB/s
                 mean_op_exec_span = mean_op_exec_cycles * 10**-3 / self.targets[self.target]  # ms
-                mean_op_gap_span = (cpu_ops[op_name] / num_iter) if op_name in cpu_ops else (mean_op_gap_cycles * 10**-3 / self.targets[self.target])  # ms
+                mean_op_gap_span = (total_op_gap_time[idx] / num_iter) if op_types[idx] == 1 else (mean_op_gap_cycles * 10**-3 / self.targets[self.target])  # ms
                 mean_total_time += mean_op_gap_span
                 table.add_row([
                     idx,
                     op_name,
-                    "NPU" if op_name not in cpu_ops else "CPU",
+                    "NPU" if op_types[idx] == 0 else "CPU",
                     mac_num,
                     "{:.3f}".format(ddr_read_bw),
                     "{:.3f}".format(ddr_write_bw),
