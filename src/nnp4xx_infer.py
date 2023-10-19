@@ -31,7 +31,8 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
             self,
             sdk_cfg_file="/DEngine/tyhcp/client/config/sdk.cfg",
             enable_dump=0,
-            enable_aipp=False
+            device_id=0,  # 指定目标设备，目前只支持0
+            node_id=0,  # 指定某设备的目标Die
     ):
         super(Nnp4xxSdkInfer, self).__init__()
 
@@ -40,14 +41,21 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
         with open(self.sdk_cfg_file) as f:
             cfg = json.load(f)
 
+        assert device_id == 0
         connect_type = cfg["node_cfg"]["connect"]
-        devices = cfg["node_cfg"]["devices"]
+        devices = cfg["node_cfg"]["devices"]   # 设备数量
         if connect_type in ["socket", "usb"]:
-            pass
+            if device_id != 0:
+                logger.error("connect_type is socket or usb, only support die0")
+                exit(-1)
         elif connect_type == "pcie":
-            pass
+            nodes = devices[0]["nodes"]  # 设备0 Die数量
+            node_ids = [node["node_id"] for node in nodes]
+            if node_id not in node_ids:
+                logger.error("node_id must be in {}".format(node_ids))
+                exit(-1)
         else:
-            logger.error("Not support connect type")
+            logger.error("Not support connect type: {}".format(connect_type))
             exit(-1)
 
         nodes = devices[0]["nodes"]
@@ -57,7 +65,8 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
             self.backend = "sdk_iss"
 
         self.enable_dump = True if enable_dump == 1 else False
-        self.enable_aipp = enable_aipp
+        self.device_id = device_id
+        self.node_id = node_id
 
         self.dump_root_path = ""
         self.result_dir = ""
@@ -87,6 +96,10 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
             dcl.init(self.sdk_cfg_file)
             logger.info("tyhcp init succeed.")
 
+            # 指定目标Die
+            dcl.set_device(self.node_id)
+            
+            # 实例化推理对象
             self.engine = dcl.CNetOperator()
 
             # if self.backend != "sdk_iss":

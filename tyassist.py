@@ -125,7 +125,7 @@ def build(cfg):
         exit(-1)
 
 
-def compare(cfg, backend):
+def compare(cfg, backend, device_id, node_id):
     try:
         if backend not in ["sdk_iss", "chip"]:
             logger.error("Compare phase only support iss and chip")
@@ -133,7 +133,7 @@ def compare(cfg, backend):
         logger.info("{}".format(cfg))
         tyexec = get_tyexec(cfg)
         tyexec.backend = backend
-        fixed_outputs = tyexec.infer()  # default disable aipp
+        fixed_outputs = tyexec.infer(device_id, node_id)  # default disable aipp
 
         # compare
         for idx, fixed_output in enumerate(fixed_outputs):
@@ -229,18 +229,18 @@ def compare2(cfg, target, data_dir):
         exit(-1)
 
 
-def profile(cfg):
+def profile(cfg, device_id, node_id):
     try:
         logger.info("{}".format(cfg))
         tyexec = get_tyexec(cfg)
-        tyexec.profile()
+        tyexec.profile(device_id, node_id)
         logger.info("success")
     except Exception as e:
         logger.error("{}".format(traceback.format_exc()))
         logger.error("TyAssist failed to profile -> {}".format(e))
 
 
-def test(cfg, dtype, backend):
+def test(cfg, dtype, backend, device_id, node_id):
     try:
         logging.getLogger("deepeye").setLevel(logging.WARNING)
 
@@ -279,7 +279,9 @@ def test(cfg, dtype, backend):
                 enable_aipp=enable_aipp,
                 target=tyexec.target,  # nnp3xx/nnp4xx
                 dtype=dtype,   # int8/fp32
-                backend=backend  # tvm/iss/chip
+                backend=backend,  # tvm/iss/chip
+                device_id=device_id,  # 目前仅用于4xx
+                node_id=node_id,  # 目前仅用于4xx
             )
         else:
             logger.error("{}.py has no class named {}".format(model_impl_module, model_impl_cls))
@@ -328,7 +330,7 @@ def test(cfg, dtype, backend):
         exit(-1)
 
 
-def demo(cfg, dtype, backend):
+def demo(cfg, dtype, backend, device_id, node_id):
     try:
         logging.getLogger("deepeye").setLevel(logging.WARNING)
         logger.info(cfg)
@@ -371,7 +373,9 @@ def demo(cfg, dtype, backend):
                 enable_aipp=enable_aipp,
                 target=tyexec.target,  # nnp3xx/nnp4xx
                 dtype=dtype,   # int8/fp32
-                backend=backend  # tvm/iss/chip
+                backend=backend,  # tvm/iss/chip
+                device_id=device_id,  # 目前仅用于4xx
+                node_id=node_id,  # 目前仅用于4xx
             )
         else:
             logger.error("{}.py has no class named {}".format(model_impl_module, model_impl_cls))
@@ -432,7 +436,7 @@ def demo(cfg, dtype, backend):
         exit(-1)
 
 
-def run(config_filepath, phase, dtype, target, backend, data_dir):
+def run(config_filepath, phase, dtype, target, backend, data_dir, device_id, node_id):
     # 补充自定义预处理文件所在目录，必须与配置文件同目录
     config_abspath = os.path.abspath(config_filepath)
     config_dir = os.path.dirname(config_abspath)
@@ -454,21 +458,21 @@ def run(config_filepath, phase, dtype, target, backend, data_dir):
         build(config)
     elif phase == "compare":
         if data_dir:
-            compare2(config, target, data_dir)
+            compare2(config, target, data_dir, device_id, node_id)
         else:
-            compare(config, backend)
+            compare(config, backend, device_id, node_id)
     elif phase == "test":
-        res = test(config, dtype, backend)
+        res = test(config, dtype, backend, device_id, node_id)
     elif phase == "demo":
-        demo(config, dtype, backend)
+        demo(config, dtype, backend, device_id, node_id)
     elif phase == "profile":
-        profile(config)
+        profile(config, device_id, node_id)
 
     sys.path.remove(config_dir)
     return res
 
 
-def benchmark(mapping_file, dtype, target, backend, version):
+def benchmark(mapping_file, dtype, target, backend, version, device_id, node_id):
     import csv
     from prettytable import from_csv
 
@@ -497,7 +501,7 @@ def benchmark(mapping_file, dtype, target, backend, version):
             continue
 
         os.chdir(config_dir)  # 切换至模型目录
-        res = run(config_abspath, "test", dtype, target, backend, None)
+        res = run(config_abspath, "test", dtype, target, backend, None, device_id, node_id)
         # logger.info("{}".format(res))
         os.chdir(root)  # 切换根目录
 
@@ -533,6 +537,8 @@ if __name__ == "__main__":
     parser.add_argument("--backend", type=str, required="demo" in sys.argv or "test" in sys.argv or (
             "--data_dir" not in sys.argv and "compare" in sys.argv),
                         choices=("chip", "iss", "tvm", "onnx"), help="Please specify one of them")
+    parser.add_argument("--device_id", type=int, default=0, help="specify a device, default is 0")
+    parser.add_argument("--node_id", type=int, default=0, help="specify a Die, default is 0")
     parser.add_argument("--log_dir", type=str, default="./logs",
                         help="Please specify a log dir, default is ./logs")
     parser.add_argument("--log_level", type=int, required=False, default=2, choices=(1, 2, 3, 4, 5),
@@ -572,6 +578,7 @@ if __name__ == "__main__":
             exit(-1)
 
     if args.type == "benchmark":
-        benchmark(args.config, args.dtype, args.target, args.backend, args.version)
+        benchmark(args.config, args.dtype, args.target, args.backend, args.version, args.device_id, args.node_id)
     else:
-        _ = run(args.config, args.type, args.dtype, args.target, args.backend, args.data_dir)
+        _ = run(args.config, args.type, args.dtype, 
+                args.target, args.backend, args.data_dir, args.device_id, args.node_id)

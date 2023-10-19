@@ -30,20 +30,43 @@ class Nnp4xxProfileTypeEnum(object):
 class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
     def __init__(
             self,
-            sdk_cfg_file="/DEngine/tyhcp/client/config/sdk.cfg"
+            sdk_cfg_file="/DEngine/tyhcp/client/config/sdk.cfg",
+            device_id=0,  # 指定目标设备，目前只支持0
+            node_id=0,  # 指定某设备的目标Die
     ):
         super(Nnp4xxSdkProfiler, self).__init__(sdk_cfg_file, "nnp400")
 
         with open(self.sdk_cfg_file) as f:
             cfg = json.load(f)
+            
+        assert device_id == 0
+        connect_type = cfg["node_cfg"]["connect"]
+        devices = cfg["node_cfg"]["devices"]   # 设备数量
+        if connect_type in ["socket", "usb"]:
+            if node_id != 0:
+                logger.error("connect_type is socket or usb, only support die0")
+                exit(-1)
+        elif connect_type == "pcie":
+            nodes = devices[0]["nodes"]  # 设备0 Die数量
+            node_ids = [node["node_id"] for node in nodes]
+            if node_id not in node_ids:
+                logger.error("node_id must be in {}".format(node_ids))
+                exit(-1)
+        else:
+            logger.error("Not support connect type: {}".format(connect_type))
+            exit(-1)
+        self.device_id = device_id
+        self.node_id = node_id  
+        
         # self.profile_dir = cfg["profiler"]["host_output"]
         self.result_dir = ""
 
-        self.ip = cfg["node_cfg"]["devices"][0]["nodes"][0]["clients"]["dcl"]["targetId"]
-        if self.ip == "127.0.0.1":   # TODO 非127.0.0.1的地址也可能是ISS服务
+        self.ip = devices[0]["nodes"][0]["clients"]["dcl"]["targetId"]
+        if self.ip == "127.0.0.1":   # 非127.0.0.1的地址也可能是ISS服务
             logger.error("ISS mode not support profile")
             exit(-1)
 
+        # profile结果保存目录
         self.uuid = str(uuid.uuid1())
         self.profile_dir = os.path.join("/tmp", self.uuid)
         if not os.path.exists(self.profile_dir):
@@ -64,10 +87,14 @@ class Nnp4xxSdkProfiler(BaseSdkProfiler, abc.ABC):
             logger.info("sdk config path: {}".format(self.sdk_cfg_file))
             dcl.init(self.sdk_cfg_file)
             logger.info("tyhcp init succeed.")
-
+            # 指定目标Die
+            dcl.set_device(self.node_id)
+            
             self.engine = dcl.CNetOperator()
 
-            if not self.engine.profile(Nnp4xxProfileTypeEnum.DCL_PROF_AICORE_METRICS | Nnp4xxProfileTypeEnum.DCL_PROF_AICPU, self.profile_dir):  # profile
+            # profile
+            if not self.engine.profile(
+                Nnp4xxProfileTypeEnum.DCL_PROF_AICORE_METRICS | Nnp4xxProfileTypeEnum.DCL_PROF_AICPU, self.profile_dir): 
                 logger.error("Failed to set profile")
                 exit(-1)
 

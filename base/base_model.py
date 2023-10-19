@@ -14,7 +14,7 @@ from src.nnp4xx_infer import Nnp4xxSdkInfer, Nnp4xxTvmInfer
 
 
 class BaseModel(object, metaclass=abc.ABCMeta):
-    """模型描述基类，提供2个功能，demo和eval
+    """模型描述基类, 提供2个功能, demo和eval
     """
     def __init__(self, **kwargs):
         """"""
@@ -26,6 +26,8 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         self.target = kwargs["target"]
         self.dtype = kwargs["dtype"]
         self.backend = kwargs["backend"]
+        self.device_id = kwargs["device_id"]   # 目前仅用于4xx
+        self.node_id = kwargs["node_id"]  # 目前仅用于4xx
 
         n, c, h, w = self.inputs[0]["shape"]
         if self.inputs[0]["layout"] == "NHWC":
@@ -60,7 +62,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
                 self.infer = OnnxInfer()
                 self.infer.set_input_names([_input["name"] for _input in self.inputs])
             else:
-                self.infer = Nnp4xxSdkInfer(enable_dump=0, enable_aipp=self.enable_aipp)
+                self.infer = Nnp4xxSdkInfer(enable_dump=0, device_id=self.device_id, node_id=self.node_id)
         else:
             logger.error("Not support target -> {}".format(self.target))
             exit(-1)
@@ -100,7 +102,7 @@ class BaseModel(object, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def inference(self, cv_image):
-        """推理接口，目前仅支持batch1
+        """推理接口, 目前仅支持batch1
         :param cv_image: opencv image
         :return:
         """

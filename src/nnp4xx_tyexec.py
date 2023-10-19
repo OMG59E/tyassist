@@ -169,7 +169,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         self.relay, self.params = extract_constants(self._tf_convert_nhwc_to_nchw(mod, params))
 
     def quantization(self, in_datas):
-        """量化，将浮点relay函数转为成定点relay函数
+        """量化, 将浮点relay函数转为成定点relay函数
         """
         if self.is_qnn:
             self.relay_quant, self.params_quant = self.relay, self.params
@@ -321,10 +321,10 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             logger.warning("nnp4xx disable build")
         self.build_span = time.time() - t_start
 
-    def infer(self):
+    def infer(self, device_id, node_id):
         from .nnp4xx_infer import Nnp4xxSdkInfer
         in_datas = self.get_datas(force_cr=True, to_file=False)
-        infer = Nnp4xxSdkInfer(enable_dump=self.enable_dump, enable_aipp=True)
+        infer = Nnp4xxSdkInfer(enable_dump=self.enable_dump, device_id=device_id, node_id=node_id)
         infer.backend = self.backend
         model_path = self.model_path_x86_64 if infer.backend == "sdk_iss" else self.model_path_aarch64
         infer.load(model_path)
@@ -417,9 +417,9 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             from tvm import relay
             layer_outs = tvm.relay.quantization.compare_layer_outputs(self.result_dir)
 
-    def profile(self):
+    def profile(self, device_id, node_id):
         from .nnp4xx_profiler import Nnp4xxSdkProfiler
-        profiler = Nnp4xxSdkProfiler()
+        profiler = Nnp4xxSdkProfiler(device_id=device_id, node_id=node_id)
         in_datas = self.get_datas(force_cr=True, to_file=False)
         profiler.load(self.model_path_aarch64)
         profiler.run(in_datas)
