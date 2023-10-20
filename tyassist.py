@@ -169,7 +169,7 @@ def compare(cfg, backend, device_id, node_id):
         logger.error("Failed to compare {}".format(traceback.format_exc()))
 
 
-def compare2(cfg, target, data_dir):
+def compare2(cfg, target, data_dir, device_id, node_id):
     """
     批量比较tvm-fp32、tvm-int8、iss、chip
     @param cfg:
