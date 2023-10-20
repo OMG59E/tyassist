@@ -50,7 +50,7 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
                 exit(-1)
         elif connect_type == "pcie":
             nodes = devices[0]["nodes"]  # 设备0 Die数量
-            node_ids = [node["node_id"] for node in nodes]
+            node_ids = [i for i in range(len(nodes))]
             if node_id not in node_ids:
                 logger.error("node_id must be in {}".format(node_ids))
                 exit(-1)
