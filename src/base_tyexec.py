@@ -339,16 +339,18 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
 
                     def gen_data(_dtype):
                         if _dtype == "float32":
-                            _data = np.random.random((n, c, h, w)).astype(dtype=_dtype)  # 数值范围[0, 1)
+                            _data = np.random.random(shape).astype(dtype=_dtype)  # 数值范围[0, 1)
                         elif _dtype == "float16":
-                            _data = np.random.random((n, c, h, w)).astype(dtype=_dtype)  # 数值范围[0, 1)
+                            _data = np.random.random(shape).astype(dtype=_dtype)  # 数值范围[0, 1)
                         elif _dtype == "int16":
-                            _data = np.random.randint(low=-(2 ** 15), high=2 ** 15 - 1, size=(n, c, h, w), dtype=_dtype)
+                            _data = np.random.randint(low=-(2 ** 15), high=2 ** 15 - 1, size=shape, dtype=_dtype)
                         elif _dtype == "uint8":
-                            _data = np.random.randint(low=0, high=255, size=(n, c, h, w), dtype=_dtype)
+                            _data = np.random.randint(low=0, high=255, size=shape, dtype=_dtype)
                         else:
                             logger.error("Not support dtype -> {}".format(_dtype))
                             exit(-1)
+                        if layout in ["NHWC"]:
+                            _data = np.transpose(_data, (0, 3, 1, 2))   # NHWC -> NCHW
                         return _data
 
                     if force_random:  # 用于量化和统计含零情况
