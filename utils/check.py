@@ -194,7 +194,7 @@ def check_config(cfg, phase="build"):
             if _input["norm_axis"] is None:
                 logger.error("norm_axis is None")
                 return False
-            norm_axis = 1
+            norm_axis = _input["norm_axis"]
 
         if norm_axis >= len(shape):
             logger.error("norm_axis out of range")
