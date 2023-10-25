@@ -18,6 +18,15 @@ class Phase(Enum):
     TEST = 3
 
 
+def check_tf_nhwc2nchw(inputs):
+    if len(inputs) > 1:
+        # 数据布局格式必须一致
+        for idx in range(1, len(inputs)):
+            if inputs[0]["layout"] == inputs[idx]["layout"]:
+                logger.error("input layout must be the same")
+                exit(-1)
+        
+
 def check_config(cfg, phase="build"):
     """配置文件参数合法性检查
     :param cfg:
@@ -268,8 +277,10 @@ def check_config(cfg, phase="build"):
                 return False
 
     # TODO
-    # 检查是否缺少关键字
-
+    framework_lists = ["tensorflow", "tflite", "tflite-qnn"]
+    if framework not in framework_lists:
+        check_tf_nhwc2nchw()
+        
     return True
 
 

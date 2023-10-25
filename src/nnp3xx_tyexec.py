@@ -41,7 +41,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 self.cfg["build"]["suppress_long_func"] = False
 
     def quantization(self, in_datas):
-        """量化，将浮点relay函数转为成定点relay函数
+        """量化, 将浮点relay函数转为成定点relay函数
         """
         if self.enable_quant:
             quantize_config, norm = self.set_quantization_cfg(in_datas)
@@ -554,6 +554,9 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         shape_dict = dict()
         for idx, _input in enumerate(self.inputs):
             shape_dict[_input["name"]] = _input["shape"]
+            # 如果输入布局为NHWC, 则将norm_axis置为1，后续会将NHWC转为NCHW
+            if _input["layout"] == "NHWC":
+                _input["norm_axis"] = 1
         sym, params = relay.frontend.from_tensorflow(
             graph=graph_def,
             layout="NCHW",  # 可选, 输出的目标布局
@@ -561,6 +564,12 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             outputs=output_names
         )
         sym = sym["main"]
+        
+        # 前提模型所有输入数据布局必须一致
+        # TODO 暂不知道如何处理多输入为NHWC的图像输入和非4维非图像输入的情况
+        if self.inputs[0]["layout"] in ["None", "NCHW"]:
+            self.relay, self.params = sym, params
+            return
         self.relay, self.params = relay.relay_pass.convert_nhwc_to_nchw(
             sym,
             params,
@@ -568,7 +577,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             convert_input_as_nchw=True,
             convert_output_as_nchw=True,
         )
-
+        
     def tflite2relay(self):
         import tflite
         from tvm import relay
@@ -580,7 +589,15 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         for idx, _input in enumerate(self.inputs):
             shape_dict[_input["name"]] = _input["shape"]
             dtype_dict[_input["name"]] = "float32"
+            # 如果输入布局为NHWC, 则将norm_axis置为1，后续会将NHWC转为NCHW
+            if _input["layout"] == "NHWC":
+                _input["norm_axis"] = 1
         sym, params = relay.frontend.from_tflite(model, shape_dict, dtype_dict)
+        # 前提模型所有输入数据布局必须一致
+        # TODO 暂不知道如何处理多输入为NHWC的图像输入和非4维非图像输入的情况
+        if self.inputs[0]["layout"] in ["None", "NCHW"]:
+            self.relay, self.params = sym, params
+            return
         self.relay, self.params = relay.relay_pass.tflite_frontend_convert(
             sym,
             params,
@@ -596,6 +613,9 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             tflite_model_buf = f.read()
         model = tflite.Model.GetRootAsModel(tflite_model_buf, 0)
         input_infos = dict()
+        enable_nhwc2nchw = False
         for idx, _input in enumerate(self.inputs):
             input_infos[_input["name"]] = {"shape": _input["shape"], "dtype": "float32"}
-        self.relay = deepeye.from_qnn(model, input_infos, self.target, convert_input_as_nchw=True)
+            if _input["layout"] == "NHWC":
+                enable_nhwc2nchw = True
+        self.relay = deepeye.from_qnn(model, input_infos, self.target, convert_input_as_nchw=enable_nhwc2nchw)

@@ -39,7 +39,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.quant_data_dir = self.quant_cfg["data_dir"]
         self.prof_img_num = self.quant_cfg["prof_img_num"]
         # self.inputs_ = list()
-        self.outputs = cfg["model"]["outputs"]
+        self.outputs = cfg["model"].get("outputs", [])
         self.num_inputs = len(self.inputs)
         self.num_outputs = len(self.outputs)
         self.relay_quant = None
@@ -227,10 +227,10 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
     def get_datas(self, filepath: str or list = "",
                   force_float=False, force_cr=True, force_random=False, to_file=False):
         """ 生成模型输入数据
-        @param filepath:  外部指定数据
-        @param force_float:  强制输出float数据
-        @param force_cr:　是否强制使能CR
-        @param force_random:  是否强制使用随机数据，主要用于生成量化数据
+        @param filepath: 外部指定数据
+        @param force_float: 强制输出float数据
+        @param force_cr: 是否强制使能CR
+        @param force_random: 是否强制使用随机数据，主要用于生成量化数据
         @param to_file:
         @return:
         """
@@ -261,10 +261,10 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             data_bin_path = os.path.join(self.result_dir, "{}_{}_{}_{}.bin".format(idx, name, dtype, shape_s))
             data_txt_path = os.path.join(self.result_dir, "{}_{}_{}_{}.txt".format(idx, name, dtype, shape_s))
 
+            n, c, h, w = shape
+            if layout == "NHWC":
+                n, h, w, c = shape 
             if _input["support"]:  # 图像数据，工具内部处理
-                n, c, h, w = shape
-                if layout == "NHWC":
-                    n, h, w, c = shape
                 ims = list()
                 for data_path in data_paths:
                     if data_path:  # 指定输入数据
@@ -290,6 +290,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                             cv2.imwrite(random_im_path, im)
                         ims.append(im)
 
+                # preprocess
                 datas = list()
                 for im in ims:
                     if not _input["enable_aipp"] or force_cr:  # 兼容芯片orISS使能AIPP情况
@@ -338,13 +339,13 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
 
                     def gen_data(_dtype):
                         if _dtype == "float32":
-                            _data = np.random.random(shape).astype(dtype=_dtype)  # 数值范围[0, 1)
+                            _data = np.random.random((n, c, h, w)).astype(dtype=_dtype)  # 数值范围[0, 1)
                         elif _dtype == "float16":
-                            _data = np.random.random(shape).astype(dtype=_dtype)  # 数值范围[0, 1)
+                            _data = np.random.random((n, c, h, w)).astype(dtype=_dtype)  # 数值范围[0, 1)
                         elif _dtype == "int16":
-                            _data = np.random.randint(low=-(2 ** 15), high=2 ** 15 - 1, size=shape, dtype=_dtype)
+                            _data = np.random.randint(low=-(2 ** 15), high=2 ** 15 - 1, size=(n, c, h, w), dtype=_dtype)
                         elif _dtype == "uint8":
-                            _data = np.random.randint(low=0, high=255, size=shape, dtype=_dtype)
+                            _data = np.random.randint(low=0, high=255, size=(n, c, h, w), dtype=_dtype)
                         else:
                             logger.error("Not support dtype -> {}".format(_dtype))
                             exit(-1)
