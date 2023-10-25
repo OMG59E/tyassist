@@ -279,7 +279,7 @@ def check_config(cfg, phase="build"):
     # TODO
     framework_lists = ["tensorflow", "tflite", "tflite-qnn"]
     if framework not in framework_lists:
-        check_tf_nhwc2nchw()
+        check_tf_nhwc2nchw(input_lists)
         
     return True
 
