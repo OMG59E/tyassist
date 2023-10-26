@@ -257,14 +257,14 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 data_paths = [data_paths for _ in range(self.bs)]
 
             shape_s = "x".join(list(map(str, shape)))
-            data_npy_path = os.path.join(self.result_dir, "{}_{}_{}_{}.npy".format(idx, name, dtype, shape_s))
-            data_bin_path = os.path.join(self.result_dir, "{}_{}_{}_{}.bin".format(idx, name, dtype, shape_s))
-            data_txt_path = os.path.join(self.result_dir, "{}_{}_{}_{}.txt".format(idx, name, dtype, shape_s))
-
-            n, c, h, w = shape
-            if layout == "NHWC":
-                n, h, w, c = shape 
+            data_npy_path = os.path.join(self.result_dir, "{}_{}_{}_{}.npy".format(idx, name.replace("/", "_"), dtype, shape_s))
+            data_bin_path = os.path.join(self.result_dir, "{}_{}_{}_{}.bin".format(idx, name.replace("/", "_"), dtype, shape_s))
+            data_txt_path = os.path.join(self.result_dir, "{}_{}_{}_{}.txt".format(idx, name.replace("/", "_"), dtype, shape_s))
+ 
             if _input["support"]:  # 图像数据，工具内部处理
+                n, c, h, w = shape
+                if layout == "NHWC":
+                    n, h, w, c = shape
                 ims = list()
                 for data_path in data_paths:
                     if data_path:  # 指定输入数据
@@ -280,8 +280,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                         continue
 
                     for b in range(self.bs):
-                        random_im_path = os.path.join(self.result_dir, "{}_{}_random{}.jpg".format(idx, name, b))
-                        random_npy_path = os.path.join(self.result_dir, "{}_{}_random{}.npy".format(idx, name, b))
+                        random_im_path = os.path.join(self.result_dir, "{}_{}_random{}.jpg".format(idx, name.replace("/", "_"), b))
+                        random_npy_path = os.path.join(self.result_dir, "{}_{}_random{}.npy".format(idx, name.replace("/", "_"), b))
                         if os.path.exists(random_npy_path):
                             im = np.load(random_npy_path)
                         else:
