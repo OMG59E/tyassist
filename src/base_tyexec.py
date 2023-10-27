@@ -9,6 +9,7 @@
 import os
 import abc
 import cv2
+import time
 import importlib
 import numpy as np
 from utils import logger
@@ -77,6 +78,9 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.iss_simu_span = 0
         self.tvm_layerwise_dump_span = 0
         self.iss_layerwise_dump_span = 0
+        self.tvm_float_simu_span = 0
+        self.tvm_fixed_simu_span = 0
+        self.x2relay_span = 0
 
         self.is_qnn = True if self.cfg["model"]["framework"] == "onnx-qnn" else False
 
@@ -549,6 +553,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
 
     def x2relay(self):
         """caffe/onnx/tensorflow/pytorch/mxnet to relay func"""
+        t_start = time.time()
         if self.framework == "caffe":
             self.caffe2relay()
         elif self.framework == "onnx":
@@ -568,7 +573,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         else:
             logger.error("Not support framework -> {}".format(self.framework))
             exit(-1)
-
+        self.x2relay_span = time.time() - t_start
         self.save_relay_to_json(self.original_json_path, self.relay, self.params)
         self.save_relay_to_model(self.original_model_path, self.relay, self.params)
 
