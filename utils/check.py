@@ -129,7 +129,7 @@ def check_config(cfg, phase="build"):
 
     if phase == "build":
         weight = cfg["model"]["weight"]
-        if cfg["model"]["framework"] == "mxnet":
+        if cfg["model"]["framework"] == "mxnet" and cfg["build"]["target"] == "nnp400":
             graph = weight
             weight += "-0000.params"
             graph += "-symbol.json"
