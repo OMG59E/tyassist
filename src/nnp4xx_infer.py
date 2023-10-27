@@ -211,10 +211,9 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
 
     @property
     def ave_latency_ms(self):
+        if self.backend == "sdk_iss" or self.enable_dump or self.total == 0:
+            return 0
         return self.total_span_ms / self.total
-        # if self.backend == "sdk_iss" or self.enable_dump or self.total == 0:
-        #     return 0
-        #
         # profile_file = self.find_model_prof_bin()
         # if not os.path.exists(profile_file):
         #     logger.error("Not found profile file -> {}".format(profile_file))
