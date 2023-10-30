@@ -94,9 +94,12 @@ def build(cfg):
         # print span
         header = ["Phase", "Span/s"]
         table = PrettyTable(header)
+        table.add_row(["x2relay", "{:.3f}".format(tyexec.x2relay_span)])
         table.add_row(["quantization", "{:.3f}".format(tyexec.quantization_span)])
         table.add_row(["build", "{:.3f}".format(tyexec.build_span)])
-        table.add_row(["iss_simu", "{:.3f}".format(tyexec.iss_simu_span)])
+        table.add_row(["tvm_float_simu", "{:.3f}".format(tyexec.tvm_float_simu_span)])
+        table.add_row(["tvm_fixed_simu", "{:.3f}".format(tyexec.tvm_fixed_simu_span)])
+        table.add_row(["iss_fixed_simu", "{:.3f}".format(tyexec.iss_simu_span)])
         table.add_row(["tvm_layerwise_dump", "{:.3f}".format(tyexec.tvm_layerwise_dump_span)])
         table.add_row(["iss_layerwise_dump", "{:.3f}".format(tyexec.iss_layerwise_dump_span)])
         table.add_row(["total", "{:.3f}".format(time.time() - t_start)])
