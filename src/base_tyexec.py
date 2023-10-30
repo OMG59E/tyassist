@@ -272,7 +272,14 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 ims = list()
                 for data_path in data_paths:
                     if data_path:  # 指定输入数据
+                        # 检查data_path是否存在
+                        if not os.path.exists(data_path):
+                            logger.error("data_path not exist, data_path -> {}".format(data_path))
+                            exit(-1)
                         im = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE if pixel_format == "GRAY" else cv2.IMREAD_COLOR)
+                        if im is None:
+                            logger.error("data_path imread failed, data_path -> {}".format(data_path))
+                            exit(-1)
                         ims.append(im)
                         continue
 
