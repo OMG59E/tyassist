@@ -46,10 +46,10 @@ build: {
     similarity_dataset: ,
     custom_preprocess_module: "",
     custom_preprocess_cls: "",
-    debug_level: 0,
+    debug_level: -1,
     calib_method: "kld",
     skip_layer_idxes: [ ],
     skip_layer_types: [ ],
   },
-  enable_dump: 2
+  enable_dump: 0
 }

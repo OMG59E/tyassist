@@ -39,10 +39,10 @@ build: {
     similarity_dataset: ,
     custom_preprocess_module: "custom_preprocess",
     custom_preprocess_cls: "CustomTensorFlowImgD",
-    debug_level: 0,
+    debug_level: -1,
     calib_method: "kld",
   },
-  enable_dump: 1,
+  enable_dump: 0,
 }
 
 

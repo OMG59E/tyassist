@@ -46,10 +46,10 @@ build: {
     similarity_dataset: ,
     custom_preprocess_module: "custom_preprocess",
     custom_preprocess_cls: "CustomMultiInputModel",
-    debug_level: 0,
+    debug_level: -1,
     calib_method: "kld",
     skip_layer_idxes: [ ],
     skip_layer_types: [ ],
   },
-  enable_dump: 1
+  enable_dump: 0
 }

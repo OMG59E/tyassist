@@ -45,7 +45,7 @@ build: {
     calib_method: "l2norm",
     skip_layer_names: [ "final" ],
   },
-  enable_dump: 2,
+  enable_dump: 0,
 }
 
 test: {

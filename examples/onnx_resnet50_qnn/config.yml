@@ -38,7 +38,7 @@ build: {
     similarity_dataset: ,
     custom_preprocess_module: ,
     custom_preprocess_cls: ,
-    debug_level: 0,
+    debug_level: -1,
     calib_method: "l2norm",
   },
   enable_dump: 0,
