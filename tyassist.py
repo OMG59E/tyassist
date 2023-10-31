@@ -77,7 +77,7 @@ def build(cfg):
         tyexec.iss_dump_output(in_datas)
 
         # step4 iss/tvm fixed simu
-        iss_fixed_output = tyexec.iss_fixed_inference(in_datas, to_file=True)
+        # iss_fixed_output = tyexec.iss_fixed_inference(in_datas, to_file=True)
         tvm_fixed_output = tyexec.tvm_fixed_inference(in_datas, to_file=True)
 
         # step5 tvm float simu
@@ -114,13 +114,13 @@ def build(cfg):
                 logger.info("[Build] float(tvm) output tensor[{}] shape: {}, dtype: {}".format(idx, tvm_float_output[idx].shape, tvm_float_output[idx].dtype))
                 table.add_row([idx, "float(tvm)", "fixed(tvm)", "{:.6f}".format(dist)])
             logger.info("[Build] fixed(tvm) output tensor[{}] shape: {}, dtype: {}".format(idx, tvm_fixed_output[idx].shape, tvm_fixed_output[idx].dtype))
-            if iss_fixed_output:
-                logger.info("[Build] fixed(iss) output tensor[{}] shape: {}, dtype: {}".format(idx, iss_fixed_output[idx].shape, iss_fixed_output[idx].dtype))
-                if not tyexec.is_qnn:
-                    dist = cosine_distance(tvm_float_output[idx], iss_fixed_output[idx])
-                    table.add_row([idx, "float(tvm)", "fixed(iss)", "{:.6f}".format(dist)])
-                dist = cosine_distance(tvm_fixed_output[idx], iss_fixed_output[idx])
-                table.add_row([idx, "fixed(tvm)", "fixed(iss)", "{:.6f}".format(dist)])
+            # if iss_fixed_output:
+            #     logger.info("[Build] fixed(iss) output tensor[{}] shape: {}, dtype: {}".format(idx, iss_fixed_output[idx].shape, iss_fixed_output[idx].dtype))
+            #     if not tyexec.is_qnn:
+            #         dist = cosine_distance(tvm_float_output[idx], iss_fixed_output[idx])
+            #         table.add_row([idx, "float(tvm)", "fixed(iss)", "{:.6f}".format(dist)])
+            #     dist = cosine_distance(tvm_fixed_output[idx], iss_fixed_output[idx])
+            #     table.add_row([idx, "fixed(tvm)", "fixed(iss)", "{:.6f}".format(dist)])
         logger.info("\n{}".format(table))
         logger.info("success")
     except Exception as e:
@@ -136,7 +136,13 @@ def compare(cfg, backend, device_id, node_id):
         logger.info("{}".format(cfg))
         tyexec = get_tyexec(cfg)
         tyexec.backend = backend
-        fixed_outputs = tyexec.infer(device_id, node_id)  # default disable aipp
+        if tyexec.target.startswith("nnp4"):
+            fixed_outputs = tyexec.infer(device_id, node_id)  # default disable aipp
+        elif tyexec.target.startswith("nnp3"):
+            fixed_outputs = tyexec.infer()  # default disable aipp
+        else:
+            logger.error("Not support target -> {}".format(tyexec.target))
+            exit(-1)
 
         # compare
         for idx, fixed_output in enumerate(fixed_outputs):
@@ -236,7 +242,13 @@ def profile(cfg, device_id, node_id):
     try:
         logger.info("{}".format(cfg))
         tyexec = get_tyexec(cfg)
-        tyexec.profile(device_id, node_id)
+        if tyexec.target.startswith("nnp4"):
+            tyexec.profile(device_id, node_id)
+        elif tyexec.target.startswith("nnp3"):
+            tyexec.profile()
+        else:
+            logger.error("Not support target -> {}".format(tyexec.target))
+            exit(-1)
         logger.info("success")
     except Exception as e:
         logger.error("{}".format(traceback.format_exc()))

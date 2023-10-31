@@ -267,14 +267,17 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             estimate_compiled_mod_Cycles = get_method("tvm.contrib.{}".format(self.logo_module), "estimate_compiled_mod_Cycles")
             estimate_compiled_mod_MACs = get_method("tvm.contrib.{}".format(self.logo_module), "estimate_compiled_mod_MACs")
             # TODO support c920
-            if self.enable_dump == 0:
-                export_lib_path = []
-                target_host = []
-                target_host_cc = []
-            else:
-                export_lib_path = [self.model_path_x86_64]
-                target_host = ["llvm -mtriple=x86_64"]
-                target_host_cc = [None]
+            # if self.enable_dump == 0:
+            #     export_lib_path = []
+            #     target_host = []
+            #     target_host_cc = []
+            # else:
+            #     export_lib_path = [self.model_path_x86_64]
+            #     target_host = ["llvm -mtriple=x86_64"]
+            #     target_host_cc = [None]
+            export_lib_path = [self.model_path_x86_64]
+            target_host = ["llvm -mtriple=x86_64"]
+            target_host_cc = [None]
             ARM_C_COMPILER = os.getenv("ARM_C_COMPILER")
             assert os.path.exists(ARM_C_COMPILER), "Not found ARM_C_COMPILER env"
             export_lib_path.append(self.model_path_aarch64)
