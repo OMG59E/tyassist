@@ -22,7 +22,7 @@ def check_tf_nhwc2nchw(inputs):
     if len(inputs) > 1:
         # 数据布局格式必须一致
         for idx in range(1, len(inputs)):
-            if inputs[0]["layout"] == inputs[idx]["layout"]:
+            if inputs[0]["layout"] != inputs[idx]["layout"]:
                 logger.error("input layout must be the same")
                 exit(-1)
         
