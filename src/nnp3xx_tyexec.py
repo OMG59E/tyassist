@@ -517,7 +517,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
     def pytorch2relay(self):
         import torch
         from tvm import relay
-        model = torch.jit.load(self.weight)
+        model = torch.jit.load(self.weight, map_location="cpu")
         input_shapes = list()
         for idx, _input in enumerate(self.inputs):
             input_shapes.append((_input["name"], _input["shape"]))
