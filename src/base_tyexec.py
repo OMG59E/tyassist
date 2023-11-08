@@ -33,7 +33,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.inputs = cfg["model"]["inputs"]
         self.outputs = self.model_cfg.get("outputs")
         self.num_inputs = len(self.inputs)
-        self.num_outputs = len(self.outputs)
+        # self.num_outputs = len(self.outputs)
         
         self.target = self.build_cfg["target"]
         self.enable_quant = self.build_cfg.get("enable_quant", True)
