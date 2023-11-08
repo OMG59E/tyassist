@@ -1,57 +1,65 @@
 # 模型量化编译配置文件
 
 model: {
-  # 模型框架，必须设置, 支持caffe/onnx/pytorch/tensorflow/mxnet，400系列目前仅支持onnx, onnx-qnn
+  # 模型框架，必须设置
+  # 支持caffe/onnx/pytorch/tensorflow/mxnet，400系列目前仅支持onnx，onnx-qnn
   framework: "",
 
-  # 编译后模型名，缺省或不配置情况为net_combine
+  # 编译后模型名
+  # 可空可缺省，表示net_combine
   name: ,
 
   # 量化文件以及各种过程文件保存路径
+  # 可空可缺省，表示./outputs
   save_dir: "",
 
   # 模型权重路径，必须设置
   weight: "",
 
-  # 模型图结构定义路径，非caffe/mxnet框架模型可以不设置
+  # 模型图结构定义路径，非caffe/mxnet框架模型可空可缺省
   graph: "",
 
   # 模型输入配置，存在多个输入，注意顺序
-  # 目前不能分别设置多个输入的NHWC->NCHW的转换, 必须相同
+  # 目前不能分别设置多个输入的NHWC->NCHW的转换，layout必须相同
   inputs: [
     {
-      # 输入名称
+      # 输入名称，必须配置
       name: , 
-      # 原模型输入形状 
+      # 原模型输入形状，必须配置
       shape: , 
-      # 输入数据布局，支持NCHW/NHWC/None, None表示非4维情况, 默认NCHW, 当为None时pixel_format必须为None
-      layout: ,  
-      # 输入数据像素格式，支持 None(未知)/RGB/BGR/GRAY, 设置为None时且不使用随机数据的情况下必须配置自定义处理模块
+      # 输入数据布局，支持NCHW/NHWC/None, None表示非4维情况，
+      # 当为None时pixel_format必须为None
+      layout: ,
+      # 输入数据像素格式，支持 None(未知)/RGB/BGR/GRAY, 必须配置
+      # 设置为None时且不使用随机数据的情况下必须配置自定义处理模块
       # None表示非图片数据，RGB/BGR/GRAY表示图片数据
       pixel_format: ,
-      # 模型原始输入数据类型(预处理之前)，支持数据类型uint8, float32, int16, float16
-      # 可缺省, 缺省情况下，若输入为图片数据则为uint8, 否则为float32
+      # 模型原始输入数据类型(预处理之前)，支持数据类型uint8、float32、int16、float16
+      # 可空可缺省，表示若输入为图片数据则为uint8，否则为float32
       dtype: "",
-      # 输入均值，可空，仅当num_mean=1时，支持broadcast
+      # 输入均值，可空可缺省，仅当num_mean=1时，支持broadcast
       mean: [ 0.0, 0.0, 0.0 ],
-      # 输入方差，可空，仅当num_std=1时，支持broadcast
+      # 输入方差，可空可缺省，仅当num_std=1时，支持broadcast
       std: [ 1.0, 1.0, 1.0 ],
-      # 沿着axis进行norm, 缺省表示1
+      # 沿着axis进行norm，可空可缺省表示1
       norm_axis: 1,
+
+      # 内置预处理参数配置，仅在输入为图像，且内置预处理能支持的情况下可用，不支持的情况下可通过自定义预处理实现
       # resize类型，0-长宽分别resize，1-长边等比例resize，输入为图像数据生效
       resize_type: 0,
       # resize图像不足部分将自动padding，仅等比例resize，且输入为图像数据生效
       padding_value: 128,
-      # 目前仅支持：0-左上角(LEFT_TOP), 1-中心点(CENTER)，仅等比例resize，且输入为图像数据生效
+      # 目前仅支持：0-左上角(LEFT_TOP)，1-中心点(CENTER)，仅等比例resize，且输入为图像数据生效
       padding_mode: 1,
-      # 用于比较各阶段输出的相似度，空表示采用随机数，默认随机数，可缺省 
+      # 用于比较各阶段输出的相似度，尽量指定量化数据外的数据
+      # 可空可缺省，表示使用随机数
       data_path: ,
-      # 表示是否使能aipp，内置输入预处理，效率更高, 建议缺省或留空
+      # 表示是否使能aipp，内置输入预处理，效率更高，建议缺省或留空
       # 可缺省或留空，默认为true，true的情况下工具推断能否使能
-      # 以下情况true无效
-      # 1. 非图像数据即pixel_format为None时，强制为false
-      # 2. 非uint8图像时，强制为false
-      # 3. 对于nnp400无效
+      # 以下情况无效
+      # 1.pixel_format为None时，强制为false
+      # 2.多输入情况下无效
+      # 3.对于nnp400无效
       enable_aipp: true,
     }
   ],
@@ -77,77 +85,91 @@ model: {
     }
   },
 
-  # 模型的python模块(test和demo必须设置), 必须与yml配置文件同级目录
+  # 模型的python模块(test和demo必须设置)，必须与yml配置文件同级目录
   model_impl_module: ,
   model_impl_cls: ,
 }
 
 build: {
-  # 目标平台，必须设置, 支持nnp300, nnp320, nnp3020, nnp400
+  # 目标平台，必须设置，支持nnp300、nnp310、nnp315、nnp320、nnp3020、nnp400
   target: "",
 
   # 是否跳过量化过程
+  # 可空可缺省，表示true
   # 注意disable之前必须已生成量化模型
   enable_quant: true,
 
   # 是否跳过编译过程
+  # 可空可缺省，表示true
   # 注意disable之前必须已编译生成模型
   enable_build: true,
 
   # 是否限制每个融合的最大算子个数，缺省或留空表示false
-  # 该参数仅对300系列芯片生效
+  # 该参数仅对NNP3xx系列芯片生效
   suppress_long_func: false,
 
-  # 编译优化等级, 支持配置为0或2, 缺省默认为0, 仅对nnp4xx生效
-  # 0表示O0优化, 2表示O2优化, O2相对O0性能更佳, 但O2容易编译失败，谨慎使用
+  # 编译优化等级，支持配置为0或2
+  # 可空可缺省，表示0，仅对NNP4xx生效
+  # 提示：0表示O0优化，2表示O2优化，O2相对O0性能更佳，但O2容易编译失败，谨慎使用
   opt_level: 0,
 
-  # 多线程编译, 空表示默认使用cpu核心数, 0表示不使用多线程
+  # 多线程编译
+  # 可空可缺省，表示默认使用cpu核心数，0表示不使用多线程
   multi_thread: ,
 
   # 量化配置参数，仅在enable_quant为true生效
   quant: {
-    # 量化输入数据路径, 留空表示使用随机数据(必须设置)
+    # 量化输入数据路径
+    # 可空可缺省，表示使用随机数据
     data_dir: "/DEngine/tyexamples/data/datasets/ILSVRC2012/ILSVRC2012_img_val",
 
-    # 量化使用的数据数量，当data_dir存在时，0表示使用所有数据
+    # 量化使用的数据数量，0表示使用所有数据，必须配置
+    # 当data_dir未配置时，必须指定明确值
     prof_img_num: 50,
 
     # 进行check_similarity的图片的张数
     # 如果大于1，最终会输出所有图片的平均相似度
     # 如果等于0，则会处理similarity_dataset中所有图片
+    # 可空可缺省，表示1
+    # 提示：仅在debug_level >= 0时生效
     similarity_img_num: 1,
 
-    # 进行相似度比对的输入数据，配置为空，则默认取前述data_dir接口表示的输入
-    # 具体配置参照dataset，可定义为图片集路径，或用户自定义的预处理。
+    # 进行量化阶段相似度比对的输入数据
+    # 可空可缺省，表示使用量化数据data_dir
     similarity_dataset: ,
 
     # 用户自定义量化函数，若不配置此项，则使用默认前处理，必须与yml配置文件同级目录
     # 以下情况必须设置自定义预处理:
-    # 1.多输入指定量化数据目录，表示量化使用指定数据
-    # 2.某输入为非图像数据，且指定输入数据，表示推理仿真使用指定数据
+    # 1.存在多个输入，同时指定data_path或data_dir，必须配置
+    # 2.某输入为非图像数据，同时指定data_path或data_dir，必须配置
+    # 3.输入为图像数据，但内置预处理不能支持，由用户判断
     custom_preprocess_module: ,
     custom_preprocess_cls: ,
 
     # 量化调试等级
+    # 可空可缺省，表示-1，建议设置为-1
     # 0 - 输出整体余弦相似度
     # 1 - 输出整体余弦相似度、输出逐层余弦相似度、逐层保存浮点模型和定点模型的数据、逐层保存浮点定点的对比PNG图
     # 2 - 输出整体余弦相似度、输出逐层余弦相似度、逐层保存浮点定点的对比PNG图
     # 3 - 输出整体余弦相似度、输出逐层余弦相似度
     #-1 - 不输出debug信息
-    debug_level: 0,
+    debug_level: -1,
 
-    # 量化优化等级, 缺省默认为0
+    # 量化优化等级，仅对NNP4xx生效
+    # 可空可缺省，表示0
     opt_level: 0,
 
-    # 量化winograd配置
+    # 量化winograd配置，仅对NNP4xx生效
+    # 可空可缺省
     disable_pass: [],
 
-    # 配置cube数量，不配默认为3，可选1/2/3
+    # 配置cube数量，可选1/2/3
+    # 可空可缺省，表示3
     num_cube: 3,
 
     # 校准方法 "kld", "min_max", "percentile_0.99..", "l2norm"
-    calib_method: "kld",
+    # 不同的策略量化耗时有差异，由少到多"min_max"，"percentile_0.99.."，"kld"，"l2norm"
+    calib_method: "l2norm",
 
     # 可配置为op的索引，可单个配置也可组成list
     skip_layer_idxes: [ ],
@@ -159,7 +181,7 @@ build: {
     skip_layer_names: [ ],
   },
 
-  # 是否使能进行逐层dump结果
+  # 是否使能进行逐层dump结果，可空可缺省表示0
   # 0 - 模型不支持iss, 不输出逐层信息
   # 1 - 模型支持iss, 输出逐层信息
   # 2 - 模型支持iss, 不输出逐层信息
@@ -174,10 +196,11 @@ test: {
   # test精度测试样例数，实际测试数为数据集内数据数与本数的较小者，不设置或者配置0为数据集内所有数据
   test_num: 0,
 
-  # 数据集模块名(必须设置), 必须与yml配置文件同级目录
+  # 数据集模块名(必须设置)，必须与yml配置文件同级目录
   dataset_module: ,
   dataset_cls: ,
-  # 是否使能aipp，前提必须编译模型时enable_aipp, 仅对chip/iss生效
+
+  # 是否使能aipp，前提必须编译模型时enable_aipp，仅对chip/iss生效，仅对3xx系列生效
   enable_aipp: false,
 }
 
@@ -188,6 +211,6 @@ demo: {
   # demo测试样例数，实际测试数为数据路径内数据数与本数的较小者，配置0为数据路径内所有数据
   num: 20,
 
-  # 是否使能aipp，前提必须编译模型时enable_aipp, 仅对chip/iss生效
+  # 是否使能aipp，前提必须编译模型时enable_aipp，仅对chip/iss生效，仅对3xx系列生效
   enable_aipp: false,
 }

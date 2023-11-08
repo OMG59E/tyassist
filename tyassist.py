@@ -77,12 +77,12 @@ def build(cfg):
         tyexec.iss_dump_output(in_datas)
 
         # step4 iss/tvm fixed simu
-        # iss_fixed_output = tyexec.iss_fixed_inference(in_datas, to_file=True)
+        iss_fixed_output = tyexec.iss_fixed_inference(in_datas, to_file=True)
         tvm_fixed_output = tyexec.tvm_fixed_inference(in_datas, to_file=True)
 
         # step5 tvm float simu
         if not tyexec.is_qnn:
-            in_datas = tyexec.get_datas(force_float=True, force_cr=True, to_file=True)  # 浮点模型输入
+            in_datas = tyexec.get_datas(use_norm=True, force_cr=True, to_file=True)  # 浮点模型输入
             tvm_float_output = tyexec.tvm_float_inference(in_datas, to_file=True)
 
         # tyexec.model_analysis()
@@ -114,13 +114,13 @@ def build(cfg):
                 logger.info("[Build] float(tvm) output tensor[{}] shape: {}, dtype: {}".format(idx, tvm_float_output[idx].shape, tvm_float_output[idx].dtype))
                 table.add_row([idx, "float(tvm)", "fixed(tvm)", "{:.6f}".format(dist)])
             logger.info("[Build] fixed(tvm) output tensor[{}] shape: {}, dtype: {}".format(idx, tvm_fixed_output[idx].shape, tvm_fixed_output[idx].dtype))
-            # if iss_fixed_output:
-            #     logger.info("[Build] fixed(iss) output tensor[{}] shape: {}, dtype: {}".format(idx, iss_fixed_output[idx].shape, iss_fixed_output[idx].dtype))
-            #     if not tyexec.is_qnn:
-            #         dist = cosine_distance(tvm_float_output[idx], iss_fixed_output[idx])
-            #         table.add_row([idx, "float(tvm)", "fixed(iss)", "{:.6f}".format(dist)])
-            #     dist = cosine_distance(tvm_fixed_output[idx], iss_fixed_output[idx])
-            #     table.add_row([idx, "fixed(tvm)", "fixed(iss)", "{:.6f}".format(dist)])
+            if iss_fixed_output:
+                logger.info("[Build] fixed(iss) output tensor[{}] shape: {}, dtype: {}".format(idx, iss_fixed_output[idx].shape, iss_fixed_output[idx].dtype))
+                if not tyexec.is_qnn:
+                    dist = cosine_distance(tvm_float_output[idx], iss_fixed_output[idx])
+                    table.add_row([idx, "float(tvm)", "fixed(iss)", "{:.6f}".format(dist)])
+                dist = cosine_distance(tvm_fixed_output[idx], iss_fixed_output[idx])
+                table.add_row([idx, "fixed(tvm)", "fixed(iss)", "{:.6f}".format(dist)])
         logger.info("\n{}".format(table))
         logger.info("success")
     except Exception as e:
@@ -214,8 +214,8 @@ def compare2(cfg, target, data_dir, device_id, node_id):
             img_path = os.path.join(data_dir, filename)
             if not os.path.exists(img_path) or not os.path.isfile(img_path):
                 continue
-            float_datas = tyexec.get_datas(img_path, force_float=True, force_cr=True, force_random=False, to_file=False)
-            fixed_datas = tyexec.get_datas(img_path, force_float=False, force_cr=True, force_random=False, to_file=False)
+            float_datas = tyexec.get_datas(img_path, use_norm=True, force_cr=True, force_random=False, to_file=False)
+            fixed_datas = tyexec.get_datas(img_path, use_norm=False, force_cr=True, force_random=False, to_file=False)
 
             float_outputs = tvm_fp32_infer.run(float_datas, to_file=False)
             fixed_outputs = tvm_int8_infer.run(fixed_datas, to_file=False)

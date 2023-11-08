@@ -23,39 +23,58 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
 
     def __init__(self, cfg: dict):
         """init"""
-        self.cfg = cfg
         self.model_dir = ""
         self.result_dir = ""
+        
+        self.cfg = cfg
+        self.build_cfg = cfg["build"]
         self.quant_cfg = cfg["build"]["quant"]
-        self.target = cfg["build"]["target"]
-        self.enable_quant = cfg["build"]["enable_quant"]
-        self.enable_build = cfg["build"]["enable_build"]
-        self.enable_dump = cfg["build"]["enable_dump"]
-        self.framework = cfg["model"]["framework"]
-        self.custom_preprocess_module = self.quant_cfg["custom_preprocess_module"]
-        self.custom_preprocess_cls = self.quant_cfg["custom_preprocess_cls"]
-        self.graph = cfg["model"]["graph"]
-        self.weight = cfg["model"]["weight"]
+        self.model_cfg = cfg["model"]
         self.inputs = cfg["model"]["inputs"]
-        self.quant_data_dir = self.quant_cfg["data_dir"]
-        self.prof_img_num = self.quant_cfg["prof_img_num"]
-        # self.inputs_ = list()
-        self.outputs = cfg["model"].get("outputs", [])
+        self.outputs = self.model_cfg.get("outputs")
         self.num_inputs = len(self.inputs)
         self.num_outputs = len(self.outputs)
+        
+        self.target = self.build_cfg["target"]
+        self.enable_quant = self.build_cfg.get("enable_quant", True)
+        self.enable_build = self.build_cfg.get("enable_build", True)
+        self.enable_dump = self.build_cfg.get("enable_dump", 0)
+
+        self.custom_preprocess_module = self.quant_cfg.get("custom_preprocess_module")
+        self.custom_preprocess_cls = self.quant_cfg.get("custom_preprocess_cls")
+        
+        self.framework = self.model_cfg["framework"]
+        self.weight = self.model_cfg["weight"]
+        self.graph = self.model_cfg.get("graph")
+                
+        self.quant_data_dir = self.quant_cfg.get("data_dir")
+        self.prof_img_num = self.quant_cfg["prof_img_num"]
+        self.build_opt_level = self.build_cfg.get("opt_level", 0)
+        self.quant_opt_level = self.quant_cfg.get("opt_level", 0)
+        self.quant_debug_level = self.quant_cfg.get("debug_level", -1)
+        self.quant_calib_method = self.quant_cfg.get("calib_method", "l2norm")
+        self.disable_pass = self.quant_cfg.get("disable_pass")
+        self.similarity_img_num = self.quant_cfg.get("similarity_img_num", 1)
+        self.similarity_dataset = self.quant_cfg.get("similarity_dataset")
+        
         self.relay_quant = None
         self.params_quant = None
         self.relay = None
         self.params = None
-        self.model_name = "net_combine"  # default
-        self.build_opt_level = cfg["build"].get("opt_level", 0)
-        self.quant_opt_level = cfg["build"]["quant"].get("opt_level", 0)
-        self.disable_pass = cfg["build"]["quant"].get("disable_pass")
-
-        self.model_dir = os.path.join(self.cfg["model"]["save_dir"], self.target)
+        
+        self.model_name = self.model_cfg.get("name")
+        if not self.model_name:
+            self.model_name = "net_combine"
+            logger.warning("Not set model name, default name -> {}".format(self.model_name))
+            
+        self.save_dir = self.model_cfg.get("save_dir")
+        if not self.save_dir:
+            self.save_dir = "outputs"
+        self.model_dir = os.path.join(self.save_dir, self.target)
         self.result_dir = os.path.join(self.model_dir, "result")
         if not os.path.exists(self.result_dir):
             os.makedirs(self.result_dir)
+        
         logger.info("model output dir -> {}".format(self.model_dir))
         self.quant_json_path = os.path.join(self.result_dir, "model_quant.json")
         self.quant_model_path = os.path.join(self.result_dir, "model_quant.model")
@@ -66,12 +85,13 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
 
         self.shape_dict = dict()
         self.dtype_dict = dict()
-        self.bs = 1  # batch size
-        self.set_model_name()
-        self.set_input_infos()
-        self.set_custom_preprocess()
+        
+        self.bs = 1  # 默认bs为1，TODO 需要考虑多输入不同batch情况
 
-        self.backend = "chip"
+        self.set_custom_preprocess()
+        self.set_input_infos()
+        
+        self.backend = "chip"   # 默认后端为chip
 
         self.quantization_span = 0
         self.build_span = 0
@@ -82,113 +102,99 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.tvm_fixed_simu_span = 0
         self.x2relay_span = 0
 
-        self.is_qnn = True if self.cfg["model"]["framework"] == "onnx-qnn" else False
+        self.is_qnn = True if self.model_cfg["framework"] == "onnx-qnn" else False
 
         if not self.quant_data_dir:
+            # 不配置量化数据目录的情况下，将使用随机数据，这时prof_img_num必须指定具体数值
             assert self.prof_img_num > 0, "Random data mode, prof_img_num must be > 0"
         else:
-            assert self.prof_img_num >= 0, "Custom/data_dir mode, prof_img_num must be >= 0"
-            if isinstance(self.quant_data_dir, str):
-                img_lists = os.listdir(self.quant_data_dir)
-                prof_img_num = len(img_lists) // self.bs
-                if self.prof_img_num == 0:
-                    self.prof_img_num = prof_img_num
-                elif prof_img_num < self.prof_img_num:
-                    logger.warning("Quant data not enough")
-                    self.prof_img_num = prof_img_num
-
-    @staticmethod
-    def set_env():
-        raise NotImplementedError
-
-    def _batch_preprocess(self):
-        # multi-batch preprocess and input_num must be = 1
-        assert len(self.inputs) == 1, "input_num must be = 1"
-        data_dir = self.quant_data_dir
-        img_lists = os.listdir(data_dir)
-        for idx in range(self.prof_img_num):
-            batch_img_lists = [os.path.join(data_dir, img_lists[i]) for i in range(idx * self.bs, (idx + 1) * self.bs)]
-            yield self.get_datas(batch_img_lists, force_float=False, force_cr=True, force_random=False, to_file=False)
-
-    def get_dataset(self):
-        if not self.quant_data_dir:  # 未配置量化路径使用随机数据情况
-            dataset = self.gen_random_quant_data
-        else:
-            if self.has_custom_preprocess:  # 配置量化数据目录情况下存在自定义预处理
-                dataset = self.custom_preprocess_cls.get_data
-            else:
-                dataset = self._batch_preprocess
-        return dataset
-
-    def set_model_name(self):
-        if "name" in self.cfg["model"]:
-            if self.cfg["model"]["name"]:
-                self.model_name = self.cfg["model"]["name"]
-                return
-        logger.warning("Not set model name, default name -> {}".format(self.model_name))
+            # 单输入且可被内置预处理支持
+            if len(self.inputs) == 1 and self.inputs[0]["support"]:
+                assert self.prof_img_num >= 0, "custom/data_dir mode, prof_img_num must be >= 0"
+                if isinstance(self.quant_data_dir, str):
+                    img_lists = os.listdir(self.quant_data_dir)
+                    prof_img_num = len(img_lists) // self.bs
+                    # 根据实际数据量，更新prof_img_num
+                    if self.prof_img_num == 0:
+                        self.prof_img_num = prof_img_num
+                    elif prof_img_num < self.prof_img_num:
+                        logger.warning("Quant data not enough, and update prof_img_num {} -> {}".format(
+                            self.prof_img_num, prof_img_num))
+                        self.prof_img_num = prof_img_num
 
     def set_input_infos(self):
+        # 更新输入配置信息
         for idx, _input in enumerate(self.inputs):
+            input_name = _input["name"]
             shape = _input["shape"]
-            if "norm_axis" not in _input:
+            if not _input.get("norm_axis"):
                 _input["norm_axis"] = 1
-            if not _input["mean"]:
+            norm_axis = _input["norm_axis"]
+            dim = shape[norm_axis]
+            if not _input.get("mean"):
                 _input["mean"] = None
-            elif len(_input["mean"]) == 1:
-                dim = shape[_input["norm_axis"]]
-                _input["mean"] = [0.0 for _ in range(dim)]
-            if not _input["std"]:
+            elif len(_input.get("mean")) == 1:  # broadcast
+                val = _input.get("mean")[0]
+                _input["mean"] = [val for _ in range(dim)]
+            if not _input.get("std"):
                 _input["std"] = None
-            elif len(_input["std"]) == 1:
-                dim = shape[_input["norm_axis"]]
-                _input["std"] = [1.0 for _ in range(dim)]
+            elif len(_input.get("std")) == 1:   # broadcast
+                val = _input.get("std")[0]
+                _input["std"] = [val for _ in range(dim)]
 
-            if _input["layout"] != "None":
-                assert _input["layout"] in ["NCHW", "NHWC"]
+            layout = _input["layout"]
+            if layout in ["NCHW", "NHWC"]:
                 n, c, h, w = shape
-                if _input["layout"] == "NHWC":
+                if layout == "NHWC":
                     n, h, w, c = shape
-                self.shape_dict[_input["name"]] = (n, c, h, w)
-            else:
-                self.shape_dict[_input["name"]] = shape
-
+                shape = (n, c, h, w)
+                
+            self.shape_dict[input_name] = shape
             self.bs = shape[0]
-
-            if "dtype" not in _input:
-                if _input["pixel_format"] == "None" or _input["layout"] == "None":
+            if idx > 0:
+                assert self.bs == self.inputs[idx - 1]["shape"][0], "all input batch size must be same"
+            
+            pixel_format = _input["pixel_format"]                
+            if not _input.get("dtype"):
+                # 用户未指定输入数据类型的情况下，非图像默认为float32，图像默认uint8
+                if pixel_format == "None":
                     _input["dtype"] = "float32"
                 else:
                     _input["dtype"] = "uint8"
 
-            self.dtype_dict[_input["name"]] = _input["dtype"]
-
-            _input["support"] = False if "None" == _input["pixel_format"] or "None" == _input["layout"] else True
+            self.dtype_dict[input_name] = _input["dtype"]
+            
+            # 判断输入是否能够被支持
+            _input["support"] = True
+            # 存在自定义优先走自定义处理          
+            if self.has_custom_preprocess or pixel_format in ["None"] or len(self.inputs) > 1:
+                _input["support"] = False
+            
             if _input["support"]:
-                if "enable_aipp" not in _input:
-                    _input["enable_aipp"] = True
-                elif _input["enable_aipp"] is None:
-                    _input["enable_aipp"] = True
-
-                if "uint8" != _input["dtype"]:  # AIPP目前限制输出必须是uint8
-                    logger.warning("input[{}] cannot enable aipp -> pixel_format: {}, dtype: {}".format(
-                        _input["name"], _input["pixel_format"], _input["dtype"]))
-                    _input["enable_aipp"] = False
-
-                _input["padding_mode"] = PaddingMode.LEFT_TOP if _input["padding_mode"] == 0 else PaddingMode.CENTER
-            else:
+                # 检查预处理参数配置
+                resize_type = _input.get("resize_type", 0)
+                padding_value = _input.get("padding_value", 128)
+                padding_mode = _input.get("padding_mode", 0)
+                _input["resize_type"] = resize_type
+                _input["padding_value"] = padding_value
+                _input["padding_mode"] = PaddingMode.LEFT_TOP if padding_mode == 0 else PaddingMode.CENTER
+            
+            _input["enable_aipp"] = _input.get("enable_aipp", False)
+            # 该输入内置预处理支持，则可使能AIPP
+            if _input["support"] and _input["dtype"] == "uint8":
+                _input["enable_aipp"] = True
+                
+            # 4xx没有CR模块
+            if self.target.startswith("nnp4"):  
                 _input["enable_aipp"] = False
 
-            if self.target.startswith("nnp4"):  # 4xx不支持aipp
-                # logger.info("Nnp4xx not support aipp")
-                _input["enable_aipp"] = False
-
-        # 检查多输入配置是否正确，uint8图像必须排列在最前面
-        if len(self.inputs) >= 2:
+        # 3xx检查多输入配置是否正确，多输入使能AIPP的情况下，图像数据必须排列在最前面
+        if len(self.inputs) >= 2 and self.target.startswith("nnp3"):
             for idx, _input in enumerate(self.inputs):
                 if _input["enable_aipp"] and idx > 0:
                     # 检查之前的输入是否存在非图像数据
                     if not self.inputs[idx - 1]["enable_aipp"]:
-                        logger.error("Not support input(disable_aipp) in front of input(enable_aipp)")
+                        logger.error("Not support input(tensor) in front of input(image)")
                         exit(-1)
 
     @property
@@ -196,9 +202,10 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         return True if self.custom_preprocess_cls else False
 
     def set_custom_preprocess(self):
-        """检查是否存在自定义预处理
-         1.多输入情况需要自定义
-         2.默认预处理不能满足的情况
+        """import自定义预处理模块
+        需要自定义预处理的情况
+        1.pixel_format为None, 表示输入为tensor数据
+        2.输入为图像数据, 但内置预处理不支持
         """
         # 自定义预处理
         if self.custom_preprocess_cls:
@@ -212,9 +219,38 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                     self.custom_preprocess_module, self.custom_preprocess_cls))
                 exit(-1)
 
-    def gen_random_quant_data(self):
+    @staticmethod
+    def set_env():
+        raise NotImplementedError
+
+    def _batch_preprocess(self):
+        assert len(self.inputs) == 1, "input_num must be = 1"
+        data_dir = self.quant_data_dir
+        img_lists = os.listdir(data_dir)
+        for idx in range(self.prof_img_num):
+            batch_img_lists = [
+                os.path.join(data_dir, img_lists[i]) for i in range(idx * self.bs, (idx + 1) * self.bs)]
+            yield self.get_datas(
+                batch_img_lists, use_norm=False, force_cr=True, force_random=False, to_file=False)
+
+    def _gen_random_quant_data(self):
+        np.random.seed(10086)
         for _ in range(self.prof_img_num):
             yield self.get_datas(force_random=True)
+            
+    def get_dataset(self):
+        if not self.quant_data_dir:
+            # 未配置量化路径使用随机数据情况
+            dataset = self._gen_random_quant_data
+        else:
+            # 配置量化数据目录情况下，存在自定义预处理
+            if self.has_custom_preprocess:
+                # 自定义处理
+                dataset = self.custom_preprocess_cls.get_data
+            else:
+                # 内置处理
+                dataset = self._batch_preprocess
+        return dataset
 
     @staticmethod
     def check_not_exist(filepath):
@@ -229,13 +265,13 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             exit(-1)
 
     def get_datas(self, filepath: str or list = "",
-                  force_float=False, force_cr=True, force_random=False, to_file=False):
+                  use_norm=False, force_cr=True, force_random=False, to_file=False):
         """ 生成模型输入数据
         @param filepath: 外部指定数据
-        @param force_float: 强制输出float数据
+        @param use_norm: 是否norm
         @param force_cr: 是否强制使能CR
         @param force_random: 是否强制使用随机数据，主要用于生成量化数据
-        @param to_file:
+        @param to_file:  是否保存数据
         @return:
         """
         in_datas = OrderedDict()  # 保证输入顺序一致
@@ -245,11 +281,12 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             layout = _input["layout"]
             dtype = _input["dtype"]
             shape = _input["shape"]
-            if _input["enable_aipp"]:
+            enable_aipp = _input["enable_aipp"]
+            support = _input["support"]
+            if enable_aipp:
                 dtype = "uint8"
-            if force_float:
-                dtype = "float32"
-            data_paths = _input["data_path"] if not filepath else filepath
+                       
+            data_paths = _input.get("data_path") if not filepath else filepath
             if isinstance(data_paths, list):
                 assert len(data_paths) == self.bs
             else:
@@ -264,19 +301,21 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             data_npy_path = os.path.join(self.result_dir, "{}_{}_{}_{}.npy".format(idx, name.replace("/", "_"), dtype, shape_s))
             data_bin_path = os.path.join(self.result_dir, "{}_{}_{}_{}.bin".format(idx, name.replace("/", "_"), dtype, shape_s))
             data_txt_path = os.path.join(self.result_dir, "{}_{}_{}_{}.txt".format(idx, name.replace("/", "_"), dtype, shape_s))
- 
-            if _input["support"]:  # 图像数据，工具内部处理
+
+            if support:  # 图像数据，工具内部处理
                 n, c, h, w = shape
                 if layout == "NHWC":
                     n, h, w, c = shape
+                bs = n
                 ims = list()
-                for data_path in data_paths:
+                for idx, data_path in enumerate(data_paths):
                     if data_path:  # 指定输入数据
                         # 检查data_path是否存在
                         if not os.path.exists(data_path):
                             logger.error("data_path not exist, data_path -> {}".format(data_path))
                             exit(-1)
-                        im = cv2.imread(data_path, cv2.IMREAD_GRAYSCALE if pixel_format == "GRAY" else cv2.IMREAD_COLOR)
+                        im = cv2.imread(data_path, 
+                                cv2.IMREAD_GRAYSCALE if pixel_format == "GRAY" else cv2.IMREAD_COLOR)
                         if im is None:
                             logger.error("data_path imread failed, data_path -> {}".format(data_path))
                             exit(-1)
@@ -284,18 +323,19 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                         continue
 
                     # 未指定输入数据，生成随机图像
-                    logger.warning("input[{}] will use random image".format(name))
+                    logger.warning("The input[{}] will use random image, recommend make user data!".format(name, idx))
                     if force_random:  # 用于量化和统计含零情况
                         im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
                         ims.append(im)
                         continue
-
-                    for b in range(self.bs):
+                    for b in range(bs):
                         random_im_path = os.path.join(self.result_dir, "{}_{}_random{}.jpg".format(idx, name.replace("/", "_"), b))
                         random_npy_path = os.path.join(self.result_dir, "{}_{}_random{}.npy".format(idx, name.replace("/", "_"), b))
                         if os.path.exists(random_npy_path):
+                            # 复用随机数据
                             im = np.load(random_npy_path)
                         else:
+                            # 保存随机数据以便复用
                             im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
                             np.save(random_npy_path, im)
                             cv2.imwrite(random_im_path, im)
@@ -304,20 +344,20 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 # preprocess
                 datas = list()
                 for im in ims:
-                    if not _input["enable_aipp"] or force_cr:  # 兼容芯片orISS使能AIPP情况
+                    if not enable_aipp or force_cr:  # 兼容芯片orISS使能AIPP情况
                         _input["padding_size"], _ = calc_padding_size(im, (w, h), _input["padding_mode"])
                         in_data = default_preprocess(
                             im,
                             (w, h),
                             mean=_input["mean"],
                             std=_input["std"],
-                            use_norm=False if not force_float else True,  # 量化前relay_func需要norm
+                            use_norm=False if not use_norm else True,  # 量化前relay_func需要norm
                             use_rgb=True if pixel_format == "RGB" else False,
                             use_resize=True,
                             resize_type=_input["resize_type"],
                             padding_value=_input["padding_value"],
                             padding_mode=_input["padding_mode"]
-                        ).astype(dtype=dtype if not force_float else "float32")  # 量化前relay_func需要float输入，也可不强转由tvm自定转换
+                        ).astype(dtype=dtype if not use_norm else "float32")  # 量化前relay_func需要float输入，也可不强转由tvm自定转换
                         datas.append(np.ascontiguousarray(in_data))
                     else:
                         if pixel_format == "RGB":
@@ -332,22 +372,19 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                             im = np.expand_dims(im, axis=0)
                         datas.append(np.ascontiguousarray(im.transpose((0, 3, 1, 2))))  # nhwc -> nchw, BGR888  uint8
                 in_datas[name] = np.concatenate(datas, axis=0)
-            else:  # 非图像数据，由自定义模块处理或随机生成
-                assert not _input["enable_aipp"], "non-image cannot enable AIPP"
+            else:  # 多输入or非图像数据or存在自定义情况
+                assert not enable_aipp, "non-image cannot enable AIPP"
                 exist = True
                 for data_path in data_paths:
                     if not os.path.exists(data_path):
-                        logger.warning("data_path not exist -> {}, and will use random data".format(data_path))
                         exist = False
+                        break
                 if exist:  # 指定输入数据
-                    if not self.has_custom_preprocess:
-                        logger.error("Not set custom preprocess")
-                        exit(-1)
-                    in_datas[name] = self.custom_preprocess_cls.get_single_data(data_paths, idx)
-                    self.check_dtype(name, in_datas[name], dtype)
+                    assert self.has_custom_preprocess, "Not set custom preprocess"
+                    in_datas[name] = self.custom_preprocess_cls.get_single_data(data_paths, idx, use_norm)
+                    self.check_dtype(name, in_datas[name], "float32" if use_norm else dtype)
                 else:  # 未指定输入数据
-                    logger.warning("input[{}] will use random data".format(name))
-
+                    logger.warning("The input[{}] will use random data, recommend make user data!".format(name))
                     def gen_data(_dtype):
                         if _dtype == "float32":
                             _data = np.random.random(shape).astype(dtype=_dtype)  # 数值范围[0, 1)
@@ -371,6 +408,28 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                             in_datas[name] = np.load(data_npy_path)
                         else:
                             in_datas[name] = gen_data(dtype)
+                    
+            if use_norm:
+                dtype = "float32"
+                data_npy_path = os.path.join(self.result_dir, "{}_{}_{}_{}_norm.npy".format(idx, name.replace("/", "_"), dtype, shape_s))
+                data_bin_path = os.path.join(self.result_dir, "{}_{}_{}_{}_norm.bin".format(idx, name.replace("/", "_"), dtype, shape_s))
+                data_txt_path = os.path.join(self.result_dir, "{}_{}_{}_{}_norm.txt".format(idx, name.replace("/", "_"), dtype, shape_s))
+                if not support:
+                    mean, std = _input["mean"], _input["std"]
+                    if mean:
+                        if layout in ["NHWC", "NCHW"]:
+                            dim = in_datas[name].shape[1]
+                            mean_shape = [1, dim, 1, 1]
+                        else:
+                            norm_axis = _input["norm_axis"]
+                            dim = in_datas[name].shape[norm_axis]
+                            mean_shape = [1 for _ in range(len(shape))]
+                            mean_shape[norm_axis] = dim
+                        mean = np.array(mean, dtype=np.float32).reshape(mean_shape)
+                        std = np.array(std, dtype=np.float32).reshape(mean_shape)
+                        in_datas[name] = (in_datas[name] - mean) / std
+                    in_datas[name] = in_datas[name].astype(dtype)
+                                                
             if to_file:
                 data = in_datas[name].copy()
                 np.save(data_npy_path, data)
@@ -402,16 +461,15 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             in_dtypes[name] = data_type
             if _input["mean"]:
                 norm[name] = {"mean": _input["mean"], "std": _input["std"], "axis": _input["norm_axis"]}
-                logger.info("The input({}) dtype -> {}".format(name, in_dtypes[name]))
                 logger.info("The input({}) mean/std -> {}".format(name, norm[name]))
+            logger.info("The input({}) dtype -> {}".format(name, in_dtypes[name]))
 
         import tvm
         from tvm import relay
         quantize_config = tvm.relay.quantization.get_quantize_config(self.target, in_dtypes)
-        quantize_config["calib_method"] = self.quant_cfg["calib_method"]
+        quantize_config["calib_method"] = self.quant_calib_method
         quantize_config["level"] = self.quant_opt_level
-        if self.disable_pass is not None:
-            quantize_config["disable_pass"] = self.disable_pass
+        quantize_config["disable_pass"] = self.disable_pass
         quantize_config["float_list"] = list()
         skip_layer_idxes = self.quant_cfg.get("skip_layer_idxes", list())
         skip_layer_types = self.quant_cfg.get("skip_layer_types", list())

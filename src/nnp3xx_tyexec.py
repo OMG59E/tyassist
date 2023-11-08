@@ -22,23 +22,12 @@ from .base_tyexec import BaseTyExec
 class Nnp3xxTyExec(BaseTyExec, ABC):
     def __init__(self, cfg: dict):
         super(Nnp3xxTyExec, self).__init__(cfg)
-        self.set_suppress_long_func()  # 限制每个融合的最大算子个数
+        self.suppress_long_func = self.build_cfg.get("suppress_long_func", False)  # 限制每个融合的最大算子个数
         self.model_path = os.path.join(self.model_dir, "{}.ty".format(self.model_name))
 
     @staticmethod
     def set_env():
         pass
-
-    def set_suppress_long_func(self):
-        if self.target.startswith("nnp4"):
-            logger.warning("Nnp4xx not support set_suppress_long_func")
-            return
-
-        if "suppress_long_func" not in self.cfg["build"]:
-            self.cfg["build"]["suppress_long_func"] = False
-        else:
-            if self.cfg["build"]["suppress_long_func"] is None:
-                self.cfg["build"]["suppress_long_func"] = False
 
     def quantization(self, in_datas):
         """量化, 将浮点relay函数转为成定点relay函数
@@ -66,12 +55,12 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 # 量化配置
                 quantize_config=quantize_config,
                 # 用来进行相似度以及相关量化效果确认
-                debug_level=self.quant_cfg["debug_level"],
+                debug_level=self.quant_debug_level,
                 # 进行相似度比对的图片的个数，默认为1。如果大于1，最终会输出所有图片的平均相似度。
-                similarity_img_num=self.quant_cfg["similarity_img_num"],
+                similarity_img_num=self.similarity_img_num,
                 # 进行相似度比对的输入数据，配置为None，则默认取前述dataset接口表示的输入。
                 # 具体配置参照dataset，可定义为图片集路径，或用户自定义的预处理。
-                similarity_dataset=self.quant_cfg["similarity_dataset"],
+                similarity_dataset=self.similarity_dataset,
                 # 用来保存
                 # 1. /fp32/output_tensors.params和quant/output_tensors.params 表示dump每一层浮点和定点的数据
                 # 2. "model_name" /opt_ir.pdf 表示optimize之后模型的拓扑结构
@@ -95,7 +84,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         self.tvm_layerwise_dump_span = time.time() - t_start
 
     def save_compare_layer_outputs(self):
-        if self.quant_cfg["debug_level"] == 1:
+        if self.quant_debug_level == 1:
             # layer_outs: dict，key为每层的name(为方便用户获知原始浮点模型每一层的数据状况，
             # 所以尽可能使用了原始浮点模型自带的op_name，但实际处理会获取不到原始模型的op_name，
             # 此时会使用opt_ir.pdf中的op_name)，相应的value为浮点和定点结果的组成的list
@@ -111,7 +100,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             # 但如果配置了任意参数，则"layout"参数就必须设置为"RGB", "BGR"，"GRAY"三者之一
             # 开启dump功能，会禁止CR模块，需要将layout强设成NCHW来关闭CR功能
             if not _input["enable_aipp"]:
-                logger.warning("Input({}) will disable_aipp".format(name))
+                logger.info("input({}): disable_aipp".format(name))
                 input_info[name] = {"layout": "NCHW"}
             else:
                 input_info[name] = {
@@ -120,8 +109,8 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                     "padding_size": None if PaddingMode.CENTER == _input["padding_mode"] else _input["padding_size"],
                     "padding_value": _input["padding_value"],
                 }
-                logger.info("Input({}): will enable_aipp".format(name))
-            logger.info("Input({}) info -> {}".format(name, input_info[name]))
+                logger.info("input({}): enable_aipp".format(name))
+            logger.info("The info of Input({}) -> {}".format(name, input_info[name]))
         return input_info
 
     def tvm_float_inference(self, in_datas, to_file=False):
@@ -251,7 +240,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             input_info = self._set_input_info_for_build()
 
             opt_cfg = dict()
-            opt_cfg["SUPPRESS_LONG_FUNC"] = self.cfg["build"]["suppress_long_func"]
+            opt_cfg["SUPPRESS_LONG_FUNC"] = self.suppress_long_func
             opt_cfg["FUNC_RUN_TIME_MAX"] = 0
 
             logger.info("################### build start ####################")
@@ -302,6 +291,9 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         logger.info("fixed relay MAC: {}".format(relay_quant_mac_num))
 
     def get_profile_info(self):
+        # 不执行iss仿真无法输出graph.json
+        if self.enable_dump == 0:
+            return
         filepath = os.path.join(self.model_dir, "model_profile.json")
         if not os.path.exists(filepath):
             logger.warning("Not found file -> {}".format(filepath))
@@ -318,7 +310,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         op_name_map = dict()
         nodes = graph["nodes"]
         for node in nodes:
-            if "debug_name" not in node or "name" not in node:
+            if node["op"] != "tvm_op":
                 continue
             op_name = node["name"]
             debug_name = node["debug_name"]

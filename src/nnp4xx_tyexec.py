@@ -25,8 +25,10 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         super(Nnp4xxTyExec, self).__init__(cfg)
 
         self.fused_json_path = os.path.join(self.result_dir, "model_fused.json")
-        self.model_path_x86_64 = os.path.join(self.model_dir, "{}_O{}_x86_64.ty".format(self.model_name, self.build_opt_level))
-        self.model_path_aarch64 = os.path.join(self.model_dir, "{}_O{}_aarch64.ty".format(self.model_name, self.build_opt_level))
+        self.model_path_x86_64 = os.path.join(self.model_dir, "{}_O{}_x86_64.ty".format(
+            self.model_name, self.build_opt_level))
+        self.model_path_aarch64 = os.path.join(self.model_dir, "{}_O{}_aarch64.ty".format(
+            self.model_name, self.build_opt_level))
         self.custom_op_module = self.cfg["model"].get("custom_op_module")
 
         ARM_C_COMPILER = os.getenv("ARM_C_COMPILER")
@@ -45,7 +47,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
     @staticmethod
     def set_env():
-        os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
+        pass
+        # os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
     def get_version(self):
         get_version = get_method("tvm.contrib.{}".format(self.logo_module), "get_version")
@@ -58,9 +61,11 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         qnn_in_dtype = dict()
         output_info = dict()
         for _, _input in enumerate(self.inputs):
-            dtype_dict[_input["name"]] = "float32"
-            norm_dict[_input["name"]] = {"mean": _input["mean"], "std": _input["std"]}
-            qnn_in_dtype[_input["name"]] = "uint8" if _input["pixel_format"] else _input["dtype"]
+            input_name = _input["name"]
+            dtype_dict[input_name] = "float32"
+            norm_dict[input_name] = {"mean": _input["mean"], "std": _input["std"]}
+            qnn_in_dtype[input_name] = "uint8" if _input["pixel_format"] in \
+                                ["RGB", "BGR", "GRAY"] else _input["dtype"]
 
         kwargs = {"dtype": dtype_dict}
         if self.is_qnn:
@@ -69,8 +74,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             kwargs["net_in_dtype"] = qnn_in_dtype
             # kwargs["output_info"] = {"output_name": {"dtype": "float32", "skip_dequant": False}}
 
-        if self.cfg["model"].get("extras"):
-            kwargs["extras"] = self.cfg["model"].get("extras")
+        if self.model_cfg.get("extras"):
+            kwargs["extras"] = self.model_cfg.get("extras")
         if self.custom_op_module is not None:
             logger.info(self.custom_op_module)
             custom_op_module = importlib.import_module(self.custom_op_module)
@@ -191,9 +196,9 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 rgb_en=1 if (self.num_inputs == 1 and self.inputs[0]["pixel_format"] == "RGB") else 0,
                 norm=norm if len(norm) > 0 else None,
                 quantize_config=quantize_config,
-                debug_level=self.quant_cfg["debug_level"],
-                similarity_img_num=self.quant_cfg["similarity_img_num"],
-                similarity_dataset=self.quant_cfg["similarity_dataset"],
+                debug_level=self.quant_debug_level,
+                similarity_img_num=self.similarity_img_num,
+                similarity_dataset=self.similarity_dataset,
                 save_dir=self.result_dir,
             )
             logger.info("################   quantization end  ######################")
@@ -416,7 +421,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         return iss_fixed_outputs
 
     def save_compare_layer_outputs(self):
-        if self.quant_cfg["debug_level"] == 1:
+        if self.quant_debug_level == 1:
             # layer_outs: dict，key为每层的name(为方便用户获知原始浮点模型每一层的数据状况，
             # 所以尽可能使用了原始浮点模型自带的op_name，但实际处理会获取不到原始模型的op_name，
             # 此时会使用opt_ir.pdf中的op_name)，相应的value为浮点和定点结果的组成的list

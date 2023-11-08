@@ -21,7 +21,7 @@ class CustomPreprocessMultiDims(BaseCustomPreprocess):
             shape = _input["shape"]
             self._data_lists.append(np.random.random(shape).astype(np.float32))
 
-    def get_single_data(self, filepaths: list, idx):
+    def get_single_data(self, filepaths: list, idx, use_norm):
         return self._data_lists[idx]
 
     def get_data(self):

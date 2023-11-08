@@ -20,17 +20,18 @@ class BaseCustomPreprocess(object, metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_single_data(self, filepaths, idx):
+    def get_single_data(self, filepaths, idx, use_norm):
         """预处理指定路径图片
-        :param filepaths:  batch图片路径
-        :param idx:  不支持输入的索引
+        :param filepaths: batch图片路径
+        :param idx: 不支持输入的索引
+        :param use_norm: 是否norm
         :return:
         """
 
     @abc.abstractmethod
     def get_data(self):
         """工具链内部调用
-        不需要norm归一化，工具链会根据配置文件，内部进行norm
+        不需要norm归一化, 工具链会根据配置文件, 内部进行norm
         """
         pass
 

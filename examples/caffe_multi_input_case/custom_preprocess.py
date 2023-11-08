@@ -32,13 +32,32 @@ class CustomMultiInputModel(BaseCustomPreprocess):
         if self._calib_num > len(self._img_lists):
             self._calib_num = len(self._img_lists)
 
-    def get_single_data(self, filepath, idx):
+    def get_single_data(self, filepaths, idx, use_norm):
         """ 非图像数据生成预处理数据
         :param filepath:  指定数据路径
         :param idx:  输入索引
+        :param use_norm:
         :return:
         """
-        pass
+        cv_image = cv2.imread(filepaths[0])
+        shape = self._inputs[idx]["shape"]
+        layout = self._inputs[idx]["layout"]
+        pixel_format = self._inputs[idx]["pixel_format"]
+        mean = self._inputs[idx]["mean"]
+        std = self._inputs[idx]["std"]
+        n, c, h, w = shape
+        if "NHWC" == layout:
+            n, h, w, c = shape
+        return default_preprocess(
+                    cv_image,
+                    (w, h),
+                    mean=mean,
+                    std=std,
+                    use_resize=True,
+                    use_rgb=True if "RGB" == pixel_format else False,
+                    use_norm=use_norm,
+                    resize_type=0,
+                )
 
     def get_data(self):
         """生成量化数据"""

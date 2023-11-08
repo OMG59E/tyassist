@@ -134,7 +134,6 @@ class Nnp3xxSdkProfiler(BaseSdkProfiler, abc.ABC):
         model_desc = json.loads("".join(ge_model_desc_lines))
         op_desc_lists = model_desc["blockDescOutLoop"][0]["blockDescInLoop"][0]["layerDesc"][0]["opList"]
 
-        # TODO multi-iter
         from prettytable import PrettyTable
         header = ["Id", "OpName", "MAC.", "DDR/R(GB/s)", "DDR/W(GB/s)", "Cycles", "Span/ms"]
         table = PrettyTable(header)

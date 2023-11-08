@@ -41,14 +41,15 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         self.total = 0
         self.time_span = 0
 
+        input_names = [_input["name"] for _input in self.inputs]
         if self.target.startswith("nnp3"):
             if self.backend == "tvm":
                 self.infer = Nnp3xxTvmInfer()
-                self.infer.set_input_names([_input["name"] for _input in self.inputs])
+                self.infer.set_input_names(input_names)
                 self.enable_aipp = False
             elif self.backend == "onnx":
                 self.infer = OnnxInfer()
-                self.infer.set_input_names([_input["name"] for _input in self.inputs])
+                self.infer.set_input_names(input_names)
             else:
                 self.infer = Nnp3xxSdkInfer(enable_dump=0, enable_aipp=self.enable_aipp)
                 self.infer.set_input_enable_aipps([_input["support"] for _input in self.inputs])
@@ -56,10 +57,10 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         elif self.target.startswith("nnp4"):
             if self.backend == "tvm":
                 self.infer = Nnp4xxTvmInfer()
-                self.infer.set_input_names([_input["name"] for _input in self.inputs])
+                self.infer.set_input_names(input_names)
             elif self.backend == "onnx":
                 self.infer = OnnxInfer()
-                self.infer.set_input_names([_input["name"] for _input in self.inputs])
+                self.infer.set_input_names(input_names)
             else:
                 self.infer = Nnp4xxSdkInfer(enable_dump=0, device_id=self.device_id, node_id=self.node_id)
         else:
