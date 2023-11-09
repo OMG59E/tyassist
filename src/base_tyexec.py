@@ -243,9 +243,10 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             # 未配置量化路径使用随机数据情况
             dataset = self._gen_random_quant_data
         else:
-            # 配置量化数据目录情况下，存在自定义预处理
+            # 存在自定义预处理
             if self.has_custom_preprocess:
                 # 自定义处理
+                logger.info("There is a custom preprocess, the custom preprocess will be used")
                 dataset = self.custom_preprocess_cls.get_data
             else:
                 # 内置处理
@@ -414,7 +415,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 data_npy_path = os.path.join(self.result_dir, "{}_{}_{}_{}_norm.npy".format(idx, name.replace("/", "_"), dtype, shape_s))
                 data_bin_path = os.path.join(self.result_dir, "{}_{}_{}_{}_norm.bin".format(idx, name.replace("/", "_"), dtype, shape_s))
                 data_txt_path = os.path.join(self.result_dir, "{}_{}_{}_{}_norm.txt".format(idx, name.replace("/", "_"), dtype, shape_s))
-                if not support:
+                if not support and not exist:
                     mean, std = _input["mean"], _input["std"]
                     if mean:
                         if layout in ["NHWC", "NCHW"]:
