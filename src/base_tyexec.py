@@ -375,7 +375,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 in_datas[name] = np.concatenate(datas, axis=0)
             else:  # 多输入or非图像数据or存在自定义情况
                 assert not enable_aipp, "non-image cannot enable AIPP"
-                exist = True
+                exist = True  # 数据是否存在的标志
                 for data_path in data_paths:
                     if not os.path.exists(data_path):
                         exist = False
@@ -409,27 +409,29 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                             in_datas[name] = np.load(data_npy_path)
                         else:
                             in_datas[name] = gen_data(dtype)
-                    
+                            
+                    if use_norm:
+                        mean, std = _input["mean"], _input["std"]
+                        if mean:
+                            if layout in ["NHWC", "NCHW"]:
+                                dim = in_datas[name].shape[1]
+                                mean_shape = [1, dim, 1, 1]
+                            else:
+                                norm_axis = _input["norm_axis"]
+                                dim = in_datas[name].shape[norm_axis]
+                                mean_shape = [1 for _ in range(len(shape))]
+                                mean_shape[norm_axis] = dim
+                            mean = np.array(mean, dtype=np.float32).reshape(mean_shape)
+                            std = np.array(std, dtype=np.float32).reshape(mean_shape)
+                            in_datas[name] = (in_datas[name] - mean) / std
+                        in_datas[name] = in_datas[name].astype(dtype)
+            
+            # 更新保存路径          
             if use_norm:
                 dtype = "float32"
                 data_npy_path = os.path.join(self.result_dir, "{}_{}_{}_{}_norm.npy".format(idx, name.replace("/", "_"), dtype, shape_s))
                 data_bin_path = os.path.join(self.result_dir, "{}_{}_{}_{}_norm.bin".format(idx, name.replace("/", "_"), dtype, shape_s))
                 data_txt_path = os.path.join(self.result_dir, "{}_{}_{}_{}_norm.txt".format(idx, name.replace("/", "_"), dtype, shape_s))
-                if not support and not exist:
-                    mean, std = _input["mean"], _input["std"]
-                    if mean:
-                        if layout in ["NHWC", "NCHW"]:
-                            dim = in_datas[name].shape[1]
-                            mean_shape = [1, dim, 1, 1]
-                        else:
-                            norm_axis = _input["norm_axis"]
-                            dim = in_datas[name].shape[norm_axis]
-                            mean_shape = [1 for _ in range(len(shape))]
-                            mean_shape[norm_axis] = dim
-                        mean = np.array(mean, dtype=np.float32).reshape(mean_shape)
-                        std = np.array(std, dtype=np.float32).reshape(mean_shape)
-                        in_datas[name] = (in_datas[name] - mean) / std
-                    in_datas[name] = in_datas[name].astype(dtype)
                                                 
             if to_file:
                 data = in_datas[name].copy()
