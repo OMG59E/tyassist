@@ -264,7 +264,24 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         if data.dtype != target_dtype:
             logger.error("input({}) dtype mismatch {} vs {}".format(name, data.dtype, target_dtype))
             exit(-1)
-
+            
+    @staticmethod
+    def _gen_random_data(shape, layout, dtype):
+        if dtype == "float32":
+            _data = np.random.random(shape).astype(dtype=dtype)  # 数值范围[0, 1)
+        elif dtype == "float16":
+            _data = np.random.random(shape).astype(dtype=dtype)  # 数值范围[0, 1)
+        elif dtype == "int16":
+            _data = np.random.randint(low=-(2 ** 15), high=2 ** 15 - 1, size=shape, dtype=dtype)
+        elif dtype == "uint8":
+            _data = np.random.randint(low=0, high=255, size=shape, dtype=dtype)
+        else:
+            logger.error("Not support dtype -> {}".format(dtype))
+            exit(-1)
+        if layout in ["NHWC"]:
+            _data = np.transpose(_data, (0, 3, 1, 2))   # NHWC -> NCHW
+        return _data
+                    
     def get_datas(self, filepath: str or list = "",
                   use_norm=False, force_cr=True, force_random=False, to_file=False):
         """ 生成模型输入数据
@@ -386,32 +403,16 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                     self.check_dtype(name, in_datas[name], "float32" if use_norm else dtype)
                 else:  # 未指定输入数据
                     logger.warning("The input[{}] will use random data, recommend make user data!".format(name))
-                    def gen_data(_dtype):
-                        if _dtype == "float32":
-                            _data = np.random.random(shape).astype(dtype=_dtype)  # 数值范围[0, 1)
-                        elif _dtype == "float16":
-                            _data = np.random.random(shape).astype(dtype=_dtype)  # 数值范围[0, 1)
-                        elif _dtype == "int16":
-                            _data = np.random.randint(low=-(2 ** 15), high=2 ** 15 - 1, size=shape, dtype=_dtype)
-                        elif _dtype == "uint8":
-                            _data = np.random.randint(low=0, high=255, size=shape, dtype=_dtype)
-                        else:
-                            logger.error("Not support dtype -> {}".format(_dtype))
-                            exit(-1)
-                        if layout in ["NHWC"]:
-                            _data = np.transpose(_data, (0, 3, 1, 2))   # NHWC -> NCHW
-                        return _data
-
                     if force_random:  # 用于量化和统计含零情况
-                        in_datas[name] = gen_data(dtype)
+                        in_datas[name] = self._gen_random_data(shape, layout, dtype)
                     else:
                         if os.path.exists(data_npy_path):
                             in_datas[name] = np.load(data_npy_path)
                         else:
-                            in_datas[name] = gen_data(dtype)
-                            
-                    if use_norm:
+                            in_datas[name] = self._gen_random_data(shape, layout, dtype)     
+                    if use_norm:  
                         mean, std = _input["mean"], _input["std"]
+                        in_datas[name] = in_datas[name].astype(dtype)
                         if mean:
                             if layout in ["NHWC", "NCHW"]:
                                 dim = in_datas[name].shape[1]
@@ -424,15 +425,12 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                             mean = np.array(mean, dtype=np.float32).reshape(mean_shape)
                             std = np.array(std, dtype=np.float32).reshape(mean_shape)
                             in_datas[name] = (in_datas[name] - mean) / std
-                        in_datas[name] = in_datas[name].astype(dtype)
-            
-            # 更新保存路径          
+            # 更新保存路径
             if use_norm:
                 dtype = "float32"
                 data_npy_path = os.path.join(self.result_dir, "{}_{}_{}_{}_norm.npy".format(idx, name.replace("/", "_"), dtype, shape_s))
                 data_bin_path = os.path.join(self.result_dir, "{}_{}_{}_{}_norm.bin".format(idx, name.replace("/", "_"), dtype, shape_s))
-                data_txt_path = os.path.join(self.result_dir, "{}_{}_{}_{}_norm.txt".format(idx, name.replace("/", "_"), dtype, shape_s))
-                                                
+                data_txt_path = os.path.join(self.result_dir, "{}_{}_{}_{}_norm.txt".format(idx, name.replace("/", "_"), dtype, shape_s))                            
             if to_file:
                 data = in_datas[name].copy()
                 np.save(data_npy_path, data)
