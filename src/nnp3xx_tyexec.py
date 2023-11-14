@@ -151,7 +151,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         iss_fixed_outputs = None
         if self.enable_dump:
             from deepeye.run_net_bin.run_net_bin import run_net_bin
-            netbin_file = os.path.join(self.model_dir, "{}.ty".format(self.model_name))
+            netbin_file = os.path.join(self.model_dir, "{}_v{}.ty".format(self.model_name, self.version))
             if not os.path.exists(netbin_file):
                 logger.error("Not found netbin_file -> {}".format(netbin_file))
                 exit(-1)
