@@ -161,6 +161,7 @@ build: {
 
     # 量化winograd配置，仅对NNP4xx生效，[]表示使能winograd
     # 可空可缺省，表示禁用winograd
+    # 目前由于支持不完善是临时可配，后期稳定后会移除
     disable_pass: [],
 
     # 配置cube数量，可选1/2/3
