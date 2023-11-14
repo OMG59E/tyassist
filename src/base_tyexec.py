@@ -470,7 +470,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         quantize_config = tvm.relay.quantization.get_quantize_config(self.target, in_dtypes)
         quantize_config["calib_method"] = self.quant_calib_method
         quantize_config["level"] = self.quant_opt_level
-        # quantize_config["disable_pass"] = self.disable_pass
+        if self.disable_pass is not None:
+            quantize_config["disable_pass"] = self.disable_pass
         quantize_config["float_list"] = list()
         skip_layer_idxes = self.quant_cfg.get("skip_layer_idxes", list())
         skip_layer_types = self.quant_cfg.get("skip_layer_types", list())

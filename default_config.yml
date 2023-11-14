@@ -159,9 +159,9 @@ build: {
     # 可空可缺省，表示0
     opt_level: 0,
 
-    # 量化winograd配置，仅对NNP4xx生效
-    # 可空可缺省
-    # disable_pass: [],
+    # 量化winograd配置，仅对NNP4xx生效，[]表示使能winograd
+    # 可空可缺省，表示禁用winograd
+    disable_pass: [],
 
     # 配置cube数量，可选1/2/3
     # 可空可缺省，表示3
