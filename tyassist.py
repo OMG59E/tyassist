@@ -43,14 +43,9 @@ def set_logger(op, log_dir, filename):
 def get_tyexec(cfg):
     target = cfg["build"]["target"]
     if target.startswith("nnp3"):
-        m = Nnp3xxTyExec(cfg)
-        if m.bs > 1:
-            logger.error("Nnp3xx not support batch-size > 1")
-            exit(-1)
-        return m
+        return Nnp3xxTyExec(cfg)
     elif target.startswith("nnp4"):
-        tyexec = Nnp4xxTyExec(cfg)
-        return tyexec
+        return Nnp4xxTyExec(cfg)
     else:
         logger.error("Not support target -> {}".format(target))
         exit(-1)

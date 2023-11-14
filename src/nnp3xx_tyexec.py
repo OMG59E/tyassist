@@ -22,8 +22,14 @@ from .base_tyexec import BaseTyExec
 class Nnp3xxTyExec(BaseTyExec, ABC):
     def __init__(self, cfg: dict):
         super(Nnp3xxTyExec, self).__init__(cfg)
+        try:
+            import deepeye
+            self.version = deepeye.util.get_version()
+        except Exception as e:
+            logger.error("Failed to get tytvm version -> {}".format(e))
+            exit(-1)
         self.suppress_long_func = self.build_cfg.get("suppress_long_func", False)  # 限制每个融合的最大算子个数
-        self.model_path = os.path.join(self.model_dir, "{}.ty".format(self.model_name))
+        self.model_path = os.path.join(self.model_dir, "{}_v{}.ty".format(self.model_name, self.version))
 
     @staticmethod
     def set_env():
@@ -271,13 +277,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         logger.info("save quant model to {}".format(quant_model_path))
 
     def get_version(self):
-        try:
-            import deepeye
-            version = deepeye.util.get_version()
-            logger.info("TyTVM Version: {}".format(version))
-        except Exception as e:
-            logger.error("Failed to get tytvm version -> {}".format(e))
-            exit(-1)
+        logger.info("TyTVM Version: v{}".format(self.version))
 
     @property
     def targets(self):
@@ -479,7 +479,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         if not os.path.exists(src):
             logger.error("Not found netbin_file -> {}".format(src))
             exit(-1)
-        dst = os.path.join(self.model_dir, "{}.ty".format(self.model_name))
+        dst = os.path.join(self.model_dir, "{}_v{}.ty".format(self.model_name, self.version))
         shutil.move(src, dst)
         logger.info("rename {} -> {}".format(src, dst))
 
