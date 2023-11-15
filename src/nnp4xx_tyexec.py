@@ -29,16 +29,12 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         with open(logo_setting_filepath, "r") as f:
             setting = json.load(f)
             self.logo_module = setting["logo"]
-            
-        get_version = get_method("tvm.contrib.{}".format(self.logo_module), "get_version")
-        self.version_info = get_version()
-        self.version = self.version_info["TYTVM_VERSION"][6:]
         
         self.fused_json_path = os.path.join(self.result_dir, "model_fused.json")
-        self.model_path_x86_64 = os.path.join(self.model_dir, "{}_O{}_x86_64_{}.ty".format(
-            self.model_name, self.build_opt_level, self.version))
-        self.model_path_aarch64 = os.path.join(self.model_dir, "{}_O{}_aarch64_{}.ty".format(
-            self.model_name, self.build_opt_level, self.version))
+
+        self.model_path_x86_64 = os.path.join(self.model_dir, "{}_O{}_x86_64.ty".format(self.model_name, self.build_opt_level))
+        self.model_path_aarch64 = os.path.join(self.model_dir, "{}_O{}_aarch64.ty".format(self.model_name, self.build_opt_level))
+              
         self.custom_op_module = self.cfg["model"].get("custom_op_module")
 
         ARM_C_COMPILER = os.getenv("ARM_C_COMPILER")
@@ -55,8 +51,10 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         # os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
     def get_version(self):
-        logger.info("TyTVM Version: {}".format(self.version_info))
-        # self.version = version_info["TYTVM_VERSION"][6:]
+        get_version = get_method("tvm.contrib.{}".format(self.logo_module), "get_version")
+        version_info = get_version()
+        version = version_info["TYTVM_VERSION"][6:]
+        logger.info("TyTVM Version: {}".format(version_info))
 
     def onnx2relay(self):
         import onnx

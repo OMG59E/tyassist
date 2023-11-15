@@ -22,14 +22,8 @@ from .base_tyexec import BaseTyExec
 class Nnp3xxTyExec(BaseTyExec, ABC):
     def __init__(self, cfg: dict):
         super(Nnp3xxTyExec, self).__init__(cfg)
-        try:
-            import deepeye
-            self.version = deepeye.util.get_version()
-        except Exception as e:
-            logger.error("Failed to get tytvm version -> {}".format(e))
-            exit(-1)
         self.suppress_long_func = self.build_cfg.get("suppress_long_func", False)  # 限制每个融合的最大算子个数
-        self.model_path = os.path.join(self.model_dir, "{}_v{}.ty".format(self.model_name, self.version))
+        self.model_path = os.path.join(self.model_dir, "{}.ty".format(self.model_name))
 
     @staticmethod
     def set_env():
@@ -151,7 +145,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         iss_fixed_outputs = None
         if self.enable_dump:
             from deepeye.run_net_bin.run_net_bin import run_net_bin
-            netbin_file = os.path.join(self.model_dir, "{}_v{}.ty".format(self.model_name, self.version))
+            netbin_file = os.path.join(self.model_dir, "{}.ty".format(self.model_name))
             if not os.path.exists(netbin_file):
                 logger.error("Not found netbin_file -> {}".format(netbin_file))
                 exit(-1)
@@ -277,7 +271,13 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         logger.info("save quant model to {}".format(quant_model_path))
 
     def get_version(self):
-        logger.info("TyTVM Version: v{}".format(self.version))
+        try:
+            import deepeye
+            version = deepeye.util.get_version()
+        except Exception as e:
+            logger.error("Failed to get tytvm version -> {}".format(e))
+            exit(-1)
+        logger.info("TyTVM Version: v{}".format(version))
 
     @property
     def targets(self):
@@ -479,7 +479,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         if not os.path.exists(src):
             logger.error("Not found netbin_file -> {}".format(src))
             exit(-1)
-        dst = os.path.join(self.model_dir, "{}_v{}.ty".format(self.model_name, self.version))
+        dst = os.path.join(self.model_dir, "{}.ty".format(self.model_name))
         shutil.move(src, dst)
         logger.info("rename {} -> {}".format(src, dst))
 
