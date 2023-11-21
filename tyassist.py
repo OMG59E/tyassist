@@ -446,7 +446,7 @@ def demo(cfg, dtype, backend, device_id, node_id):
         exit(-1)
 
 
-def run(config_filepath, phase, dtype, target, backend, data_dir, device_id, node_id):
+def run(config_filepath, phase, dtype, target, backend, data_dir, opt_level, device_id, node_id):
     # 补充自定义预处理文件所在目录，必须与配置文件同目录
     config_abspath = os.path.abspath(config_filepath)
     config_dir = os.path.dirname(config_abspath)
@@ -459,6 +459,10 @@ def run(config_filepath, phase, dtype, target, backend, data_dir, device_id, nod
     if target is not None:
         config["build"]["target"] = target
 
+    # 更新4xx编译优化等级
+    if opt_level is not None:
+        config["build"]["opt_level"] = opt_level
+    
     # update
     if backend == "iss":
         backend = "sdk_iss"
@@ -482,7 +486,7 @@ def run(config_filepath, phase, dtype, target, backend, data_dir, device_id, nod
     return res
 
 
-def benchmark(mapping_file, dtype, target, backend, version, device_id, node_id):
+def benchmark(mapping_file, dtype, target, backend, version, opt_level, device_id, node_id):
     import csv
     from prettytable import from_csv
 
@@ -511,7 +515,7 @@ def benchmark(mapping_file, dtype, target, backend, version, device_id, node_id)
             continue
 
         os.chdir(config_dir)  # 切换至模型目录
-        res = run(config_abspath, "test", dtype, target, backend, None, device_id, node_id)
+        res = run(config_abspath, "test", dtype, target, backend, None, opt_level, device_id, node_id)
         # logger.info("{}".format(res))
         os.chdir(root)  # 切换根目录
 
@@ -543,6 +547,8 @@ if __name__ == "__main__":
                         help="Please specify a chip target")
     parser.add_argument("--dtype", "-t", type=str, default="int8", choices=("int8", "fp32"),
                         help="Please specify one of them, default int8")
+    parser.add_argument("--opt_level", type=int, required=False, choices=(0, 2),
+                        help="Please specify one of them, default 0, only for nnp4xx!")
     parser.add_argument("--data_dir", type=str, help="Please specify a data dir, required only comapre specify images")
     parser.add_argument("--backend", type=str, required="demo" in sys.argv or "test" in sys.argv or (
             "--data_dir" not in sys.argv and "compare" in sys.argv),
@@ -588,7 +594,7 @@ if __name__ == "__main__":
             exit(-1)
 
     if args.type == "benchmark":
-        benchmark(args.config, args.dtype, args.target, args.backend, args.version, args.device_id, args.node_id)
+        benchmark(args.config, args.dtype, args.target, args.backend, args.version, args.opt_level, args.device_id, args.node_id)
     else:
         _ = run(args.config, args.type, args.dtype, 
-                args.target, args.backend, args.data_dir, args.device_id, args.node_id)
+                args.target, args.backend, args.data_dir, args.opt_level, args.device_id, args.node_id)
