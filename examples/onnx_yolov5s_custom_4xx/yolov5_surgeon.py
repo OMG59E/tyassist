@@ -3,7 +3,7 @@ import numpy as np
 import onnx
 import onnx_graphsurgeon as gs
 
-sourceOnnx = "../onnx_yolov5s_custom/yolov5s.onnx"
+sourceOnnx = "../../models/onnx/onnx_yolov5/best.onnx"
 destinationOnnx = "yolov5s_surgeon.onnx"
 
 graph = gs.import_onnx(onnx.shape_inference.infer_shapes(onnx.load(sourceOnnx)))
