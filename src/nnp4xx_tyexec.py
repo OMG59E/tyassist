@@ -11,8 +11,6 @@ import torch
 import time
 import json
 import os
-import onnx
-import onnxruntime
 from collections import OrderedDict
 from abc import ABC
 from utils import logger
@@ -483,6 +481,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         span_infos = get_available_graph_spans(tvm_float_lib)
 
         # onnx
+        import onnx
+        import onnxruntime
         model = onnx.shape_inference.infer_shapes(onnx.load(self.weight))
         ops_kv = dict()
         for node in model.graph.node:
