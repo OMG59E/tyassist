@@ -13,6 +13,7 @@ model: {
       pixel_format: "None",
       mean: [ 0, 0, 0, 0 ] ,
       std: [ 1, 1, 1, 1 ],
+      norm_axis: 3,
       resize_type: 0,
       padding_value: 128,
       padding_mode: 0,
