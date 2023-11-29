@@ -453,8 +453,6 @@ def run(config_filepath, phase, dtype, target, backend, data_dir, opt_level, dev
     sys.path.insert(0, config_dir)  # 自定义模块环境变量
 
     config = read_yaml_to_dict(config_abspath)
-    if not check_config(config, phase):
-        exit(-1)
     # 更新target，优先使用命令行
     if target is not None:
         config["build"]["target"] = target
@@ -462,7 +460,10 @@ def run(config_filepath, phase, dtype, target, backend, data_dir, opt_level, dev
     # 更新4xx编译优化等级
     if opt_level is not None:
         config["build"]["opt_level"] = opt_level
-    
+    # 检查配置
+    if not check_config(config, phase):
+        exit(-1)
+        
     # update
     if backend == "iss":
         backend = "sdk_iss"
