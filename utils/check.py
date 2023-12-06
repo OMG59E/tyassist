@@ -51,7 +51,7 @@ def check_model_cfg(cfg):
         framework_lists = ["caffe", "onnx", "pytorch", "mxnet", "tensorflow", "tflite", "tflite-qnn", "onnx-qnn"]
     elif target.startswith("nnp4"):
         # 内部支持mxnet，对外不支持
-        framework_lists = ["onnx", "onnx-qnn", "mxnet"]
+        framework_lists = ["onnx", "onnx-qnn", "mxnet", "tensorflow", "tflite", "caffe"]
     else:
         logger.error("Not support target -> {}".format(target))
         return False
@@ -225,7 +225,7 @@ def check_model_cfg(cfg):
     
     # TODO 目前限制多个输入的数据布局必须一致
     framework_lists = ["tensorflow", "tflite", "tflite-qnn"]
-    if framework not in framework_lists:
+    if framework in framework_lists:
         check_tf_nhwc2nchw(inputs_cfg)
     return True
 
