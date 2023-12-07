@@ -51,7 +51,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
     def get_version(self):
         get_version = get_method("tvm.contrib.{}".format(self.logo_module), "get_version")
         version_info = get_version()
-        version = version_info["TYTVM_VERSION"][6:]
+        # version = version_info["TYTVM_VERSION"][6:]
         logger.info("TyTVM Version: {}".format(version_info))
 
     def onnx2relay(self):
@@ -161,17 +161,38 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         shape_dict = dict()
         for _, _input in enumerate(self.inputs):
             shape_dict[_input["name"]] = _input["shape"]
-        mod, params = load_model_from_file(self.weight, "pb", shape_dict=shape_dict, layout="NHWC")
+            if _input["layout"] == "NHWC":
+                n, h, w, c = _input["shape"]
+                _input["shape"] = (n, c, h, w)
+                _input["norm_axis"] = 1
+                _input["layout"] = "NCHW"
+        mod, params = load_model_from_file(self.weight, "tensorflow", shape_dict=shape_dict, layout="NHWC")
         self.relay, self.params = extract_constants(self._tf_convert_nhwc_to_nchw(mod, params))
-
+        
     def tflite2relay(self):
         load_model_from_file = get_method("tvm.contrib.{}".format(self.logo_module), "load_model_from_file")
         extract_constants = get_method("tvm.contrib.{}.relay.transform".format(self.logo_module), "extract_constants")
         shape_dict = dict()
         for _, _input in enumerate(self.inputs):
             shape_dict[_input["name"]] = _input["shape"]
+            if _input["layout"] == "NHWC":
+                n, h, w, c = _input["shape"]
+                _input["shape"] = (n, c, h, w)
+                _input["norm_axis"] = 1
+                _input["layout"] = "NCHW"
         mod, params = load_model_from_file(self.weight, "tflite", shape_dict, layout="NHWC")
         self.relay, self.params = extract_constants(self._tf_convert_nhwc_to_nchw(mod, params))
+        
+    def caffe2relay(self):
+        from tvm.contrib.edgex.relay.frontend import caffe_pb2 as pb
+        load_model_from_file = get_method("tvm.contrib.{}".format(self.logo_module), "load_model_from_file")
+        shape_dict = dict()
+        dtype_dict = dict()
+        for _, _input in enumerate(self.inputs):
+            shape_dict[_input["name"]] = _input["shape"]
+            dtype_dict[_input["name"]] = "float32"
+        kwargs = {"dtype_dict": dtype_dict}
+        self.relay, self.params = load_model_from_file(os.path.dirname(self.weight), "caffe", self.shape_dict, **kwargs)
 
     def quantization(self, in_datas):
         """量化, 将浮点relay函数转为成定点relay函数
@@ -462,8 +483,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         """
         onnx-float vs tvm-float vs tvm-fixed vs iss-fixed
         """
-        data_float = self.get_datas(force_float=True, force_cr=True, to_file=True)  # 浮点模型输入
-        data_fixed = self.get_datas(force_float=False, force_cr=True, to_file=True)  # 量化后模型输入
+        data_float = self.get_datas(use_norm=True, force_cr=True, to_file=True)  # 浮点模型输入
+        data_fixed = self.get_datas(use_norm=False, force_cr=True, to_file=True)  # 量化后模型输入
 
         import tvm
         from tvm.relay.transform import SimplifyInference
@@ -511,7 +532,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
         # tvm量化模型逐层结果
         relay_quant = self.load_relay_from_json(self.quant_json_path)
-        quant_lib = compile_cpuref_model(relay_float, params=None)
+        quant_lib = compile_cpuref_model(relay_quant, params=None)
         _, _, _, quant_outputs = layerwise_error.run(quant_lib, inputs=data_fixed)
 
         # 图层融合和优化后模型CPU逐层结果
