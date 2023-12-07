@@ -127,20 +127,22 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         for idx, _input in enumerate(self.inputs):
             input_name = _input["name"]
             shape = _input["shape"]
-            if not _input.get("norm_axis"):
-                _input["norm_axis"] = 1
-            norm_axis = _input["norm_axis"]
-            dim = shape[norm_axis]
-            if not _input.get("mean"):
+            mean = _input.get("mean")
+            if mean:
+                norm_axis = _input.get("norm_axis")
+                if not norm_axis:
+                    _input["norm_axis"] = 1
+                norm_axis = _input["norm_axis"]
+                dim = shape[norm_axis]
+                if len(_input.get("mean")) == 1:  # broadcast
+                    val = _input.get("mean")[0]
+                    _input["mean"] = [val for _ in range(dim)]
+                if len(_input.get("std")) == 1:   # broadcast
+                    val = _input.get("std")[0]
+                    _input["std"] = [val for _ in range(dim)]
+            else:
                 _input["mean"] = None
-            elif len(_input.get("mean")) == 1:  # broadcast
-                val = _input.get("mean")[0]
-                _input["mean"] = [val for _ in range(dim)]
-            if not _input.get("std"):
                 _input["std"] = None
-            elif len(_input.get("std")) == 1:   # broadcast
-                val = _input.get("std")[0]
-                _input["std"] = [val for _ in range(dim)]
 
             layout = _input["layout"]
             if layout in ["NCHW", "NHWC"]:

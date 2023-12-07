@@ -130,25 +130,21 @@ def check_model_cfg(cfg):
             logger.error("The layout is None, pixel_format must be None")
             return False
         
-        norm_axis = input_cfg.get("norm_axis")
-        if norm_axis is None:
-            norm_axis = 1
-        
-        if norm_axis >= len(shape) and norm_axis < 0:
-            logger.error("The norm_axis out of range")
-            return False
-        
-        dim = shape[norm_axis]
         mean = input_cfg.get("mean")
         std = input_cfg.get("std")
         if (mean is None and std is not None) or (mean is not None and std is None):
             logger.error("The mean/std is None, then std/mean must be None")
             return False
         
-        if not mean:
-            # 未配置均值方差的情况
-            pass
-        else:
+        # 配置均值方差情况
+        if mean and std:
+            norm_axis = input_cfg.get("norm_axis")
+            if norm_axis is None:
+                norm_axis = 1
+            if norm_axis >= len(shape) and norm_axis < 0:
+                logger.error("The norm_axis out of range")
+                return False
+            dim = shape[norm_axis]
             if len(mean) != len(std):
                 logger.error("mean_len != std_len")
                 return False
@@ -156,32 +152,13 @@ def check_model_cfg(cfg):
             if len(mean) != 1 and dim != len(mean):
                 logger.error("mean size not match norm_dim")
                 return False
-        
+        # 检查数据类型
         dtype = input_cfg.get("dtype")
         dtype_lists = ["uint8", "float32", "int16", "float16"]
         if dtype is not None and dtype not in dtype_lists:
             logger.error("dtype({}) must be in {}".format(dtype, dtype_lists))
             return False
-
-        resize_type = input_cfg.get("resize_type")
-        resize_type_lists = [0, 1]
-        if resize_type is not None and resize_type not in resize_type_lists:
-            logger.error("resize_type({}) must be in {}".format(resize_type, resize_type_lists))
-            return False
-        padding_value = input_cfg.get("padding_value")
-        if padding_value is not None:
-            if not isinstance(padding_value, int):
-                logger.error("padding_value expect int type")
-                return False
-            if padding_value < 0 or padding_value > 255:
-                logger.error("padding_value must be >=0 or <= 255")
-                return False
-        padding_mode = input_cfg.get("padding_mode")
-        padding_mode_lists = [0, 1]
-        if padding_mode is not None and padding_mode not in padding_mode_lists:
-            logger.error("padding_mode({}) must be in {}".format(padding_mode, padding_mode_lists))
-            return False
-        
+        # 检查测试数据
         data_path = input_cfg.get("data_path")
         if data_path:
             if not (isinstance(data_path, str) or isinstance(data_path, list)):
@@ -197,13 +174,7 @@ def check_model_cfg(cfg):
                         return False
                     if not os.path.exists(data_path):
                         logger.error("data_path not exist -> {}".format(path))
-                        return False
-        
-        enable_aipp = input_cfg.get("enable_aipp")
-        if enable_aipp is not None and enable_aipp not in [True, False]:
-            logger.error("enable_aipp must be in [True, False]")
-            return False
-        
+                        return False  
         # 检查自定义预处理设置
         # pixel_format为None或存在多个输入，同时指定data_path或quant_data_dir
         quant_data_dir = cfg["build"]["quant"].get("data_dir")
@@ -213,7 +184,33 @@ def check_model_cfg(cfg):
             if (not custom_preprocess_module) or (not custom_preprocess_cls):
                 logger.error("custom_preprocess_module/custom_preprocess_cls not set")
                 return False
-    
+            
+        # 输入为图像数据 
+        if pixel_format != "None" and not cfg["build"]["quant"].get("custom_preprocess_module"):
+            resize_type = input_cfg.get("resize_type")
+            resize_type_lists = [0, 1]
+            if resize_type is not None and resize_type not in resize_type_lists:
+                logger.error("resize_type({}) must be in {}".format(resize_type, resize_type_lists))
+                return False
+            padding_value = input_cfg.get("padding_value")
+            if padding_value is not None:
+                if not isinstance(padding_value, int):
+                    logger.error("padding_value expect int type")
+                    return False
+                if padding_value < 0 or padding_value > 255:
+                    logger.error("padding_value must be >=0 or <= 255")
+                    return False
+            padding_mode = input_cfg.get("padding_mode")
+            padding_mode_lists = [0, 1]
+            if padding_mode is not None and padding_mode not in padding_mode_lists:
+                logger.error("padding_mode({}) must be in {}".format(padding_mode, padding_mode_lists))
+                return False
+            # 输入为图像检查aipp
+            enable_aipp = input_cfg.get("enable_aipp")
+            if enable_aipp is not None and enable_aipp not in [True, False]:
+                logger.error("enable_aipp must be in [True, False]")
+                return False
+        
     # 检查输出配置
     outputs = model_cfg.get("outputs", [])
     if not isinstance(outputs, list):
