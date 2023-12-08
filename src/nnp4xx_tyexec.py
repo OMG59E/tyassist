@@ -15,6 +15,7 @@ from collections import OrderedDict
 from abc import ABC
 from utils import logger
 from utils.utils import get_method
+from utils.dist_metrics import cosine_distance
 from .base_tyexec import BaseTyExec
 
 
@@ -311,9 +312,10 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             target_host_cc.append(ARM_C_COMPILER)
 
             config = {
-                "tir.{}.EstimateCost.enable".format(self.logo_module): True,  #
-                "tir.{}.CalculateMac.enable".format(self.logo_module): True,  #
+                "tir.{}.EstimateCost.enable".format(self.logo_module): True,
+                "tir.{}.CalculateMac.enable".format(self.logo_module): True,
                 "{}.relay_to_tir.collect_lower_errors".format(self.logo_module): False,
+                "tir.{}.InjectCheckpoint.enable".format(self.logo_module): False,
                 # "relay.{}.byoa".format(self.logo_module): False,
             }
             if self.cfg["build"].get("multi_thread"):
@@ -499,7 +501,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         callback = SimplifyInference()
         relay_float = callback(relay_float)
         tvm_float_lib = compile_cpuref_model(relay_float, params=None)
-        span_infos = get_available_graph_spans(tvm_float_lib)
+        # span_infos = get_available_graph_spans(tvm_float_lib)
 
         # onnx
         import onnx
@@ -507,18 +509,13 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         model = onnx.shape_inference.infer_shapes(onnx.load(self.weight))
         ops_kv = dict()
         for node in model.graph.node:
-            logger.info("op_names: {}, output_names: {}".format(node.name, node.output))
+            logger.info("op_name: {}, output_names: {}".format(node.name, node.output))
             for output in node.output:
-                ops_kv[node.name] = node.output
+                # ops_kv[node.name] = node.output
+                for out_name in node.output:
+                    ops_kv[out_name] = node.name
                 model.graph.output.insert(-1, onnx.ValueInfoProto(name=output))
         ort_session = onnxruntime.InferenceSession(model.SerializeToString())
-
-        spans_kv = dict()
-        for span_info in span_infos:
-            logger.info(span_info)
-            if span_info["name"] not in spans_kv:
-                assert span_info["name"] in ops_kv
-                spans_kv[span_info["name"]] = ops_kv[span_info["name"]]  # opname
                 
         outputs = list()
         for output in ort_session.get_outputs():
@@ -553,22 +550,24 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         for key in ort_outs:
             onnx_data = ort_outs[key]  # output_name
 
-            def compare(key, expect, outputs):
-                if key not in outputs:
+            def compare(opname, expect, outputs):
+                if opname not in outputs:
                     return "Missing"
-                actual = outputs[key][0]
-                cosine = get_cos_similarity_per_channel_average(expect, actual, layout="NCHW")
+                actual = outputs[opname][0]
+                # cosine = get_cos_similarity_per_channel_average(expect, actual, layout="NCHW")
+                cosine = cosine_distance(expect, actual)
                 if cosine is None:
                     return f"Mismatch shape: {actual.shape}"
-                return "%.3f" % cosine
-
+                return "%.6f" % cosine
+            # 找到output_name的对应opname
+            opname = ops_kv[key]
             summary.append([
                 key,
                 str(onnx_data.shape),
-                compare(key, onnx_data, tvm_float_outputs),
-                compare(key, onnx_data, quant_outputs),
-                compare(key, onnx_data, fuse_outputs),
-                compare(key, onnx_data, simu_outputs),
+                compare(opname, onnx_data, tvm_float_outputs),
+                compare(opname, onnx_data, quant_outputs),
+                compare(opname, onnx_data, fuse_outputs),
+                compare(opname, onnx_data, simu_outputs),
             ])
 
         import prettytable
