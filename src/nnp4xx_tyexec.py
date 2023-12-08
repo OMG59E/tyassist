@@ -15,7 +15,7 @@ from collections import OrderedDict
 from abc import ABC
 from utils import logger
 from utils.utils import get_method
-from utils.dist_metrics import cosine_distance
+from utils.dist_metrics import get_cos_similarity_per_channel_average
 from .base_tyexec import BaseTyExec
 
 
@@ -224,9 +224,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 save_dir=self.result_dir,
             )
             logger.info("################   quantization end  ######################")
-
             self.save_relay_to_json(self.quant_json_path, self.relay_quant, self.params_quant)
-            self.save_relay_to_model(self.quant_json_path, self.relay_quant, self.params_quant)
+            # self.save_relay_to_model(self.quant_json_path, self.relay_quant, self.params_quant)
         else:
             self.relay_quant = self.load_relay_from_json(self.quant_json_path)
         self.quantization_span = time.time() - t_start
@@ -481,27 +480,18 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
     def save_relay_to_model(quant_model_path, relay_func, params):
         logger.warning("Not support save relay to model, can be visualized by netron")
 
-    def compare_layerwise(self):
+    def compare_layerwise(self, filepath=None):
         """
         onnx-float vs tvm-float vs tvm-fixed vs iss-fixed
         """
-        data_float = self.get_datas(use_norm=True, force_cr=True, to_file=True)  # 浮点模型输入
-        data_fixed = self.get_datas(use_norm=False, force_cr=True, to_file=True)  # 量化后模型输入
+        data_float = self.get_datas(filepath=filepath, use_norm=True, force_cr=True, to_file=True)  # 浮点模型输入
+        data_fixed = self.get_datas(filepath=filepath, use_norm=False, force_cr=True, to_file=True)  # 量化后模型输入
 
         import tvm
         from tvm.relay.transform import SimplifyInference
         layerwise_error = get_method("tvm.contrib.{}.relay.analysis".format(self.logo_module), "LayerwiseError")
         compile_cpuref_model = get_method("tvm.contrib.{}".format(self.logo_module), "compile_cpuref_model")
-        get_available_graph_spans = get_method("tvm.contrib.{}".format(self.logo_module), "get_available_graph_spans")
-        get_cos_similarity_per_channel_average = get_method(
-            "tvm.contrib.{}.testing".format(self.logo_module), "get_cos_similarity_per_channel_average")
-
-        # 加载tvm浮点模型, 编译为包含span信息的cpu可执行模型
-        relay_float = self.load_relay_from_json(self.original_json_path)
-        callback = SimplifyInference()
-        relay_float = callback(relay_float)
-        tvm_float_lib = compile_cpuref_model(relay_float, params=None)
-        # span_infos = get_available_graph_spans(tvm_float_lib)
+        # get_available_graph_spans = get_method("tvm.contrib.{}".format(self.logo_module), "get_available_graph_spans")
 
         # onnx
         import onnx
@@ -524,26 +514,36 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         ort_outs = ort_session.run(outputs, data_float)
         ort_outs = OrderedDict(zip(outputs, ort_outs))
 
-        # 前端tvm float模型逐层结果
-        _, _, _, tvm_float_outputs = layerwise_error.run(tvm_float_lib, inputs=data_float)
+        tvm_float_outputs = dict()
+        if not self.is_qnn:
+            # 非qnn模型，加载tvm浮点模型, 编译为包含span信息的cpu可执行模型
+            relay_float = self.load_relay_from_json(self.original_json_path)
+            callback = SimplifyInference()
+            relay_float = callback(relay_float)
+            tvm_float_lib = compile_cpuref_model(relay_float, params=None)
+            # span_infos = get_available_graph_spans(tvm_float_lib)
+            # 前端tvm float模型逐层结果
+            _, _, _, tvm_float_outputs = layerwise_error.run(tvm_float_lib, inputs=data_float)
 
         # tvm量化模型逐层结果
-        relay_quant = self.load_relay_from_json(self.quant_json_path)
+        relay_quant = self.load_relay_from_json(self.quant_json_path if not self.is_qnn else self.original_json_path)
         quant_lib = compile_cpuref_model(relay_quant, params=None)
         _, _, _, quant_outputs = layerwise_error.run(quant_lib, inputs=data_fixed)
 
         # 图层融合和优化后模型CPU逐层结果
         build_config_nnp = get_method("tvm.contrib.{}".format(self.logo_module), "build_config_nnp")
         optimize_nnp_model = get_method("tvm.contrib.{}".format(self.logo_module), "optimize_nnp_model")
+        target_device = tvm.target.Target(self.logo_module)
         with build_config_nnp(opt_level=self.build_opt_level):
-            fuse_mod, fuse_params = optimize_nnp_model(relay_quant, None, tvm.target.fuxiao())
+            fuse_mod, fuse_params = optimize_nnp_model(relay_quant, None, target_device)
         fuse_lib = compile_cpuref_model(fuse_mod, params=fuse_params)
         _, _, _, fuse_outputs = layerwise_error.run(fuse_lib, inputs=data_fixed)
 
         # 获取模拟器上的逐层结果
         simu_outputs = dict()
-        # lib_x86 = tvm.runtime.load_module(self.model_path_x86_64)
-        # _, _, _, simu_outputs = layerwise_error.run(lib_x86, inputs=data_fixed)
+        if self.enable_dump in [1, 2]:
+            lib_x86 = tvm.runtime.load_module(self.model_path_x86_64)
+            _, _, _, simu_outputs = layerwise_error.run(lib_x86, inputs=data_fixed)
 
         # 绘制比对表格
         summary = []
@@ -554,11 +554,11 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 if opname not in outputs:
                     return "Missing"
                 actual = outputs[opname][0]
-                # cosine = get_cos_similarity_per_channel_average(expect, actual, layout="NCHW")
-                cosine = cosine_distance(expect, actual)
+                cosine = get_cos_similarity_per_channel_average(expect, actual, layout="NCHW")
                 if cosine is None:
                     return f"Mismatch shape: {actual.shape}"
                 return "%.6f" % cosine
+
             # 找到output_name的对应opname
             opname = ops_kv[key]
             summary.append([

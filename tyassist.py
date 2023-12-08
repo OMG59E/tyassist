@@ -173,18 +173,17 @@ def compare(cfg, backend, device_id, node_id):
         logger.error("Failed to compare {}".format(traceback.format_exc()))
 
 
-def compare2(cfg, target, data_dir, device_id, node_id):
+def compare2(cfg, target, data_path, device_id, node_id):
     """
     批量比较tvm-fp32、tvm-int8、iss、chip
-    @param cfg:
-    @param backend:
-    @param data_dir:
-    @return:
+    目前阻塞于iss太慢, tvm环境和sdk冲突
     """
-    # TODO
     try:
         tyexec = get_tyexec(cfg)
         if target.startswith("nnp4"):
+            if tyexec.is_qnn:
+                logger.error("Not support qnn model")
+                exit(-1)
             from src.nnp4xx_infer import Nnp4xxSdkInfer, Nnp4xxTvmInfer
             tvm_fp32_infer = Nnp4xxTvmInfer()
             tvm_int8_infer = Nnp4xxTvmInfer()
@@ -204,9 +203,9 @@ def compare2(cfg, target, data_dir, device_id, node_id):
         table = None
         first = True
 
-        file_list = os.listdir(data_dir)
+        file_list = os.listdir(data_path)
         for filename in file_list:
-            img_path = os.path.join(data_dir, filename)
+            img_path = os.path.join(data_path, filename)
             if not os.path.exists(img_path) or not os.path.isfile(img_path):
                 continue
             float_datas = tyexec.get_datas(img_path, use_norm=True, force_cr=True, force_random=False, to_file=False)
@@ -230,6 +229,19 @@ def compare2(cfg, target, data_dir, device_id, node_id):
         logger.info("TVM-FP32 vs TVM-INT8:\n{}".format(table))
     except Exception as e:
         logger.error("Failed to compare\n{}".format(traceback.format_exc()))
+        exit(-1)
+        
+
+def compare_layerwise(cfg, target, data_path, device_id, node_id):
+    try:
+        tyexec = get_tyexec(cfg)
+        if target.startswith("nnp4"):
+            tyexec.compare_layerwise(data_path)
+        else:
+            logger.error("Not support target -> {}".format(target))
+            exit(-1)
+    except Exception as e:
+        logger.error("Failed to compare_layerwise ->\n{}".format(e))
         exit(-1)
 
 
@@ -446,7 +458,7 @@ def demo(cfg, dtype, backend, device_id, node_id):
         exit(-1)
 
 
-def run(config_filepath, phase, dtype, target, backend, data_dir, opt_level, device_id, node_id):
+def run(config_filepath, phase, dtype, target, backend, data_path, enable_layers, opt_level, device_id, node_id):
     # 补充自定义预处理文件所在目录，必须与配置文件同目录
     config_abspath = os.path.abspath(config_filepath)
     config_dir = os.path.dirname(config_abspath)
@@ -456,7 +468,8 @@ def run(config_filepath, phase, dtype, target, backend, data_dir, opt_level, dev
     # 更新target，优先使用命令行
     if target is not None:
         config["build"]["target"] = target
-
+    target = config["build"]["target"]
+    
     # 更新4xx编译优化等级
     if opt_level is not None:
         config["build"]["opt_level"] = opt_level
@@ -472,8 +485,13 @@ def run(config_filepath, phase, dtype, target, backend, data_dir, opt_level, dev
     if phase == "build":
         build(config)
     elif phase == "compare":
-        if data_dir:
-            compare2(config, target, data_dir, device_id, node_id)
+        if data_path:
+            if os.path.isfile(data_path) and enable_layers:
+                compare_layerwise(config, target, data_path, device_id, node_id)
+            elif os.path.isdir(data_path):
+                compare2(config, target, data_path, device_id, node_id)
+            else:
+                logger.error("\n1. compare with layers, data_path should be a filepath\n2. compare2, data_path should be a dir")
         else:
             compare(config, backend, device_id, node_id)
     elif phase == "test":
@@ -550,9 +568,10 @@ if __name__ == "__main__":
                         help="Please specify one of them, default int8")
     parser.add_argument("--opt_level", type=int, required=False, choices=(0, 2),
                         help="Please specify one of them, default 0, only for nnp4xx!")
-    parser.add_argument("--data_dir", type=str, help="Please specify a data dir, required only comapre specify images")
+    parser.add_argument("--data_path", type=str, help="Please specify a dir or path, required only comapre specify images")
+    parser.add_argument("--layers", action="store_true", help="Debug layer by layer, required only comapre")
     parser.add_argument("--backend", type=str, required="demo" in sys.argv or "test" in sys.argv or (
-            "--data_dir" not in sys.argv and "compare" in sys.argv),
+            "--data_path" not in sys.argv and "compare" in sys.argv),
                         choices=("chip", "iss", "tvm", "onnx"), help="Please specify one of them")
     parser.add_argument("--device_id", type=int, default=0, help="specify a device, default is 0")
     parser.add_argument("--node_id", type=int, default=0, help="specify a Die, default is 0")
@@ -598,4 +617,4 @@ if __name__ == "__main__":
         benchmark(args.config, args.dtype, args.target, args.backend, args.version, args.opt_level, args.device_id, args.node_id)
     else:
         _ = run(args.config, args.type, args.dtype, 
-                args.target, args.backend, args.data_dir, args.opt_level, args.device_id, args.node_id)
+                args.target, args.backend, args.data_path, args.layers, args.opt_level, args.device_id, args.node_id)
