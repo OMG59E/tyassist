@@ -218,12 +218,12 @@ def check_model_cfg(cfg):
         return False
     if framework in ["tensorflow"] and not outputs:
         logger.error("Not set model, when framework is tensorflow, must be set it")
-        return False 
+        return False
     
     # TODO 目前限制多个输入的数据布局必须一致
-    framework_lists = ["tensorflow", "tflite", "tflite-qnn"]
-    if framework in framework_lists:
-        check_tf_nhwc2nchw(inputs_cfg)
+    # framework_lists = ["tensorflow", "tflite", "tflite-qnn"]
+    # if framework in framework_lists:
+    #     check_tf_nhwc2nchw(inputs_cfg)
     return True
 
 
