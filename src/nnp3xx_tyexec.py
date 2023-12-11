@@ -287,8 +287,8 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         from deepeye.util import count_mac
         relay_mac_num = count_mac(self.relay)
         relay_quant_mac_num = count_mac(self.relay_quant)
-        logger.info("float relay MAC: {}".format(relay_mac_num))
-        logger.info("fixed relay MAC: {}".format(relay_quant_mac_num))
+        logger.info("Original model MACs: {}".format(relay_mac_num))
+        logger.info("Quantified model MACs: {}".format(relay_quant_mac_num))
 
     def get_profile_info(self):
         # 不执行iss仿真无法输出graph.json

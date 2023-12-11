@@ -465,7 +465,21 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             shutil.rmtree(profiler.profile_dir, ignore_errors=True)
 
     def get_relay_mac(self):
-        pass
+        mac_path = os.path.join(self.result_dir, "macs.json")
+        if not os.path.exists(mac_path):
+            logger.warning("Not found -> {}".format(mac_path))
+            return
+        with open(mac_path, "rb") as f:
+            compiled_model_MACs_info = json.load(f)
+        compiled_model_MACs = 0
+        for key in compiled_model_MACs_info:
+            compiled_model_MACs += compiled_model_MACs_info[key]  # 工具链内乘加算1次
+        import tvm
+        estimate_origin_mod_FLOPs = get_method("tvm.contrib.{}".format(self.logo_module), "estimate_origin_mod_FLOPs")
+        original_model_MACs_info = estimate_origin_mod_FLOPs(self.relay)
+        original_model_MACs = original_model_MACs_info["total"]["float32"]
+        logger.info("Original model MACs: {}".format(original_model_MACs))
+        logger.info("Compiled model MACs: {}".format(compiled_model_MACs))
 
     def get_device_type(self):
         logger.warning("Nnp4xx not support get device type")
