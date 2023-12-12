@@ -217,7 +217,7 @@ def check_model_cfg(cfg):
         logger.error("model outputs expect list type")
         return False
     if framework in ["tensorflow"] and not outputs:
-        logger.error("Not set model, when framework is tensorflow, must be set it")
+        logger.error("Not set outputs, when framework is tensorflow, must be set it")
         return False
     
     # TODO 目前限制多个输入的数据布局必须一致
