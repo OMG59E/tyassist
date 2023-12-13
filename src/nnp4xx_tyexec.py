@@ -477,7 +477,10 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         import tvm
         estimate_origin_mod_FLOPs = get_method("tvm.contrib.{}".format(self.logo_module), "estimate_origin_mod_FLOPs")
         original_model_MACs_info = estimate_origin_mod_FLOPs(self.relay)
-        original_model_MACs = original_model_MACs_info["total"]["float32"]
+        original_model_MACs_total_info = original_model_MACs_info["total"]
+        original_model_MACs = 0
+        for key in original_model_MACs_total_info:
+            original_model_MACs += original_model_MACs_total_info[key]
         logger.info("Original model MACs: {}".format(original_model_MACs))
         logger.info("Compiled model MACs: {}".format(compiled_model_MACs))
 
