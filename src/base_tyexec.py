@@ -270,9 +270,9 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
     @staticmethod
     def _gen_random_data(shape, layout, dtype):
         if dtype == "float32":
-            _data = np.random.random(shape).astype(dtype=dtype)  # 数值范围[0, 1)
+            _data = np.random.uniform(low=0, high=128, size=shape).astype(dtype=dtype)  # 数值范围[0, 128)
         elif dtype == "float16":
-            _data = np.random.random(shape).astype(dtype=dtype)  # 数值范围[0, 1)
+            _data = np.random.uniform(low=0, high=128, size=shape).astype(dtype=dtype)  # 数值范围[0, 128)
         elif dtype == "int16":
             _data = np.random.randint(low=-(2 ** 15), high=2 ** 15 - 1, size=shape, dtype=dtype)
         elif dtype == "uint8":
@@ -317,7 +317,12 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                     logger.warning("data_path will be reused")
                 data_paths = [data_paths for _ in range(self.bs)]
 
-            shape_s = "x".join(list(map(str, shape)))
+            if support:
+                new_shape = shape
+                new_shape[0] = 1
+                shape_s = "x".join(list(map(str, new_shape)))
+            else:
+                shape_s = "x".join(list(map(str, shape)))
             data_npy_path = os.path.join(self.result_dir, "{}_{}_{}_{}.npy".format(idx, name.replace("/", "_"), dtype, shape_s))
             data_bin_path = os.path.join(self.result_dir, "{}_{}_{}_{}.bin".format(idx, name.replace("/", "_"), dtype, shape_s))
             data_txt_path = os.path.join(self.result_dir, "{}_{}_{}_{}.txt".format(idx, name.replace("/", "_"), dtype, shape_s))
@@ -343,23 +348,23 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                         continue
 
                     # 未指定输入数据，生成随机图像
+                    # TODO 需要处理量化和验证数据为同一批的问题
                     logger.warning("The input[{}] will use random image, recommend make user data!".format(name, idx))
                     if force_random:  # 用于量化和统计含零情况
                         im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
                         ims.append(im)
                         continue
-                    for b in range(bs):
-                        random_im_path = os.path.join(self.result_dir, "{}_{}_random{}.jpg".format(idx, name.replace("/", "_"), b))
-                        random_npy_path = os.path.join(self.result_dir, "{}_{}_random{}.npy".format(idx, name.replace("/", "_"), b))
-                        if os.path.exists(random_npy_path):
-                            # 复用随机数据
-                            im = np.load(random_npy_path)
-                        else:
-                            # 保存随机数据以便复用
-                            im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
-                            np.save(random_npy_path, im)
-                            cv2.imwrite(random_im_path, im)
-                        ims.append(im)
+                    random_im_path = os.path.join(self.result_dir, "{}_{}_random.jpg".format(idx, name.replace("/", "_")))
+                    random_npy_path = os.path.join(self.result_dir, "{}_{}_random.npy".format(idx, name.replace("/", "_")))
+                    if os.path.exists(random_npy_path):
+                        # 复用随机数据
+                        im = np.load(random_npy_path)
+                    else:
+                        # 保存随机数据以便复用
+                        im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
+                        np.save(random_npy_path, im)
+                        cv2.imwrite(random_im_path, im)
+                    ims.append(im)
 
                 # preprocess
                 datas = list()
