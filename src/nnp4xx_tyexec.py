@@ -6,11 +6,10 @@
 @Author  : xingwg
 @software: PyCharm 
 """
-import importlib
-import torch
+import os
 import time
 import json
-import os
+import importlib
 from collections import OrderedDict
 from abc import ABC
 from utils import logger
@@ -97,103 +96,6 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         kwargs = {"dtype": dtype_dict}
         load_model_from_file = get_method("tvm.contrib.{}".format(self.logo_module), "load_model_from_file")
         self.relay, self.params = load_model_from_file(self.weight, "mxnet", self.shape_dict, **kwargs)
-
-    def pytorch2relay(self):
-        load_model_from_file = get_method("tvm.contrib.{}".format(self.logo_module), "load_model_from_file")
-        self.relay, self.params = load_model_from_file(self.weight, "pytorch", self.shape_dict)
-
-    @staticmethod
-    def _tf_convert_nhwc_to_nchw(mod, params):
-        import tvm
-        from tvm import relay
-        from tvm.relay.build_module import bind_params_by_name
-        mod["main"] = bind_params_by_name(mod["main"], params)
-
-        with tvm.transform.PassContext(opt_level=3):
-            seq = tvm.transform.Sequential(
-                [
-                    relay.transform.RemoveUnusedFunctions(),
-                    relay.transform.ConvertLayout({"nn.conv2d": ["NCHW", "default"]}),
-                    relay.transform.FoldConstant(),
-                ]
-            )
-            mod = seq(mod)
-
-        class RemoveLayoutTransform(tvm.relay.ExprMutator):
-            def __init__(self, mod):
-                super(self.__class__, self).__init__()
-                self.count = 0
-                mod["main"] = self.visit(mod["main"])
-                self.new_mod = relay.transform.InferType()(mod)
-
-            def visit_var(self, var):
-                if var.name_hint == "input_tensor":
-                    new_var = relay.Var(var.name_hint, relay.TensorType([1, 3, 224, 224], "float32"))
-                else:
-                    new_var = var
-                return new_var
-
-            def visit_call(self, call):
-                new_fn = self.visit(call.op)
-                new_args = [self.visit(arg) for arg in call.args]
-                self.count = self.count + 1
-                if self.count == 1:
-                    assert call.op.name == "nn.pad"
-                    new_call = relay.nn.pad(new_args[0], pad_width=((0, 0), (0, 0), (3, 3), (3, 3)))
-                elif self.count == 3:
-                    assert call.args[0].op.name == "layout_transform"
-                    new_args[0] = new_args[0].args[0]
-                    new_call = relay.Call(new_fn, new_args, call.attrs, call.type_args, call.span)
-                else:
-                    new_call = relay.Call(new_fn, new_args, call.attrs, call.type_args, call.span)
-                return new_call
-
-            def visit_function(self, fn):
-                new_params = []
-                for x in fn.params:
-                    new_params.append(self.visit(x))
-                new_body = self.visit(fn.body)
-                return relay.Function(new_params, new_body, fn.ret_type, fn.type_params, fn.attrs, fn.span)
-        return RemoveLayoutTransform(mod).new_mod
-
-    def tensorflow2relay(self):
-        load_model_from_file = get_method("tvm.contrib.{}".format(self.logo_module), "load_model_from_file")
-        extract_constants = get_method("tvm.contrib.{}.relay.transform".format(self.logo_module), "extract_constants")
-        shape_dict = dict()
-        for _, _input in enumerate(self.inputs):
-            shape_dict[_input["name"]] = _input["shape"]
-            if _input["layout"] == "NHWC":
-                n, h, w, c = _input["shape"]
-                _input["shape"] = (n, c, h, w)
-                _input["norm_axis"] = 1
-                _input["layout"] = "NCHW"
-        mod, params = load_model_from_file(self.weight, "tensorflow", shape_dict=shape_dict, layout="NHWC")
-        self.relay, self.params = extract_constants(self._tf_convert_nhwc_to_nchw(mod, params))
-        
-    def tflite2relay(self):
-        load_model_from_file = get_method("tvm.contrib.{}".format(self.logo_module), "load_model_from_file")
-        extract_constants = get_method("tvm.contrib.{}.relay.transform".format(self.logo_module), "extract_constants")
-        shape_dict = dict()
-        for _, _input in enumerate(self.inputs):
-            shape_dict[_input["name"]] = _input["shape"]
-            if _input["layout"] == "NHWC":
-                n, h, w, c = _input["shape"]
-                _input["shape"] = (n, c, h, w)
-                _input["norm_axis"] = 1
-                _input["layout"] = "NCHW"
-        mod, params = load_model_from_file(self.weight, "tflite", shape_dict, layout="NHWC")
-        self.relay, self.params = extract_constants(self._tf_convert_nhwc_to_nchw(mod, params))
-        
-    def caffe2relay(self):
-        from tvm.contrib.edgex.relay.frontend import caffe_pb2 as pb
-        load_model_from_file = get_method("tvm.contrib.{}".format(self.logo_module), "load_model_from_file")
-        shape_dict = dict()
-        dtype_dict = dict()
-        for _, _input in enumerate(self.inputs):
-            shape_dict[_input["name"]] = _input["shape"]
-            dtype_dict[_input["name"]] = "float32"
-        kwargs = {"dtype_dict": dtype_dict}
-        self.relay, self.params = load_model_from_file(os.path.dirname(self.weight), "caffe", self.shape_dict, **kwargs)
 
     def quantization(self, in_datas):
         """量化, 将浮点relay函数转为成定点relay函数
