@@ -35,6 +35,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         self.model_path_aarch64 = os.path.join(self.model_dir, "{}_O{}_aarch64.ty".format(self.model_name, self.build_opt_level))
               
         self.custom_op_module = self.cfg["model"].get("custom_op_module")
+        self.op_config = self.quant_cfg.get("op_config", {})
 
         ARM_C_COMPILER = os.getenv("ARM_C_COMPILER")
         if ARM_C_COMPILER is None:
@@ -205,29 +206,52 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
         t_start = time.time()
         if self.enable_quant:
+            bypass = False
             quantize_config, norm = self.set_quantization_cfg(in_datas)
-            logger.info("################   quantization start  ######################")
-            import tvm
-            from tvm.relay.quantization import quantize
-            self.relay_quant, self.params_quant = tvm.relay.quantization.quantize(
-                self.relay,
-                self.params,
-                model_name="opt_ir",
-                dataset=self.get_dataset(),
-                prof_img_num=self.prof_img_num,
-                rgb_en=1 if (self.num_inputs == 1 and self.inputs[0]["pixel_format"] == "RGB") else 0,
-                norm=norm if len(norm) > 0 else None,
-                quantize_config=quantize_config,
-                debug_level=self.quant_debug_level,
-                similarity_img_num=self.similarity_img_num,
-                similarity_dataset=self.similarity_dataset,
-                save_dir=self.result_dir,
-            )
-            logger.info("################   quantization end  ######################")
+            if "image.resize2d" in self.op_config:
+                dtype = self.op_config["image.resize2d"]["input0"]["dtype"]
+                if dtype == "int8":
+                    quantize_config["op_config"] = {"image.resize2d": {"quantized": True}}
+                elif dtype == "int16":
+                    quantize_config["op_config"] = self.op_config
+                    from tvm.contrib.edgex.relay.op.strategy import register_edgex_fprimfunc
+                    @register_edgex_fprimfunc("image.resize2d")
+                    def fprimfunc_image_resize2d_edgex(attrs, inputs, out_type):
+                        from tvm.contrib.edgex.asm_vu_ops.vu_register_fprimfunc import fprimfunc_image_resize2d_edgex as impl
+                        return impl(attrs, inputs, out_type)
+                elif dtype == "float16":
+                    pass
+                elif dtype == "float32":
+                    bypass = True
+            
+            if bypass:
+                self.relay_quant, self.params_quant = self.relay, self.params
+                logger.info(self.relay_quant)
+            else:
+                logger.info("################   quantization start  ######################")
+                import tvm
+                from tvm.relay.quantization import quantize
+                self.relay_quant, self.params_quant = tvm.relay.quantization.quantize(
+                    self.relay,
+                    self.params,
+                    model_name="opt_ir",
+                    dataset=self.get_dataset(),
+                    prof_img_num=self.prof_img_num,
+                    rgb_en=1 if (self.num_inputs == 1 and self.inputs[0]["pixel_format"] == "RGB") else 0,
+                    norm=norm if len(norm) > 0 else None,
+                    quantize_config=quantize_config,
+                    debug_level=self.quant_debug_level,
+                    similarity_img_num=self.similarity_img_num,
+                    similarity_dataset=self.similarity_dataset,
+                    save_dir=self.result_dir,
+                )
+                logger.info("################   quantization end  ######################")
             self.save_relay_to_json(self.quant_json_path, self.relay_quant, self.params_quant)
             # self.save_relay_to_model(self.quant_json_path, self.relay_quant, self.params_quant)
         else:
             self.relay_quant = self.load_relay_from_json(self.quant_json_path)
+        # self.relay_quant, self.params_quant = self.relay, self.params
+        # logger.info("{}".format(self.relay_quant))
         self.quantization_span = time.time() - t_start
 
         t_start = time.time()
@@ -284,6 +308,26 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         except Exception as e:
             logger.error("Failed to load model -> {}".format(e))
             exit(-1)
+            
+    @staticmethod
+    def offload_cpu_strategy(func):
+        import tvm
+        from tvm import relay
+        class Int16Finder(relay.ExprVisitor):
+            def __init__(self):
+                super().__init__()
+                self.is_int16_op = False
+
+            def visit_call(self, call):
+                if call.checked_type.dtype == "int16" or call.args[0].checked_type.dtype == "int16":
+                    print(call.op)
+                    if not (isinstance(call.op, tvm.ir.Op) and call.op.name == "image.resize2d"):
+                        self.is_int16_op = True
+                return super().visit_call(call)
+
+        finder = Int16Finder()
+        finder.visit(func)
+        return finder.is_int16_op
 
     def build(self, in_datas):
         t_start = time.time()
@@ -291,7 +335,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             import tvm
             optimize_and_compile = get_method("tvm.contrib.{}".format(self.logo_module), "optimize_and_compile")
             estimate_compiled_mod_Cycles = get_method("tvm.contrib.{}".format(self.logo_module), "estimate_compiled_mod_Cycles")
-            estimate_compiled_mod_MACs = get_method("tvm.contrib.{}".format(self.logo_module), "estimate_compiled_mod_MACs")
+            estimate_compiled_mod_MACs = get_method("tvm.contrib.{}".format(self.logo_module), "estimate_compiled_mod_MACs")            
             # TODO support c920
             # if self.enable_dump == 0:
             #     export_lib_path = []
@@ -332,6 +376,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 working_dir=self.model_dir,
                 export_lib_path=export_lib_path,
                 opt_level=self.build_opt_level,
+                offload_cpu_strategy=self.offload_cpu_strategy,
                 target_host=target_host,
                 target_host_cc=target_host_cc,
                 target_device=target_device,

@@ -180,6 +180,17 @@ build: {
 
     # 可配置为原模型op_name，注意原模型在量化前会进行优化融合，所以指定原模型opname有可能会失败
     skip_layer_names: [ ],
+
+    # 指定op为指定精度，int16支持不完善，注意float32目前仅支持单算子模型
+    op_config: {
+      # op类型
+      "image.resize2d": {
+        "quantized": True,   # 是否量化
+        "input0": {
+          "dtype": "int16",   #可选float32、float16、int16、int8
+        }
+      }
+    },
   },
 
   # 是否使能进行逐层dump结果，可空可缺省表示0
