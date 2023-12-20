@@ -598,11 +598,11 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         """tvm cpu fixed"""
         raise NotImplementedError
 
-    def infer(self):
+    def infer(self, device_id, node_id):
         """ inference on chip/sdk_iss """
         raise NotImplementedError
 
-    def profile(self):
+    def profile(self, device_id, node_id):
         raise NotImplementedError
 
     @abc.abstractmethod

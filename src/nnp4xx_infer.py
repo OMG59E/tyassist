@@ -124,14 +124,6 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
         self.total_span_ms += (time.time() - t_start) * 1000
         self.total += 1
 
-        if self.enable_dump:
-            if self.backend == "chip":
-                self.compare_layer_out()
-            elif self.backend == "sdk_iss":
-                logger.warning("Inference time cannot be output when enable_dump == 1")
-            else:
-                logger.error("Not support backend -> {}".format(self.backend))
-
         if to_file:
             logger.info("[{}] predict result: outputs size -> {}".format(self.backend, len(outputs)))
             for idx, output in enumerate(outputs):

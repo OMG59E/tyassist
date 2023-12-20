@@ -10,6 +10,7 @@ import os
 import time
 import json
 import importlib
+import numpy as np
 from collections import OrderedDict
 from abc import ABC
 from utils import logger
@@ -263,6 +264,13 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         outputs = infer.run(in_datas, to_file=True)
         infer.unload()
         ave_latency_ms = infer.ave_latency_ms
+        if infer.enable_dump:
+            if infer.backend == "chip":
+                infer.compare_layer_out()
+            elif infer.backend == "sdk_iss":
+                logger.warning("Inference time cannot be output when enable_dump == 1")
+            else:
+                logger.error("Not support backend -> {}".format(self.backend))
         # # 清理profile输出
         # if os.path.exists(infer.profile_dir):
         #     import shutil
@@ -399,19 +407,64 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
     def save_relay_to_model(quant_model_path, relay_func, params):
         logger.warning("Not support save relay to model, can be visualized by netron")
 
-    def compare_layerwise(self, filepath=None):
+    @staticmethod
+    def get_spans(graph_json: dict):
+        import base64
+        results = list()
+        for idx, node in enumerate(graph_json["nodes"]):
+            if node["op"] == "tvm_op":
+                func_name = node["attrs"]["func_name"]
+                if "LoweredFunctionNameHint" in node["attrs"]:
+                    func_name = node["attrs"]["LoweredFunctionNameHint"]
+                if "span_info" in node["attrs"]:
+                    span_info = node["attrs"]["span_info"]
+                    try:
+                        span_info = json.loads(base64.b64decode(span_info))
+                        for span_name, out_idx in span_info.items():
+                            span_dict = dict()
+                            span_dict["name"] = span_name
+                            span_dict["func_name"] = func_name
+                            span_dict["output_idx"] = out_idx
+                            span_dict["node_idx"] = idx
+                            results.append(span_dict)
+                    except Exception as e:  # pylint: disable=broad-exception-caught
+                        logger.warning(f"Illegal span info: {span_info}:\n{e}")
+        return results
+
+    def compare_layerwise(self, filepath=None, backend="iss"):
         """
-        onnx-float vs tvm-float vs tvm-fixed vs iss-fixed
+        onnx-float vs tvm-float vs tvm-fixed vs iss-fixed vs chip-fixed
         """
         data_float = self.get_datas(filepath=filepath, use_norm=True, force_cr=True, to_file=True)  # 浮点模型输入
         data_fixed = self.get_datas(filepath=filepath, use_norm=False, force_cr=True, to_file=True)  # 量化后模型输入
-
+        
+        # 获取芯片逐层输出
+        if backend == "chip":
+            try:
+                from .nnp4xx_infer import Nnp4xxSdkInfer
+                infer = Nnp4xxSdkInfer(enable_dump=1, device_id=0, node_id=0)
+                infer.backend = self.backend
+                infer.load(self.model_path_aarch64)
+                json_graph = infer.engine.get_json_graph()
+                chip_spans = self.get_spans(json.loads(json_graph))
+                outputs = infer.run(data_fixed, to_file=False)
+                infer.unload()
+                #
+                dump_root_path = infer.dump_root_path
+                if not os.path.exists(dump_root_path):
+                    logger.error("Not found dump_root_path: {}".format(dump_root_path))
+                    exit(-1)
+            except Exception as e:
+                pass
+        
         import tvm
         from tvm.relay.transform import SimplifyInference
         layerwise_error = get_method("tvm.contrib.{}.relay.analysis".format(self.logo_module), "LayerwiseError")
         compile_cpuref_model = get_method("tvm.contrib.{}".format(self.logo_module), "compile_cpuref_model")
         # get_available_graph_spans = get_method("tvm.contrib.{}".format(self.logo_module), "get_available_graph_spans")
 
+        self.get_version()
+        
         # onnx
         import onnx
         import onnxruntime
@@ -440,7 +493,6 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             callback = SimplifyInference()
             relay_float = callback(relay_float)
             tvm_float_lib = compile_cpuref_model(relay_float, params=None)
-            # span_infos = get_available_graph_spans(tvm_float_lib)
             # 前端tvm float模型逐层结果
             _, _, _, tvm_float_outputs = layerwise_error.run(tvm_float_lib, inputs=data_float)
 
@@ -460,9 +512,23 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
 
         # 获取模拟器上的逐层结果
         simu_outputs = dict()
-        if self.enable_dump in [1, 2]:
+        if backend in ["iss", "chip"] and self.enable_dump in [1, 2]:
             lib_x86 = tvm.runtime.load_module(self.model_path_x86_64)
             _, _, _, simu_outputs = layerwise_error.run(lib_x86, inputs=data_fixed)
+
+        chip_outs = dict()
+        for term in chip_spans:
+            name = term["name"]
+            func_name = term["func_name"]
+            output_idxes = term["output_idx"]
+            res = list()
+            for idx in output_idxes:
+                dtype = simu_outputs[name][idx].dtype
+                shape = simu_outputs[name][idx].shape
+                data = np.fromfile(
+                    os.path.join(dump_root_path, "{}_out{}.bin".format(func_name, idx)), dtype=dtype).reshape(shape)
+                res.append(data)
+            chip_outs[name] = res
 
         # 绘制比对表格
         summary = []
@@ -487,12 +553,13 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 compare(opname, onnx_data, quant_outputs),
                 compare(opname, onnx_data, fuse_outputs),
                 compare(opname, onnx_data, simu_outputs),
+                compare(opname, onnx_data, chip_outs),
             ])
 
         import prettytable
         table = prettytable.PrettyTable()
         table.field_names = [
-            "layer", "onnx_shape", "tvm-float vs onnx", "tvm-fixed vs onnx", "tvm-fused vs onnx", "tvm-iss vs onnx",]
+            "layer", "onnx_shape", "tvm-float vs onnx", "tvm-fixed vs onnx", "tvm-fused vs onnx", "iss vs onnx", "chip vs onnx"]
         table.add_rows(summary)
         logger.info("\n{}".format(table))
 

@@ -232,11 +232,11 @@ def compare2(cfg, target, data_path, device_id, node_id):
         exit(-1)
         
 
-def compare_layerwise(cfg, target, data_path, device_id, node_id):
+def compare_layerwise(cfg, target, data_path, device_id, node_id, backend):
     try:
         tyexec = get_tyexec(cfg)
         if target.startswith("nnp4"):
-            tyexec.compare_layerwise(data_path)
+            tyexec.compare_layerwise(data_path, backend)
         else:
             logger.error("Not support target -> {}".format(target))
             exit(-1)
@@ -487,7 +487,7 @@ def run(config_filepath, phase, dtype, target, backend, data_path, enable_layers
     elif phase == "compare":
         if data_path:
             if os.path.isfile(data_path) and enable_layers:
-                compare_layerwise(config, target, data_path, device_id, node_id)
+                compare_layerwise(config, target, data_path, device_id, node_id, backend)
             elif os.path.isdir(data_path):
                 compare2(config, target, data_path, device_id, node_id)
             else:
@@ -570,9 +570,8 @@ if __name__ == "__main__":
                         help="Please specify one of them, default 0, only for nnp4xx!")
     parser.add_argument("--data_path", type=str, help="Please specify a dir or path, required only comapre specify images")
     parser.add_argument("--layers", action="store_true", help="Debug layer by layer, required only comapre")
-    parser.add_argument("--backend", type=str, required="demo" in sys.argv or "test" in sys.argv or (
-            "--data_path" not in sys.argv and "compare" in sys.argv),
-                        choices=("chip", "iss", "tvm", "onnx"), help="Please specify one of them")
+    parser.add_argument("--backend", type=str, required="demo" in sys.argv or "test" in sys.argv or "compare" in sys.argv,
+                        choices=("chip", "iss", "tvm", "onnx") if "compare" not in sys.argv else ("chip", "iss"), help="Please specify one of them")
     parser.add_argument("--device_id", type=int, default=0, help="specify a device, default is 0")
     parser.add_argument("--node_id", type=int, default=0, help="specify a Die, default is 0")
     parser.add_argument("--log_dir", type=str, default="./logs",

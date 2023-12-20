@@ -444,7 +444,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             nnp_dev="nnp300 -mnnp=nnp3xx"
         )
 
-    def infer(self):
+    def infer(self, device_id=0, node_id=0):
         """ infer one time """
         from .nnp3xx_infer import Nnp3xxSdkInfer
         in_datas = self.get_datas(force_cr=True, to_file=False)
@@ -454,11 +454,18 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         infer.set_input_pixel_format([_input["pixel_format"] for _input in self.inputs])
         infer.load(self.model_path)
         outputs = infer.run(in_datas, to_file=True)
+        if infer.enable_dump == 1:
+            if infer.backend == "chip":
+                infer.compare_layer_out()
+            elif infer.backend == "sdk_iss":
+                logger.warning("Inference time cannot be output when enable_dump == 1")
+            else:
+                logger.error("Not support backend -> {}".format(self.backend))
         ave_latency_ms = infer.ave_latency_ms
         logger.info("[{}] average cost: {:.3f}ms".format(self.target, ave_latency_ms))
         return outputs
 
-    def profile(self):
+    def profile(self, device_id=0, node_id=0):
         from .nnp3xx_profiler import Nnp3xxSdkProfiler
         profiler = Nnp3xxSdkProfiler(
             net_cfg_file="/DEngine/tyhcp/net.cfg",
