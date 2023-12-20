@@ -439,6 +439,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         data_fixed = self.get_datas(filepath=filepath, use_norm=False, force_cr=True, to_file=True)  # 量化后模型输入
         
         # 获取芯片逐层输出
+        chip_spans = dict()
         if backend == "chip":
             try:
                 from .nnp4xx_infer import Nnp4xxSdkInfer
