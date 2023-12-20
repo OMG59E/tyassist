@@ -86,3 +86,9 @@ python3 tyassist.py test -c config.yml -t int8 --target nnp300 --backend chip --
 ```shell
 python3 tyassist.py demo -c config.yml -t int8 --target nnp300 --backend chip --log_dir ./logs
 ```
+
+### 逐层比对
+支持onnx、tvm-float、tvm-fixed、tvm-fused、iss、chip 逐层比对，经过融合后丢失的op会显示missing
+```shell
+python3 tyassist.py compare -c config.yml --data_path "a_img_path" --layers --target nnp400 --backend chip
+```
