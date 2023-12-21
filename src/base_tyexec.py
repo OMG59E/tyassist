@@ -359,6 +359,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                     if os.path.exists(random_npy_path):
                         # 复用随机数据
                         im = np.load(random_npy_path)
+                        to_file = False
                     else:
                         # 保存随机数据以便复用
                         im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
@@ -415,6 +416,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                     else:
                         if os.path.exists(data_npy_path):
                             in_datas[name] = np.load(data_npy_path)
+                            to_file = False
                         else:
                             in_datas[name] = self._gen_random_data(shape, layout, dtype)     
                     if use_norm:  
