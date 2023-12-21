@@ -435,8 +435,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         """
         onnx-float vs tvm-float vs tvm-fixed vs iss-fixed vs chip-fixed
         """
-        data_float = self.get_datas(filepath=filepath, use_norm=True, force_cr=True, to_file=True)  # 浮点模型输入
-        data_fixed = self.get_datas(filepath=filepath, use_norm=False, force_cr=True, to_file=True)  # 量化后模型输入
+        data_float = self.get_datas(filepath=filepath, use_norm=True, force_cr=True, to_file=False)  # 浮点模型输入
+        data_fixed = self.get_datas(filepath=filepath, use_norm=False, force_cr=True, to_file=False)  # 量化后模型输入
         
         # 获取芯片逐层输出
         chip_spans = dict()
@@ -465,7 +465,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         from tvm.relay.transform import SimplifyInference
         layerwise_error = get_method("tvm.contrib.{}.relay.analysis".format(self.logo_module), "LayerwiseError")
         compile_cpuref_model = get_method("tvm.contrib.{}".format(self.logo_module), "compile_cpuref_model")
-        # get_available_graph_spans = get_method("tvm.contrib.{}".format(self.logo_module), "get_available_graph_spans")
+        get_available_graph_spans = get_method("tvm.contrib.{}".format(self.logo_module), "get_available_graph_spans")
 
         self.get_version()
         
@@ -494,6 +494,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         logger.info("Step2 - inference onnx finished, and time: {:.3f}s".format(time.time() - t))
 
         tvm_float_outputs = dict()
+        span_infos = list()
         if not self.is_qnn:
             logger.info("Step3 - inference tvm-float start")
             t = time.time()
@@ -523,6 +524,11 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         with build_config_nnp(opt_level=self.build_opt_level):
             fuse_mod, fuse_params = optimize_nnp_model(relay_quant, None, target_device)
         fuse_lib = compile_cpuref_model(fuse_mod, params=fuse_params)
+        span_infos = get_available_graph_spans(fuse_lib)
+        spans_dict = dict()
+        for item in span_infos:
+            print(item)
+            spans_dict[item["name"]] = item["func_name"]
         _, _, _, fuse_outputs = layerwise_error.run(fuse_lib, inputs=data_fixed)
         logger.info("Step5 - inference tvm-fused finished, and time: {:.3f}s".format(time.time() - t))
 
@@ -573,6 +579,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             opname, idx = ops_kv[output_name]
             summary.append([
                 "{}_out{}".format(opname, idx),
+                "Missing" if opname not in spans_dict else spans_dict[opname],
                 str(onnx_data.shape),
                 "Missing" if opname not in tvm_float_outputs else compare(onnx_data, tvm_float_outputs[opname][idx]),
                 "Missing" if opname not in quant_outputs else compare(onnx_data, quant_outputs[opname][idx]),
@@ -584,7 +591,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         import prettytable
         table = prettytable.PrettyTable()
         table.field_names = [
-            "layer", "onnx_shape", "tvm-float vs onnx", "tvm-fixed vs onnx", "tvm-fused vs onnx", "iss vs onnx", "chip vs onnx"]
+            "opanme", "func_name", "onnx_shape", "tvm-float vs onnx", "tvm-fixed vs onnx", "tvm-fused vs onnx", "iss vs onnx", "chip vs onnx"]
         table.add_rows(summary)
         logger.info("\n{}".format(table))
 
