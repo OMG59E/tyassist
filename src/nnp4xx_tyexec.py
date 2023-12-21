@@ -442,6 +442,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         chip_spans = dict()
         if backend == "chip":
             try:
+                logger.info("Step1 - inference chip start")
+                t = time.time()
                 from .nnp4xx_infer import Nnp4xxSdkInfer
                 infer = Nnp4xxSdkInfer(enable_dump=1, device_id=0, node_id=0)
                 infer.backend = self.backend
@@ -450,6 +452,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 chip_spans = self.get_spans(json.loads(json_graph))
                 outputs = infer.run(data_fixed, to_file=False)
                 infer.unload()
+                logger.info("Step1 - inference chip finished, and time: {:.3f}s".format(time.time() - t))
                 #
                 dump_root_path = infer.dump_root_path
                 if not os.path.exists(dump_root_path):
@@ -467,6 +470,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         self.get_version()
         
         # onnx
+        logger.info("Step2 - inference onnx start")
+        t = time.time()
         import onnx
         import onnxruntime
         model = onnx.shape_inference.infer_shapes(onnx.load(self.weight))
@@ -475,8 +480,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             logger.info("op_name: {}, output_names: {}".format(node.name, node.output))
             for output in node.output:
                 # ops_kv[node.name] = node.output
-                for out_name in node.output:
-                    ops_kv[out_name] = node.name
+                for idx, out_name in enumerate(node.output):
+                    ops_kv[out_name] = (node.name, idx)
                 model.graph.output.insert(-1, onnx.ValueInfoProto(name=output))
         ort_session = onnxruntime.InferenceSession(model.SerializeToString())
                 
@@ -486,9 +491,12 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 outputs.append(output.name)
         ort_outs = ort_session.run(outputs, data_float)
         ort_outs = OrderedDict(zip(outputs, ort_outs))
+        logger.info("Step2 - inference onnx finished, and time: {:.3f}s".format(time.time() - t))
 
         tvm_float_outputs = dict()
         if not self.is_qnn:
+            logger.info("Step3 - inference tvm-float start")
+            t = time.time()
             # 非qnn模型，加载tvm浮点模型, 编译为包含span信息的cpu可执行模型
             relay_float = self.load_relay_from_json(self.original_json_path)
             callback = SimplifyInference()
@@ -496,13 +504,19 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             tvm_float_lib = compile_cpuref_model(relay_float, params=None)
             # 前端tvm float模型逐层结果
             _, _, _, tvm_float_outputs = layerwise_error.run(tvm_float_lib, inputs=data_float)
+            logger.info("Step3 - inference tvm-float finished, and time: {:.3f}s".format(time.time() - t))
 
         # tvm量化模型逐层结果
+        logger.info("Step4 - inference tvm-fixed start")
+        t = time.time()
         relay_quant = self.load_relay_from_json(self.quant_json_path if not self.is_qnn else self.original_json_path)
         quant_lib = compile_cpuref_model(relay_quant, params=None)
         _, _, _, quant_outputs = layerwise_error.run(quant_lib, inputs=data_fixed)
+        logger.info("Step4 - inference tvm-fixed finished, and time: {:.3f}s".format(time.time() - t))
 
         # 图层融合和优化后模型CPU逐层结果
+        logger.info("Step5 - inference tvm-fused start")
+        t = time.time()
         build_config_nnp = get_method("tvm.contrib.{}".format(self.logo_module), "build_config_nnp")
         optimize_nnp_model = get_method("tvm.contrib.{}".format(self.logo_module), "optimize_nnp_model")
         target_device = tvm.target.Target(self.logo_module)
@@ -510,12 +524,16 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             fuse_mod, fuse_params = optimize_nnp_model(relay_quant, None, target_device)
         fuse_lib = compile_cpuref_model(fuse_mod, params=fuse_params)
         _, _, _, fuse_outputs = layerwise_error.run(fuse_lib, inputs=data_fixed)
+        logger.info("Step5 - inference tvm-fused finished, and time: {:.3f}s".format(time.time() - t))
 
         # 获取模拟器上的逐层结果
+        logger.info("Step6 - inference tvm-iss start")
+        t = time.time()
         simu_outputs = dict()
         if backend in ["iss", "chip"] and self.enable_dump in [1, 2]:
             lib_x86 = tvm.runtime.load_module(self.model_path_x86_64)
             _, _, _, simu_outputs = layerwise_error.run(lib_x86, inputs=data_fixed)
+        logger.info("Step6 - inference tvm-iss finished, and time: {:.3f}s".format(time.time() - t))
 
         chip_outs = dict()
         for term in chip_spans:
@@ -524,37 +542,43 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             output_idxes = term["output_idx"]
             res = list()
             for idx in output_idxes:
-                dtype = simu_outputs[name][idx].dtype
-                shape = simu_outputs[name][idx].shape
-                data = np.fromfile(
-                    os.path.join(dump_root_path, "{}_out{}.bin".format(func_name, idx)), dtype=dtype).reshape(shape)
+                json_path = os.path.join(dump_root_path, "{}_out{}.json".format(func_name, idx))
+                bin_path = os.path.join(dump_root_path, "{}_out{}.bin".format(func_name, idx))
+                if not os.path.exists(json_path):
+                    logger.warning("Not found chip output:", json_path)
+                    continue
+                if not os.path.exists(bin_path):
+                    logger.warning("Not found chip output:", bin_path)
+                    continue
+                with open(json_path, "rb") as f:
+                    out_infos = json.load(f)
+                dtype = out_infos["dtype"]
+                shape = out_infos["shape"]
+                data = np.fromfile(bin_path, dtype=dtype).reshape(shape)
                 res.append(data)
             chip_outs[name] = res
 
         # 绘制比对表格
         summary = []
-        for key in ort_outs:
-            onnx_data = ort_outs[key]  # output_name
+        for output_name in ort_outs:
+            onnx_data = ort_outs[output_name]  # output_name
 
-            def compare(opname, expect, outputs):
-                if opname not in outputs:
-                    return "Missing"
-                actual = outputs[opname][0]
+            def compare(expect, actual):
                 cosine = get_cos_similarity_per_channel_average(expect, actual, layout="NCHW")
                 if cosine is None:
                     return f"Mismatch shape: {actual.shape}"
                 return "%.6f" % cosine
 
             # 找到output_name的对应opname
-            opname = ops_kv[key]
+            opname, idx = ops_kv[output_name]
             summary.append([
-                key,
+                "{}_out{}".format(opname, idx),
                 str(onnx_data.shape),
-                compare(opname, onnx_data, tvm_float_outputs),
-                compare(opname, onnx_data, quant_outputs),
-                compare(opname, onnx_data, fuse_outputs),
-                compare(opname, onnx_data, simu_outputs),
-                compare(opname, onnx_data, chip_outs),
+                "Missing" if opname not in tvm_float_outputs else compare(onnx_data, tvm_float_outputs[opname][idx]),
+                "Missing" if opname not in quant_outputs else compare(onnx_data, quant_outputs[opname][idx]),
+                "Missing" if opname not in fuse_outputs else compare(onnx_data, fuse_outputs[opname][idx]),
+                "Missing" if opname not in simu_outputs else compare(onnx_data, simu_outputs[opname][idx]),
+                "Missing" if opname not in chip_outs else compare(onnx_data, chip_outs[opname][idx]),
             ])
 
         import prettytable
