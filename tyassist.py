@@ -241,7 +241,7 @@ def compare_layerwise(cfg, target, data_path, device_id, node_id, backend):
             logger.error("Not support target -> {}".format(target))
             exit(-1)
     except Exception as e:
-        logger.error("Failed to compare_layerwise ->\n{}".format(e))
+        logger.error("Failed to compare_layerwise ->\n{}".format(traceback.format_exc()))
         exit(-1)
 
 
@@ -258,8 +258,7 @@ def profile(cfg, device_id, node_id):
             exit(-1)
         logger.info("success")
     except Exception as e:
-        logger.error("{}".format(traceback.format_exc()))
-        logger.error("TyAssist failed to profile -> {}".format(e))
+        logger.error("TyAssist failed to profile -> {}".format(traceback.format_exc()))
 
 
 def test(cfg, dtype, backend, device_id, node_id):
