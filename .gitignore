@@ -74,4 +74,5 @@ outputs/
 *.json
 *.tflite
 *.pt
+.idea
 examples
