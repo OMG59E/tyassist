@@ -59,7 +59,7 @@ class Nnp4xxSdkInfer(BaseInfer, ABC):
             exit(-1)
 
         nodes = devices[0]["nodes"]
-        self.ip = nodes[0]["clients"]["dcl"]["targetId"]
+        self.ip = nodes[0]["clients"]["cl"]["targetId"]
         self.backend = "chip"
         if self.ip == "127.0.0.1":   # TODO 非127.0.0.1的地址也可能是ISS服务
             self.backend = "sdk_iss"
