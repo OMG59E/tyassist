@@ -127,7 +127,7 @@ class Classifier(BaseModel, ABC):
 
         top1, top5 = float(top1)/total_num, float(top5)/total_num
         return {
-            "input_size": "{}x{}x{}x{}".format(1, 3, self._input_size[1], self._input_size[0]),
+            "input_size": "{}x{}x{}x{}".format(self.bs, 3, self._input_size[1], self._input_size[0]),
             "dataset": self.dataset.dataset_name,
             "num": total_num,
             "top1": "{:.6f}".format(top1),
