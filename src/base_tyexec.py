@@ -153,8 +153,9 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 
             self.shape_dict[input_name] = shape
             self.bs = shape[0]
-            if idx > 0:
-                assert self.bs == self.inputs[idx - 1]["shape"][0], "all input batch size must be same"
+            # 每个输入0维未必表示batch
+            # if idx > 0:
+            #     assert self.bs == self.inputs[idx - 1]["shape"][0], "all input batch size must be same"
             
             pixel_format = _input["pixel_format"]                
             if not _input.get("dtype"):
