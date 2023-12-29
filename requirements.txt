@@ -8,3 +8,4 @@ pyyaml==6.0
 xlsxwriter
 pycocotools>=2.0.6
 onnx_graphsurgeon
+psutil
