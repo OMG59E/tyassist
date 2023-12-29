@@ -9,6 +9,7 @@
 import os
 import time
 import json
+import psutil
 import importlib
 import numpy as np
 from collections import OrderedDict
@@ -64,14 +65,16 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         for _, _input in enumerate(self.inputs):
             input_name = _input["name"]
             dtype_dict[input_name] = "float32"
-            norm_dict[input_name] = {"mean": _input["mean"], "std": _input["std"]}
+            if _input["mean"]:
+                norm_dict[input_name] = {"mean": _input["mean"], "std": _input["std"]}
             qnn_in_dtype[input_name] = "uint8" if _input["pixel_format"] in \
                                 ["RGB", "BGR", "GRAY"] else _input["dtype"]
 
         kwargs = {"dtype": dtype_dict}
         if self.is_qnn:
             kwargs["qnn"] = self.is_qnn
-            kwargs["norm"] = norm_dict
+            if len(norm_dict) > 0:
+                kwargs["norm"] = norm_dict
             kwargs["net_in_dtype"] = qnn_in_dtype
             # kwargs["output_info"] = {"output_name": {"dtype": "float32", "skip_dequant": False}}
 
@@ -220,8 +223,12 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 "tir.{}.InjectCheckpoint.enable".format(self.logo_module): False,
                 # "relay.{}.byoa".format(self.logo_module): False,
             }
-            if self.cfg["build"].get("multi_thread"):
-                config["{}.relay_to_tir.compile_thread".format(self.logo_module)] = self.cfg["build"].get("multi_thread")
+            multi_thread = self.cfg["build"].get("multi_thread")
+            if multi_thread is not None:
+                config["{}.relay_to_tir.compile_thread".format(self.logo_module)] = multi_thread
+            else:
+                multi_thread = psutil.cpu_count(False)
+            logger.info("Build thread: {}".format(multi_thread))
             num_cube = self.cfg["build"].get("num_cube")
             if num_cube:
                 assert num_cube in [1, 2, 3]
