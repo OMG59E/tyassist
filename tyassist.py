@@ -14,6 +14,7 @@ import argparse
 import importlib
 import logging
 import time
+from utils.gen_config import gen_default_config
 from prettytable import PrettyTable
 from utils import logger
 from utils.glog_format import GLogFormatter
@@ -558,7 +559,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TyAssist Tool")
     parser.add_argument("type", type=str, choices=("demo", "test", "compare", "benchmark", "build", "profile"),
                         help="Please specify a operator")
-    parser.add_argument("--config", "-c", type=str, required=True,
+    parser.add_argument("--config", "-c", type=str, required=True if "--onnx" not in sys.argv else False,
                         help="Please specify a configuration file")
     parser.add_argument("--target", type=str, required=False,
                         choices=("nnp300", "nnp3020", "nnp310", "nnp315m", "nnp320", "nnp400"),
@@ -567,10 +568,12 @@ if __name__ == "__main__":
                         help="Please specify one of them, default int8")
     parser.add_argument("--opt_level", type=int, required=False, choices=(0, 2),
                         help="Please specify one of them, default 0, only for nnp4xx!")
-    parser.add_argument("--data_path", type=str, help="Please specify a dir or path, required only comapre specify images")
+    parser.add_argument("--data_path", type=str,
+                        help="Please specify a dir or path, required only comapre specify images")
     parser.add_argument("--layers", action="store_true", help="Debug layer by layer, required only comapre")
     parser.add_argument("--backend", type=str, required="demo" in sys.argv or "test" in sys.argv or "compare" in sys.argv,
-                        choices=("chip", "iss", "tvm", "onnx") if "compare" not in sys.argv else ("chip", "iss"), help="Please specify one of them")
+                        choices=("chip", "iss", "tvm", "onnx") if "compare" not in sys.argv else ("chip", "iss"),
+                        help="Please specify one of them")
     parser.add_argument("--device_id", type=int, default=0, help="specify a device, default is 0")
     parser.add_argument("--node_id", type=int, default=0, help="specify a Die, default is 0")
     parser.add_argument("--log_dir", type=str, default="./logs",
@@ -579,13 +582,11 @@ if __name__ == "__main__":
                         help="Please specify a log level, default 2, 1:DEBUG, 2:INFO, 3:WARNING, 4:ERROR, 5:FATAL")
     parser.add_argument("--version", type=str, required=("benchmark" in sys.argv),
                         help="Please specify a tytvm version, required only onnx backend")
-
+    parser.add_argument("--onnx", type=str, required="--config" not in sys.argv and "-c" not in sys.argv,
+                        help="Please specify a onnx file")
+    
     args = parser.parse_args()
     logger.setLevel(args.log_level*10)
-
-    check_file_exist(args.config)
-    basename, _ = os.path.splitext(os.path.basename(args.config))
-    set_logger(args.type, args.log_dir, basename)
 
     dirname, filename = os.path.split(os.path.abspath(__file__))
     version_path = os.path.join(dirname, "version")
@@ -594,6 +595,22 @@ if __name__ == "__main__":
     with open(version_path, "rb") as f:
         VERSION = f.readline().decode("gbk").strip()
         logger.info("{} with TyAssist version: {}".format(args.type, VERSION))
+      
+    if "--onnx" not in sys.argv:
+        check_file_exist(args.config)
+        basename, _ = os.path.splitext(os.path.basename(args.config))
+        set_logger(args.type, args.log_dir, basename)
+    elif "--onnx" in sys.argv and ("--config" not in sys.argv and "-c" not in sys.argv):
+        # 简便方式快速编译，方便评估编译测试性能
+        check_file_exist(args.onnx)
+        basename, ext = os.path.splitext(os.path.basename(args.onnx))
+        if ext != ".onnx":
+            logger.error("Only support onnx model")
+            exit(-1)
+        set_logger(args.type, args.log_dir, basename)
+        config = gen_default_config(args.onnx)
+        build(config)
+        exit(0)
 
     # check
     if args.backend == "tvm":
