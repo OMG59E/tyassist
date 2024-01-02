@@ -33,6 +33,11 @@ def gen_default_config(onnx_file):
         input_info["dtype"] = "float32"
         input_info["layout"] = "None"
         input_info["pixel_format"] = "None"
+        input_info["mean"] = "None"
+        input_info["std"] = "None"
+        input_info["resize_type"] = 0
+        input_info["padding_value"] = 128
+        input_info["padding_mode"] = 1
         input_info["data_path"] = ""
         input_infos.append(input_info)
     
