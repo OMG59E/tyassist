@@ -168,6 +168,10 @@ build: {
     # 可空可缺省，表示3
     num_cube: 3,
 
+    # 调度每个subgraph的运行时间阈值
+    # 可空可缺省，表示按照性能最好的方式切分子图
+    fuse_subgraph_ms_threshold: ,
+
     # 校准方法 "kld", "min_max", "percentile_0.99..", "l2norm"
     # 不同的策略量化耗时有差异，由少到多"min_max"，"percentile_0.99.."，"kld"，"l2norm"
     calib_method: "l2norm",

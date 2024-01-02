@@ -229,10 +229,19 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             else:
                 multi_thread = psutil.cpu_count(False)
             logger.info("Build thread: {}".format(multi_thread))
+            # fuse_subgraph_ms_threshold
+            fuse_subgraph_ms_threshold = self.cfg["build"].get("fuse_subgraph_ms_threshold")
+            if fuse_subgraph_ms_threshold is not None:
+                if fuse_subgraph_ms_threshold <= 0:
+                    logger.error("fuse_subgraph_ms_threshold must be > 0")
+                    exit(-1)
+                config["{}.FuseSubgraph.ms_threshold".format(self.logo_module)] = float(fuse_subgraph_ms_threshold)
+                logger.info("{}.FuseSubgraph.ms_threshold: {}ms".format(self.logo_module, fuse_subgraph_ms_threshold))
             num_cube = self.cfg["build"].get("num_cube")
             if num_cube:
                 assert num_cube in [1, 2, 3]
                 config["hardware.pe_num"] = num_cube
+                logger.info("hardware.pe_num: {}".format(num_cube))
             target_device = tvm.target.Target(
                 self.logo_module, host="{}_virtual_host".format(self.logo_module) if self.enable_dump != 0 else None)
 
