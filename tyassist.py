@@ -14,6 +14,7 @@ import argparse
 import importlib
 import logging
 import time
+import yaml
 from utils.gen_config import gen_default_config
 from prettytable import PrettyTable
 from utils import logger
@@ -609,6 +610,11 @@ if __name__ == "__main__":
             exit(-1)
         set_logger(args.type, args.log_dir, basename)
         config = gen_default_config(args.onnx)
+        config["build"]["opt_level"] = 0 if args.opt_level is None else 2
+        config_yml = "{}.yml".format(basename)
+        with open(config_yml, "w") as f:
+            yaml.dump(config, f, default_flow_style=False, sort_keys=True)
+        logger.info("Save default config to: {}".format(config_yml))
         build(config)
         exit(0)
 

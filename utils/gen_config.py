@@ -80,8 +80,4 @@ def gen_default_config(onnx_file):
             "enable_dump": 0,
         }
     }
-    config_yml = "{}.yml".format(basename)
-    with open(config_yml, "w") as f:
-        yaml.dump(default_cfg, f, default_flow_style=False, sort_keys=True)
-    logger.info("Save default config to: {}".format(config_yml))
     return default_cfg
