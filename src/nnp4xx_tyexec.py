@@ -548,7 +548,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         span_infos = get_available_graph_spans(fuse_lib)
         spans_dict = dict()
         for item in span_infos:
-            print(item)
+            # print(item)
             spans_dict[item["name"]] = item["func_name"]
         _, _, _, fuse_outputs = layerwise_error.run(fuse_lib, inputs=data_fixed)
         logger.info("Step5 - inference tvm-fused finished, and time: {:.3f}s".format(time.time() - t))
