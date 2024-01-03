@@ -400,15 +400,20 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         compiled_model_MACs = 0
         for key in compiled_model_MACs_info:
             compiled_model_MACs += compiled_model_MACs_info[key]  # 工具链内乘加算1次
-        import tvm
-        estimate_origin_mod_FLOPs = get_method("tvm.contrib.{}".format(self.logo_module), "estimate_origin_mod_FLOPs")
-        original_model_MACs_info = estimate_origin_mod_FLOPs(self.relay)
-        original_model_MACs_total_info = original_model_MACs_info["total"]
-        original_model_MACs = 0
-        for key in original_model_MACs_total_info:
-            original_model_MACs += original_model_MACs_total_info[key]
-        logger.info("Original model MACs: {}".format(original_model_MACs))
         logger.info("Compiled model MACs: {}".format(compiled_model_MACs))
+        
+        # 非qnn模型估计原始模型的MACs
+        if not self.is_qnn:
+            import tvm
+            estimate_origin_mod_FLOPs = get_method("tvm.contrib.{}".format(self.logo_module), "estimate_origin_mod_FLOPs")
+            original_model_MACs_info = estimate_origin_mod_FLOPs(self.relay)
+            original_model_MACs_total_info = original_model_MACs_info["total"]
+            original_model_MACs = 0
+            for key in original_model_MACs_total_info:
+                original_model_MACs += original_model_MACs_total_info[key]
+            logger.info("Original model MACs: {}".format(original_model_MACs))
+        else:
+            logger.warning("Qnn model not support estimate MACs")
 
     def get_device_type(self):
         logger.warning("Nnp4xx not support get device type")
