@@ -117,6 +117,14 @@ build: {
   # 可空可缺省，表示默认使用cpu核心数，0表示不使用多线程
   multi_thread: ,
 
+  # 调度每个subgraph的运行时间阈值
+  # 可空可缺省，表示按照性能最好的方式切分子图
+  fuse_subgraph_ms_threshold: ,
+
+  # 配置cube数量，可选1/2/3
+  # 可空可缺省，表示3
+  num_cube: 3,
+
   # 量化配置参数，仅在enable_quant为true生效
   quant: {
     # 量化输入数据路径
@@ -163,14 +171,6 @@ build: {
     # 可空可缺省，表示禁用winograd
     # 目前由于支持不完善是临时可配，后期稳定后会移除
     disable_pass: [],
-
-    # 配置cube数量，可选1/2/3
-    # 可空可缺省，表示3
-    num_cube: 3,
-
-    # 调度每个subgraph的运行时间阈值
-    # 可空可缺省，表示按照性能最好的方式切分子图
-    fuse_subgraph_ms_threshold: ,
 
     # 校准方法 "kld", "min_max", "percentile_0.99..", "l2norm"
     # 不同的策略量化耗时有差异，由少到多"min_max"，"percentile_0.99.."，"kld"，"l2norm"
