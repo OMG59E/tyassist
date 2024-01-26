@@ -15,9 +15,8 @@ import importlib
 import logging
 import time
 import yaml
-from utils.gen_config import gen_default_config
 from prettytable import PrettyTable
-from utils import logger
+from utils import logger, set_logger_level, set_logger_handle
 from utils.glog_format import GLogFormatter
 from utils.parser import read_yaml_to_dict
 from utils.dist_metrics import cosine_distance
@@ -39,7 +38,7 @@ def set_logger(op, log_dir, filename):
     filepath = os.path.join(log_dir, "{}-{}-{}.log".format(filename, op, t))
     file_handler = logging.FileHandler(filepath)
     file_handler.setFormatter(GLogFormatter())
-    logger.addHandler(file_handler)
+    set_logger_handle(file_handler)
 
 
 def get_tyexec(cfg):
@@ -587,7 +586,7 @@ if __name__ == "__main__":
                         help="Please specify a onnx file")
     
     args = parser.parse_args()
-    logger.setLevel(args.log_level*10)
+    set_logger_level(args.log_level)
 
     dirname, filename = os.path.split(os.path.abspath(__file__))
     version_path = os.path.join(dirname, "version")
@@ -602,6 +601,7 @@ if __name__ == "__main__":
         basename, _ = os.path.splitext(os.path.basename(args.config))
         set_logger(args.type, args.log_dir, basename)
     elif "--onnx" in sys.argv and ("--config" not in sys.argv and "-c" not in sys.argv):
+        from utils.gen_config import gen_default_config
         # 简便方式快速编译，方便评估编译测试性能
         check_file_exist(args.onnx)
         basename, ext = os.path.splitext(os.path.basename(args.onnx))
