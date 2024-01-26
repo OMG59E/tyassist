@@ -117,7 +117,7 @@ build: {
   # 可空可缺省，表示默认使用cpu核心数，0表示不使用多线程
   multi_thread: ,
 
-  # 调度每个subgraph的运行时间阈值
+  # 调度每个subgraph的运行时间阈值，单位ms，大于0生效
   # 可空可缺省，表示按照性能最好的方式切分子图
   fuse_subgraph_ms_threshold: ,
 
