@@ -17,3 +17,13 @@ console_handler.setFormatter(GLogFormatterWithColor())
 
 logger.addHandler(console_handler)
 logger.setLevel(logging.INFO)
+
+
+def set_logger_level(level):
+    logger.setLevel(level*10)
+    
+
+def set_logger_handle(handle):
+    logger.addHandler(handle)
+
+
