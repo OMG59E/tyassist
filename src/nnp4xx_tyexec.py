@@ -243,7 +243,8 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 config["hardware.pe_num"] = num_cube
                 logger.info("hardware.pe_num: {}".format(num_cube))
             target_device = tvm.target.Target(
-                self.logo_module, host="{}_virtual_host".format(self.logo_module) if self.enable_dump != 0 else None)
+                # self.logo_module, host="{}_virtual_host".format(self.logo_module) if self.enable_dump != 0 else None)
+                self.logo_module, host="{}_virtual_host".format(self.logo_module))
 
             mods = optimize_and_compile(
                 self.relay_quant,
