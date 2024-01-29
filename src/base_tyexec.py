@@ -42,6 +42,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
 
         self.custom_preprocess_module = self.quant_cfg.get("custom_preprocess_module")
         self.custom_preprocess_cls = self.quant_cfg.get("custom_preprocess_cls")
+        self.custom_preprocess_quant_cls = None
+        self.custom_preprocess_similarity_cls = None
         
         self.framework = self.model_cfg["framework"]
         self.weight = self.model_cfg["weight"]
@@ -56,6 +58,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         self.disable_pass = self.quant_cfg.get("disable_pass")
         self.similarity_img_num = self.quant_cfg.get("similarity_img_num", 1)
         self.similarity_dataset = self.quant_cfg.get("similarity_dataset")
+        if not self.similarity_dataset:
+            self.similarity_dataset = self.quant_data_dir         
         
         self.relay_quant = None
         self.params_quant = None
@@ -215,8 +219,10 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             m = importlib.import_module(self.custom_preprocess_module)
             if hasattr(m, self.custom_preprocess_cls):
                 # 实例化预处理对象
-                self.custom_preprocess_cls = getattr(m, self.custom_preprocess_cls)(
+                self.custom_preprocess_quant_cls = getattr(m, self.custom_preprocess_cls)(
                     self.inputs, self.prof_img_num, self.quant_data_dir)
+                self.custom_preprocess_similarity_cls = getattr(m, self.custom_preprocess_cls)(
+                    self.inputs, self.similarity_img_num, self.similarity_dataset)
             else:
                 logger.error("{}.py has no class named {}".format(
                     self.custom_preprocess_module, self.custom_preprocess_cls))
@@ -226,35 +232,49 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
     def set_env():
         raise NotImplementedError
 
-    def _batch_preprocess(self):
+    def _batch_preprocess(self, data_dir, prof_img_num):
         assert len(self.inputs) == 1, "input_num must be = 1"
-        data_dir = self.quant_data_dir
         img_lists = os.listdir(data_dir)
-        for idx in range(self.prof_img_num):
+        for idx in range(prof_img_num):
             batch_img_lists = [
                 os.path.join(data_dir, img_lists[i]) for i in range(idx * self.bs, (idx + 1) * self.bs)]
             yield self.get_datas(
                 batch_img_lists, use_norm=False, force_cr=True, force_random=False, to_file=False)
 
-    def _gen_random_quant_data(self):
+    def _gen_random_quant_data(self, prof_img_num):
         np.random.seed(10086)
-        for _ in range(self.prof_img_num):
+        for _ in range(prof_img_num):
             yield self.get_datas(force_random=True)
             
     def get_dataset(self):
         if not self.quant_data_dir:
             # 未配置量化路径使用随机数据情况
-            dataset = self._gen_random_quant_data
+            dataset = self._gen_random_quant_data(self.prof_img_num)
         else:
             # 存在自定义预处理
             if self.has_custom_preprocess:
                 # 自定义处理
                 logger.info("There is a custom preprocess, the custom preprocess will be used")
-                dataset = self.custom_preprocess_cls.get_data
+                dataset = self.custom_preprocess_quant_cls.get_data
             else:
                 # 内置处理
-                dataset = self._batch_preprocess
+                dataset = self._batch_preprocess(self.quant_data_dir, self.prof_img_num)
         return dataset
+
+    def get_similarity_dataset(self):
+        if not self.similarity_dataset:
+            # 未配置量化路径使用随机数据情况
+            similarity_dataset = self._gen_random_quant_data(self.similarity_img_num)
+        else:
+            # 存在自定义预处理
+            if self.has_custom_preprocess:
+                # 自定义处理
+                logger.info("There is a custom preprocess, the custom preprocess will be used")
+                similarity_dataset = self.custom_preprocess_similarity_cls.get_data
+            else:
+                # 内置处理
+                similarity_dataset = self._batch_preprocess(self.similarity_dataset, self.similarity_img_num)
+        return similarity_dataset
 
     @staticmethod
     def check_not_exist(filepath):
@@ -335,6 +355,10 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 bs = n
                 ims = list()
                 for idx, data_path in enumerate(data_paths):
+                    if force_random:  # 用于量化和统计含零情况
+                        im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
+                        ims.append(im)
+                        continue
                     if data_path:  # 指定输入数据
                         # 检查data_path是否存在
                         if not os.path.exists(data_path):
@@ -351,10 +375,6 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                     # 未指定输入数据，生成随机图像
                     # TODO 需要处理量化和验证数据为同一批的问题
                     logger.warning("The input[{}] will use random image, recommend make user data!".format(name, idx))
-                    if force_random:  # 用于量化和统计含零情况
-                        im = np.random.randint(low=0, high=255, size=(h, w, c), dtype="uint8")
-                        ims.append(im)
-                        continue
                     random_im_path = os.path.join(self.result_dir, "{}_{}_random.jpg".format(idx, name.replace("/", "_")))
                     random_npy_path = os.path.join(self.result_dir, "{}_{}_random.npy".format(idx, name.replace("/", "_")))
                     if os.path.exists(random_npy_path):
@@ -401,40 +421,40 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 in_datas[name] = np.concatenate(datas, axis=0)
             else:  # 多输入or非图像数据or存在自定义情况
                 assert not enable_aipp, "non-image cannot enable AIPP"
-                exist = True  # 数据是否存在的标志
-                for data_path in data_paths:
-                    if not os.path.exists(data_path):
-                        exist = False
-                        break
-                if exist:  # 指定输入数据
-                    assert self.has_custom_preprocess, "Not set custom preprocess"
-                    in_datas[name] = self.custom_preprocess_cls.get_single_data(data_paths, idx, use_norm)
-                    self.check_dtype(name, in_datas[name], "float32" if use_norm else dtype)
-                else:  # 未指定输入数据
-                    logger.warning("The input[{}] will use random data, recommend make user data!".format(name))
-                    if force_random:  # 用于量化和统计含零情况
-                        in_datas[name] = self._gen_random_data(shape, layout, dtype)
-                    else:
+                if force_random:  # 用于量化和统计含零情况
+                    in_datas[name] = self._gen_random_data(shape, layout, dtype)
+                else:
+                    exist = True  # 数据是否存在的标志
+                    for data_path in data_paths:
+                        if not os.path.exists(data_path):
+                            exist = False
+                            break
+                    if exist:  # 指定输入数据
+                        assert self.has_custom_preprocess, "Not set custom preprocess"
+                        in_datas[name] = self.custom_preprocess_cls.get_single_data(data_paths, idx, use_norm)
+                        self.check_dtype(name, in_datas[name], "float32" if use_norm else dtype)
+                    else:  # 未指定输入数据
+                        logger.warning("The input[{}] will use random data, recommend make user data!".format(name))
                         if os.path.exists(data_npy_path):
                             in_datas[name] = np.load(data_npy_path)
                             to_file = False
                         else:
                             in_datas[name] = self._gen_random_data(shape, layout, dtype)     
-                    if use_norm:  
-                        mean, std = _input["mean"], _input["std"]
-                        in_datas[name] = in_datas[name].astype(dtype)
-                        if mean:
-                            if layout in ["NHWC", "NCHW"]:
-                                dim = in_datas[name].shape[1]
-                                mean_shape = [1, dim, 1, 1]
-                            else:
-                                norm_axis = _input["norm_axis"]
-                                dim = in_datas[name].shape[norm_axis]
-                                mean_shape = [1 for _ in range(len(shape))]
-                                mean_shape[norm_axis] = dim
-                            mean = np.array(mean, dtype=np.float32).reshape(mean_shape)
-                            std = np.array(std, dtype=np.float32).reshape(mean_shape)
-                            in_datas[name] = (in_datas[name] - mean) / std
+                        if use_norm:  
+                            mean, std = _input["mean"], _input["std"]
+                            in_datas[name] = in_datas[name].astype(dtype)
+                            if mean:
+                                if layout in ["NHWC", "NCHW"]:
+                                    dim = in_datas[name].shape[1]
+                                    mean_shape = [1, dim, 1, 1]
+                                else:
+                                    norm_axis = _input["norm_axis"]
+                                    dim = in_datas[name].shape[norm_axis]
+                                    mean_shape = [1 for _ in range(len(shape))]
+                                    mean_shape[norm_axis] = dim
+                                mean = np.array(mean, dtype=np.float32).reshape(mean_shape)
+                                std = np.array(std, dtype=np.float32).reshape(mean_shape)
+                                in_datas[name] = (in_datas[name] - mean) / std
             # 更新保存路径
             if use_norm:
                 dtype = "float32"

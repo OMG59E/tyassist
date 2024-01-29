@@ -119,14 +119,14 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 self.relay,
                 self.params,
                 model_name="opt_ir",
-                dataset=self.get_dataset(),
+                dataset=self.get_dataset,
                 prof_img_num=self.prof_img_num,
                 rgb_en=1 if (self.num_inputs == 1 and self.inputs[0]["pixel_format"] == "RGB") else 0,
                 norm=norm if len(norm) > 0 else None,
                 quantize_config=quantize_config,
                 debug_level=self.quant_debug_level,
                 similarity_img_num=self.similarity_img_num,
-                similarity_dataset=self.similarity_dataset,
+                similarity_dataset=self.get_similarity_dataset,
                 save_dir=self.result_dir,
             )
             logger.info("################   quantization end  ######################")
