@@ -510,7 +510,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         new_skip_layer_idxes = list()
         range_list_str = ""
         for idx in range(len(skip_layer_idxes)):
-            if isinstance(skip_layer_idxes[idx], tuple):
+            if isinstance(skip_layer_idxes[idx], list):
                 assert len(skip_layer_idxes[idx]) == 2
                 t_start = skip_layer_idxes[idx][0]
                 t_end = skip_layer_idxes[idx][1]
@@ -522,7 +522,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                 new_skip_layer_idxes.append(skip_layer_idxes[idx])
         
         if range_list_str:
-            quantize_config["float_list"].appned(range_list_str)
+            quantize_config["float_list"].append(range_list_str)
         if skip_layer_idxes:
             quantize_config["float_list"].extend(new_skip_layer_idxes)
         if skip_layer_types:
@@ -530,7 +530,6 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         if skip_layer_names:
             quantize_config["float_list"].extend(skip_layer_names)
         logger.info("quantize_config: {}".format(quantize_config))
-        exit(-1)
         return quantize_config, norm
 
     @staticmethod
