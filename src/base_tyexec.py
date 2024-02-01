@@ -506,13 +506,31 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         skip_layer_idxes = self.quant_cfg.get("skip_layer_idxes", list())
         skip_layer_types = self.quant_cfg.get("skip_layer_types", list())
         skip_layer_names = self.quant_cfg.get("skip_layer_names", list())
+        
+        new_skip_layer_idxes = list()
+        range_list_str = ""
+        for idx in range(len(skip_layer_idxes)):
+            if isinstance(skip_layer_idxes[idx], tuple):
+                assert len(skip_layer_idxes[idx]) == 2
+                t_start = skip_layer_idxes[idx][0]
+                t_end = skip_layer_idxes[idx][1]
+                if not range_list_str:
+                    range_list_str = "range_{}_{}".format(t_start, t_end)
+                else:
+                    range_list_str += "_{}_{}".format(t_start, t_end)
+            else:
+                new_skip_layer_idxes.append(skip_layer_idxes[idx])
+        
+        if range_list_str:
+            quantize_config["float_list"].appned(range_list_str)
         if skip_layer_idxes:
-            quantize_config["float_list"].extend(skip_layer_idxes)
+            quantize_config["float_list"].extend(new_skip_layer_idxes)
         if skip_layer_types:
             quantize_config["float_list"].extend(skip_layer_types)
         if skip_layer_names:
             quantize_config["float_list"].extend(skip_layer_names)
         logger.info("quantize_config: {}".format(quantize_config))
+        exit(-1)
         return quantize_config, norm
 
     @staticmethod

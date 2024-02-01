@@ -177,6 +177,7 @@ build: {
     calib_method: "l2norm",
 
     # 可配置为op的索引，可单个配置也可组成list
+    # 支持按range设置量化，例子：[(1, 10), 13, 15, ...]，(1, 10)表示将索引1-10的op设置为fp16
     skip_layer_idxes: [ ],
 
     # 可配置为op的类型，可单个配置也可组成list
