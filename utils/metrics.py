@@ -274,7 +274,7 @@ def coco_eval(pred_json, anno_json, image_ids, iou_type="bbox"):
         cocoGt = COCO(anno_json)  # init annotations api
         pred = cocoGt.loadRes(pred_json)  # init predictions api
         eval = COCOeval(cocoGt, pred, iou_type)
-        eval.params.imgIds = cocoGt.getImgIds()  # image IDs to evaluate
+        eval.params.imgIds = image_ids  # cocoGt.getImgIds()  # image IDs to evaluate
         eval.evaluate()
         eval.accumulate()
         eval.summarize()
