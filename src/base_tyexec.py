@@ -254,8 +254,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             # 存在自定义预处理
             if self.has_custom_preprocess:
                 # 自定义处理
-                logger.info("There is a custom preprocess, the custom preprocess will be used")
-                dataset = self.custom_preprocess_quant_cls.get_data
+                logger.info("Found a custom preprocess, the custom preprocess will be used")
+                dataset = self.custom_preprocess_quant_cls.get_data()
             else:
                 # 内置处理
                 dataset = self._batch_preprocess(self.quant_data_dir, self.prof_img_num)
@@ -269,8 +269,8 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             # 存在自定义预处理
             if self.has_custom_preprocess:
                 # 自定义处理
-                logger.info("There is a custom preprocess, the custom preprocess will be used")
-                similarity_dataset = self.custom_preprocess_similarity_cls.get_data
+                logger.info("Found a custom preprocess, the custom preprocess will be used")
+                similarity_dataset = self.custom_preprocess_similarity_cls.get_data()
             else:
                 # 内置处理
                 similarity_dataset = self._batch_preprocess(self.similarity_dataset, self.similarity_img_num)
@@ -431,7 +431,7 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
                             break
                     if exist:  # 指定输入数据
                         assert self.has_custom_preprocess, "Not set custom preprocess"
-                        in_datas[name] = self.custom_preprocess_cls.get_single_data(data_paths, idx, use_norm)
+                        in_datas[name] = self.custom_preprocess_quant_cls.get_single_data(data_paths, idx, use_norm)
                         self.check_dtype(name, in_datas[name], "float32" if use_norm else dtype)
                     else:  # 未指定输入数据
                         logger.warning("The input[{}] will use random data, recommend make user data!".format(name))
