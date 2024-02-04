@@ -600,7 +600,7 @@ if __name__ == "__main__":
         check_file_exist(args.config)
         basename, _ = os.path.splitext(os.path.basename(args.config))
         set_logger(args.type, args.log_dir, basename)
-    elif "--onnx" in sys.argv and ("--config" not in sys.argv and "-c" not in sys.argv):
+    elif "--onnx" in sys.argv and ("--config" not in sys.argv and "-c" not in sys.argv and "build" in sys.argv):
         from utils.gen_config import gen_default_config
         # 简便方式快速编译，方便评估编译测试性能
         check_file_exist(args.onnx)
