@@ -288,7 +288,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
         relay_mac_num = count_mac(self.relay)
         relay_quant_mac_num = count_mac(self.relay_quant)
         logger.info("Original model MACs: {}".format(relay_mac_num))
-        logger.info("Quantified model MACs: {}".format(relay_quant_mac_num))
+        logger.info("Compiled model MACs: {}".format(relay_quant_mac_num))
 
     def get_profile_info(self):
         # 不执行iss仿真无法输出graph.json
