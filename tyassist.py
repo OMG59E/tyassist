@@ -611,6 +611,8 @@ if __name__ == "__main__":
         set_logger(args.type, args.log_dir, basename)
         config = gen_default_config(args.onnx)
         config["build"]["opt_level"] = 0 if args.opt_level is None else 2
+        if args.target:
+            config["build"]["target"] = args.target
         config_yml = "{}.yml".format(basename)
         with open(config_yml, "w") as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=True)
