@@ -45,7 +45,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 model_name="opt_ir",
                 # 用户使用云天自带的预处理时，配置为输入量化profile(统计模型的层分布用来 calibrate 生成 scale)
                 # 的图片集路径，支持图片格式为 jpg，jpeg，png，bmp。也可配置为用户自定义的预处理。类型str/generator
-                dataset=self.get_dataset(),
+                dataset=self.get_dataset,
                 # 使用校准数据数量
                 prof_img_num=self.prof_img_num,
                 # 此配置仅在 dataset 配置为图片集路径（即使用云天自带的预处理），且输入为3通道时有效，对生成芯片模型无效
@@ -60,7 +60,7 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
                 similarity_img_num=self.similarity_img_num,
                 # 进行相似度比对的输入数据，配置为None，则默认取前述dataset接口表示的输入。
                 # 具体配置参照dataset，可定义为图片集路径，或用户自定义的预处理。
-                similarity_dataset=self.similarity_dataset,
+                similarity_dataset=self.get_similarity_dataset,
                 # 用来保存
                 # 1. /fp32/output_tensors.params和quant/output_tensors.params 表示dump每一层浮点和定点的数据
                 # 2. "model_name" /opt_ir.pdf 表示optimize之后模型的拓扑结构
