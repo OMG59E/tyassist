@@ -83,9 +83,9 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
         if self.custom_op_module is not None:
             logger.info(self.custom_op_module)
             custom_op_module = importlib.import_module(self.custom_op_module)
-            from_onnx = get_method("tvm.contrib.{}.relay.frontend.onnx".format(self.logo_module), "from_onnx")
-            self.relay, self.params = from_onnx(onnx.load(self.weight), shape=self.shape_dict, **kwargs)
-            return
+            # from_onnx = get_method("tvm.contrib.{}.relay.frontend.onnx".format(self.logo_module), "from_onnx")
+            # self.relay, self.params = from_onnx(onnx.load(self.weight), shape=self.shape_dict, **kwargs)
+            # return
         load_model_from_file = get_method("tvm.contrib.{}".format(self.logo_module), "load_model_from_file")
         self.relay, self.params = load_model_from_file(self.weight, "onnx", self.shape_dict, **kwargs)
 
@@ -131,7 +131,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             )
             logger.info("################   quantization end  ######################")
             self.save_relay_to_json(self.quant_json_path, self.relay_quant, self.params_quant)
-            # self.save_relay_to_model(self.quant_json_path, self.relay_quant, self.params_quant)
+            self.save_relay_to_model(self.quant_model_path, self.relay_quant, self.params_quant)
         else:
             self.relay_quant = self.load_relay_from_json(self.quant_json_path)
         self.quantization_span = time.time() - t_start
@@ -168,6 +168,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
                 cc_options.append(f"-I{cand}/3rdparty/dlpack/include")
                 cc_options.append(f"-I{cand}/3rdparty/dmlc-core/include")
         if save_path:
+            logger.info("save compiled model to {}".format(save_path))
             lib.export_library(save_path, addons=addons, options=cc_options)
         return lib
 
@@ -184,7 +185,7 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
             cpu_lib = Nnp4xxTyExec.compile_extern_lib(relay_func, cpu_lib, save_path)
             # if save_path:
             #     cpu_lib.export_library(save_path)
-            cpu_lib = tvm.runtime.load_module(save_path)
+            # cpu_lib = tvm.runtime.load_module(save_path)
             module = graph_executor.GraphModule(cpu_lib["default"](tvm.cpu()))
             return module
         except Exception as e:
@@ -425,9 +426,10 @@ class Nnp4xxTyExec(BaseTyExec, ABC):
     def get_profile_info(self):
         pass
 
-    @staticmethod
-    def save_relay_to_model(quant_model_path, relay_func, params):
-        logger.warning("Not support save relay to model, can be visualized by netron")
+    def save_relay_to_model(self, model_path, relay_func, params):
+        relay_exporter = get_method("tvm.contrib.{}.utils.export_relay_to_onnx".format(self.logo_module), "RelayExporter")
+        relay_exporter().save(relay_func, params, model_path)
+        logger.info("Save model to {}, can be visualized by netron".format(model_path))
 
     @staticmethod
     def get_spans(graph_json: dict):
