@@ -264,11 +264,10 @@ class Nnp3xxTyExec(BaseTyExec, ABC):
             logger.warning("disable build")
         self.build_span = time.time() - t_start
 
-    @staticmethod
-    def save_relay_to_model(quant_model_path, relay_func, params):
+    def save_relay_to_model(self, model_path, relay_func, params):
         from tvm.contrib.export import RelayExporter
-        RelayExporter().save(relay_func, quant_model_path, params)  # 生成Netron模型可视化文件
-        logger.info("save quant model to {}".format(quant_model_path))
+        RelayExporter().save(relay_func, model_path, params)  # 生成Netron模型可视化文件
+        logger.info("Save quant model to {}, can be visualized by netron".format(model_path))
 
     def get_version(self):
         try:

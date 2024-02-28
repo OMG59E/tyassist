@@ -80,12 +80,12 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
             os.makedirs(self.result_dir)
         
         logger.info("model output dir -> {}".format(self.model_dir))
-        self.quant_json_path = os.path.join(self.result_dir, "model_quant.json")
-        self.quant_model_path = os.path.join(self.result_dir, "model_quant.model")
-        self.original_json_path = os.path.join(self.result_dir, "model_original.json")
-        self.original_model_path = os.path.join(self.result_dir, "model_original.model")
-        self.cpu_model_float_path = os.path.join(self.model_dir, "cpu_model_float.ty")
-        self.cpu_model_fixed_path = os.path.join(self.model_dir, "cpu_model_fixed.ty")
+        self.quant_json_path = os.path.join(self.result_dir, "quantified.json")
+        self.quant_model_path = os.path.join(self.result_dir, "quantified.onnx")
+        self.original_json_path = os.path.join(self.result_dir, "frontend.json")
+        self.original_model_path = os.path.join(self.result_dir, "frontend.onnx")
+        self.cpu_model_float_path = os.path.join(self.model_dir, "frontend.ty")
+        self.cpu_model_fixed_path = os.path.join(self.model_dir, "quantified.ty")
 
         self.shape_dict = dict()
         self.dtype_dict = dict()
@@ -545,10 +545,9 @@ class BaseTyExec(object, metaclass=abc.ABCMeta):
         tvm.relay.quantization.save_ir_to_json(quant_json_path, relay_func, params)
         logger.info("save relay to {}".format(quant_json_path))
 
-    @staticmethod
-    def save_relay_to_model(quant_model_path, relay_func, params):
+    def save_relay_to_model(self, model_path, relay_func, params):
         """ save relay to model, can be visualized by netron
-        @param quant_model_path:
+        @param model_path:
         @param relay_func:
         @param params:
         @return:
